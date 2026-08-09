@@ -46,4 +46,24 @@ export class GatesProbeController {
   moduleMap(@Param('businessId') businessId: string) {
     return { data: { ok: true as const, gate: 'module.map', businessId } };
   }
+
+  @Post('module-org-chart')
+  @RequireModule(EntitlementCodes.ModuleOrgChart)
+  @ApiOperation({ summary: 'Probe: require module.org_chart' })
+  @ApiOkResponse({ description: 'Allowed' })
+  moduleOrgChart(@Param('businessId') businessId: string) {
+    return {
+      data: { ok: true as const, gate: 'module.org_chart', businessId },
+    };
+  }
+
+  @Post('module-timeline')
+  @RequireModule(EntitlementCodes.ModuleTimeline)
+  @ApiOperation({ summary: 'Probe: require module.timeline' })
+  @ApiOkResponse({ description: 'Allowed' })
+  moduleTimeline(@Param('businessId') businessId: string) {
+    return {
+      data: { ok: true as const, gate: 'module.timeline', businessId },
+    };
+  }
 }
