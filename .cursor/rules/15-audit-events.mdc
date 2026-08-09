@@ -1,0 +1,43 @@
+# Audit events (Permanent)
+
+## Law
+
+Security- and workflow-sensitive actions append an **`audit_events`** row (PostgreSQL). Never soft-delete audit rows. Never log secrets (OTP, tokens, raw license keys, payment card data).
+
+## Locked actions (codes)
+
+| Action | When | `businessId` |
+| --- | --- | --- |
+| `auth.login` | OTP verify success | `null` |
+| `business.create` | Business created | set |
+| `business.delete` | Business soft-deleted | set |
+| `billing.payment.succeeded` | Payment verified → paid | set |
+| `billing.license.activated` | SELF_HOSTED install license activated | `null` |
+| `export.pdf.enqueued` | PDF export job queued | set |
+| `document.delete` | Document soft-deleted | set |
+| `document.workflow.submit` | draft → review | set |
+| `document.workflow.approve` | review → approved | set |
+| `document.workflow.reject` | review → draft | set |
+| `document.workflow.publish` | approved → published | set |
+| `document.workflow.unpublish` | published → draft | set |
+| `document.workflow.reopen` | approved → draft | set |
+| `workspace.backup.completed` | Backup ZIP built | set |
+| `workspace.restore.completed` | Restore applied | set |
+
+Canonical codes: `AuditActions` in `@vdb/shared-types`.
+
+## Shape
+
+- Columns: `business_id?`, `user_id?`, `action`, `entity_type`, `entity_id?`, `meta` JSONB, `created_at`
+- Always set `businessId` for tenant-scoped entities
+- `meta` holds non-sensitive context (`from`, `to`, `note`, `amount`, `documentId`, …)
+- Writers must not fail the primary write path (`AuditService.log` swallows errors)
+
+## List API (Owner UI)
+
+- `GET /api/businesses/:businessId/audit-events` — JWT + **OWNER/ADMIN** only
+- Always constrain to the path business: rows with `businessId = :businessId`, plus **safe** install/user-scoped rows:
+  - `auth.login` where `businessId IS NULL` and `userId` is a **member** of that business
+  - `billing.license.activated` where `businessId IS NULL` (install-wide; no other-business entities)
+- Never return another business’s `businessId` rows
+- Filters: `action`, `entityType`, `from` / `to` (ISO date), pagination

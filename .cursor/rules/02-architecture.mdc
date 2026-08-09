@@ -50,6 +50,8 @@ Rendering: `Document JSON` (Mongo) → HTML/CSS canonical → ExportJob (Redis q
 
 Never call PDF renderer on the interactive request path for every editor keystroke.
 
+**Non-goal (current version):** DOCX/PPTX Office export — see ADR 025. Do not fork a second layout engine for Word/PowerPoint without product unlock.
+
 ## Domain modules (Nest modules)
 
 - `IdentityModule` — User, OTP

@@ -36,8 +36,8 @@ Do not ship Editor without Feature Gate.
 ## Phase exit E2E (Core+)
 
 - Runnable edition funnels live under `scripts/e2e/` (API-first; Playwright UI optional).
-- Acceptance checklists live under `docs/qa/` (`phase-01-saas-acceptance.md`, self-hosted counterpart, `phase-02-corporate-acceptance.md`).
-- Prefer `npm run test:e2e:saas` / `npm run test:e2e:self-hosted` / `npm run test:e2e:corporate` over undocumented manual-only gates.
+- Acceptance checklists live under `docs/qa/` (`phase-01-saas-acceptance.md`, self-hosted counterpart, `phase-02-corporate-acceptance.md`, `phase-03-professional-acceptance.md`).
+- Prefer `npm run test:e2e:saas` / `npm run test:e2e:self-hosted` / `npm run test:e2e:corporate` / `npm run test:e2e:professional` over undocumented manual-only gates.
 
 ## Git
 

@@ -22,7 +22,7 @@ alwaysApply: true
 - Theme preference persistence (foundation): cookie `vdb-theme` (`light` | `dark` | `system`) — avoid FOUC; user-settings API may sync later.
 - Support **RTL for `fa`** and **LTR for `en`** at the document/app shell level (`dir` + layout).
 - API user-facing error `message` should be localizable (return `code` + optional localized message, or let client map `code` → i18n).
-- Document content language (company profile FA/EN) is a domain feature; UI chrome i18n is mandatory regardless.
+- **Document content language** (Business data FA/EN + `documents.locale`) is a **domain feature**, separate from UI chrome — see ADR 015. Columns hold default `fa`; `translations` JSONB holds other locales. Export `dir`/`lang` follow document locale, not the Next.js UI locale.
 
 ## Definition of Done add-ons
 

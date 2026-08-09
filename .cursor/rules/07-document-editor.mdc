@@ -9,8 +9,10 @@ alwaysApply: true
 
 - **Data** (Business entities) ≠ **Template** (layout, tokens, blocks, bindings) ≠ **Document** (instance: data refs + template + page config).
 - Bindings use explicit placeholders (e.g. `{{business.name}}`, repeaters for collections).
-- Collection repeater (`repeater` block): loops PG Business data with `{{item.*}}` — see ADR 013 (no advanced formulas in Phase 02).
+- Collection repeater (`repeater` block): loops PG Business data with `{{item.*}}` — see ADR 013.
+- Advanced bindings / simple formulas: `{{count(source)}}`, `{{count(source where field=value)}}` — **whitelist parser only, never eval** — see ADR 016.
 - Conditional visibility: optional `when` on blocks (`exists` | `empty` | `eq` on `collection.<source>`) evaluated at preview + PDF — see ADR 014 (no rule-engine trees in Phase 02).
+- Document locale (`fa`|`en` on PG + Mongo body): preview/PDF `dir`/`lang` and localized collection strings — see ADR 015 (separate from UI chrome i18n).
 
 ## Editor UX rules
 
@@ -22,15 +24,20 @@ alwaysApply: true
 - Block reorder = vertical flow DnD only (e.g. dnd-kit sortable) — not x/y free placement.
 - Editor lives under `apps/web/src/features/editor/`; open route `/app/documents/[documentId]`.
 - Mutating editor actions respect subscription `writable` (disable UI; API still gates).
+- **Published body lock (ADR 020 / 021):** while document `status` is `review`, `approved`, or `published`, editor must not autosave body mutations; return to `draft` via reject/unpublish/reopen before editing. Server rejects silent body overwrite.
+- **Approval workflow (ADR 021):** Draft → Review → Approved → Published; OWNER/ADMIN approve/publish; final PDF only for Approved/Published.
+- **Comments (ADR 022):** PG comments anchored to optional `pageId`/`blockId`; resolve; no mentions in MVP.
 
 ## Pagination & print
 
 - Master header/footer and page numbers are first-class (`masters[]` + `pages[].masterId` in document-schema v3).
 - HTML preview and PDF final render share the same order: resolve master → header → page body → footer → page number.
 - `headerSlot` / `footerSlot` in flow are markers only; repeating chrome comes from the assigned master.
-- Smart breaks: avoid orphan titles; support keep-with-next where modeled.
+- Smart breaks: `breakRules` on blocks + shared `paginateDocumentBody` (estimate packer) for preview **and** PDF — see ADR 017. Preview is approximate; PDF adds CSS break hints. No absolute canvas.
+- Interactive PDF: optional block `link` (external / email / phone / internal `#h-{id}`); TOC entries are anchors; Chromium PDF outline via Playwright `outline`+`tagged` — see ADR 018.
 - Print presets (A4/A3/…, DPI tiers) live in export config, not hardcoded in Next.js UI components.
 - Auto TOC (`toc` block): entries from section/text headings; page numbers = logical `pages[]` index — see ADR 012 (not Chromium print-sheet pages).
+- **Non-goal (current version):** DOCX / PPTX (or other Office) export from Document JSON — Phase 03 spike **Won't**; primary final export remains PDF. See ADR 025 + `docs/spikes/docx-pptx-p03-t11.md`. Do not add half-gated `export.docx` routes without a funded renderer track.
 
 ## Assets
 

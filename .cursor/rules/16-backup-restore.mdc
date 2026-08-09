@@ -1,0 +1,48 @@
+# Business Backup / Restore (Permanent)
+
+## Law
+
+A Business Owner can **export** a versioned ZIP of that Business’s workspace data and **restore** it into a target Business with an explicit confirm step. Never silent overwrite. Never include secrets, OTPs, license keys, or payment card data.
+
+## Package format
+
+| Field | Value |
+| --- | --- |
+| Kind | `vdb.business-backup` |
+| `formatVersion` | `1` (bump on incompatible layout) |
+| Container | ZIP |
+| Storage key (completed backup) | `{businessId}/backups/{jobId}/package.zip` |
+| Storage key (uploaded restore) | `{businessId}/restores/{jobId}/package.zip` |
+
+ZIP layout (v1):
+
+```text
+manifest.json
+pg.json          # tenant content tables (arrays)
+mongo.json       # template_bodies, document_bodies, document_version_bodies
+files/media/{assetId}/original[.ext]
+files/media/{assetId}/thumb|web|print   # optional derivatives
+files/fonts/{fontId}/original[.ext]
+```
+
+## Included / excluded
+
+**Include:** design themes, fonts (+ binaries), media (+ binaries), templates + Mongo bodies, documents + versions + comments + Mongo bodies, content entities (projects, team, branches, galleries, locations, timeline, services, clients, certificates).
+
+**Exclude:** users, memberships, subscriptions, invoices, payments, audit_events, export_jobs, import_jobs, installation license, OTP/JWT secrets.
+
+## Gates
+
+- **OWNER only** (`TenancyService.assertOwner`) + JWT + `@RequireWritable` (subscription writable + SELF_HOSTED license via EntitlementGuard).
+- List/download scoped by path `businessId`.
+
+## Restore safety
+
+1. Upload → parse → **preview** (counts, formatVersion, source name). Status `uploaded`.
+2. Commit requires explicit call; if target has existing workspace content and `confirmReplace !== true` → **409** `BACKUP_RESTORE_TARGET_NOT_EMPTY`.
+3. With `confirmReplace: true`, soft-delete existing included entities for that business and remove Mongo bodies, then insert remapped rows (new IDs; `businessId` = target).
+4. Jobs via BullMQ (`backup.workspace` / `restore.workspace`); HTTP handlers stay fast.
+
+## Editions
+
+Same in `SELF_HOSTED` and `SAAS`. Platform-wide DB dumps are ops/deploy concern — see `docs/deploy/`.

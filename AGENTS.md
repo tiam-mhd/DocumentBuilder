@@ -33,7 +33,9 @@ You are working in **Visual Document Builder** (VDB).
 | `12-design-themes.mdc` | Document brand tokens vs app chrome dark/light |
 | `13-templates-blocks.mdc` | Template PG+Mongo split + core block registry |
 | `14-content-entities.mdc` | Corporate content (Projects…) + `module.*` gates |
+| `15-audit-events.mdc` | Append-only audit_events for workflow/security |
+| `16-backup-restore.mdc` | Business ZIP backup/restore (OWNER, no silent overwrite) |
 
-Phase exit QA: `docs/qa/` + `scripts/e2e/` (phase-01 edition funnels + `phase-02-corporate-acceptance` / `npm run test:e2e:corporate`).
+Phase exit QA: `docs/qa/` + `scripts/e2e/` (phase-01 edition funnels + `phase-02-corporate-acceptance` / `npm run test:e2e:corporate` + `phase-03-professional-acceptance` / `npm run test:e2e:professional`).
 
 If a user request conflicts with these rules, refuse the conflicting part and propose a compliant design.

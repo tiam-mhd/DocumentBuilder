@@ -4,6 +4,17 @@
 
 Sellable **corporate content** entities (Projects, Team, Gallery, …) live in Nest `ContentModule`, are **PostgreSQL** tenant tables (`business_id` + soft-delete), and are gated server-side — never UI-only.
 
+## Content locale / translations (ADR 015)
+
+| Concern | Rule |
+| --- | --- |
+| Default language | Canonical string columns = **`fa`** |
+| Other locales | JSONB `translations` — MVP shape `{ "en": { "<field>": "…" } }` |
+| Tables (MVP) | `projects`, `project_categories`, `team_members`, `branches`, `business_services`, `clients`, `certificates`, `timeline_events` |
+| Resolve | `pickLocalized` — non-fa uses translation with **fallback to column** |
+| Document | `documents.locale` + Mongo `DocumentBody.locale` drive PDF `dir`/`lang` and collection `?locale=` |
+| Not here | UI chrome next-intl (`10-theme-and-i18n.mdc`); galleries/locations without translations in MVP |
+
 ## Projects / Portfolio (`module.projects`)
 
 | Concern | Rule |
@@ -17,6 +28,20 @@ Sellable **corporate content** entities (Projects, Team, Gallery, …) live in N
 | Status | `draft` \| `published` \| `archived` |
 | API | `/api/businesses/:businessId/projects` (+ `/project-categories`) |
 | Mutate + list | `EntitlementGuard` + `@RequireModule('module.projects')` |
+
+## Content import Excel/CSV (Phase 03)
+
+| Concern | Rule |
+| --- | --- |
+| MVP entity | **Projects** only — see ADR 019 |
+| Entitlement | Same as Projects: `@RequireModule('module.projects')` + `@RequireWritable` |
+| Table | PostgreSQL `import_jobs` (`business_id`, status, mapping/preview/result JSON) |
+| Temp file | ObjectStorage `{businessId}/imports/{importId}/original.{csv\|xlsx}` |
+| Flow | Upload → map columns → preview → transactional commit (valid rows) |
+| Large files | BullMQ queue `import.content` when row count &gt; `IMPORT_SYNC_MAX_ROWS` |
+| Limits | `IMPORT_MAX_BYTES`, `IMPORT_MAX_ROWS` (env) |
+| API | `/api/businesses/:businessId/imports/...` |
+| Non-goal | Auto-create categories/locations; other entities until product unlocks |
 
 ## Team members + Branches (foundational Business Data)
 

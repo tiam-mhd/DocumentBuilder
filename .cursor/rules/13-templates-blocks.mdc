@@ -66,7 +66,7 @@ Unknown block types must **fail safely** at validate/render (reject or skip with
 | --- | --- |
 | Entitlement | Source-dependent: `projects` → `module.projects`; `timelineEvents` → `module.timeline`; else foundational |
 | Props | `source`, `limit`, `emptyMessage`; **children** = card template |
-| Binding | `{{item.<key>}}` only (ADR 013) — no formulas |
+| Binding | `{{item.<key>}}` (ADR 013) + document-level `{{business.name}}` / `{{count(...)}}` (ADR 016) — no eval |
 | API | `GET .../collections/:source` for preview; export resolves same data |
 | Nested | Nested `repeater` unsupported in MVP |
 
@@ -101,3 +101,16 @@ Bump `DOCUMENT_SCHEMA_VERSION` / template schema in `packages/document-schema` o
 | Body | MongoDB `document_bodies` | Validated `DocumentBody` with `businessId` + `documentId`; may hold `dataRefs` (not template content) |
 
 Create-from-template **copies** block structure into the document body (snapshot). Later template edits do not mutate existing documents. Soft-delete: PG `deleted_at`; Mongo body removed (restore = recreate / future recycle bin).
+
+## Document versions (Phase 03)
+
+| Concern | Rule |
+| --- | --- |
+| Metadata | PostgreSQL `document_versions` (`business_id`, `document_id`, `version_number`, `source`) |
+| Body snapshot | MongoDB `document_version_bodies` — immutable copy; always filter `businessId` |
+| Create | Auto on **publish**; manual `POST .../versions` |
+| Published lock | `PATCH` body while `status` ∈ `review\|approved\|published` → conflict lock code (ADR 020/021) |
+| Restore / clone | Restore → current body + draft; clone → **new** document |
+| Compare MVP | Metadata/stats only — see ADR 020 |
+| Approval | State machine draft→review→approved→published — see ADR 021; PDF export only approved/published |
+| Comments | PG `document_comments` — see ADR 022; resolve; mentions out of MVP |
