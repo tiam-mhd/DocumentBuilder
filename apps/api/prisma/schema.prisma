@@ -1,0 +1,376 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum SubscriptionStatus {
+  trial
+  active
+  grace
+  expired
+  pending_payment
+}
+
+enum InvoiceStatus {
+  open
+  paid
+  void
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  failed
+  canceled
+}
+
+enum PaymentProvider {
+  fake
+  zarinpal
+}
+
+model User {
+  id            String               @id @default(cuid())
+  mobile        String               @unique
+  trialConsumed Boolean              @default(false) @map("trial_consumed")
+  createdAt     DateTime             @default(now()) @map("created_at")
+  updatedAt     DateTime             @updatedAt @map("updated_at")
+  memberships   BusinessMembership[]
+
+  @@map("users")
+}
+
+model Business {
+  id           String               @id @default(cuid())
+  name         String
+  createdAt    DateTime             @default(now()) @map("created_at")
+  updatedAt    DateTime             @updatedAt @map("updated_at")
+  deletedAt    DateTime?            @map("deleted_at")
+  memberships  BusinessMembership[]
+  subscription Subscription?
+  invoices     Invoice[]
+  payments     Payment[]
+  mediaAssets  MediaAsset[]
+  fontFaces    FontFace[]
+  designThemes DesignTheme[]
+  templates    DocumentTemplate[]
+  documents    Document[]
+  exportJobs   ExportJob[]
+
+  @@map("businesses")
+}
+
+model BusinessMembership {
+  id         String         @id @default(cuid())
+  businessId String         @map("business_id")
+  userId     String         @map("user_id")
+  role       MembershipRole @default(MEMBER)
+  createdAt  DateTime       @default(now()) @map("created_at")
+  updatedAt  DateTime       @updatedAt @map("updated_at")
+  business   Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, userId])
+  @@index([userId])
+  @@index([businessId])
+  @@map("business_memberships")
+}
+
+model Plan {
+  id               String         @id @default(cuid())
+  code             String         @unique
+  nameKey          String         @map("name_key")
+  descriptionKey   String         @map("description_key")
+  priceMonthly     Int            @map("price_monthly")
+  currency         String         @default("IRR")
+  baseEntitlements Json           @map("base_entitlements")
+  isActive         Boolean        @default(true) @map("is_active")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+  planModules      PlanModule[]
+  subscriptions    Subscription[]
+
+  @@map("plans")
+}
+
+model CatalogModule {
+  id             String               @id @default(cuid())
+  code           String               @unique
+  nameKey        String               @map("name_key")
+  descriptionKey String               @map("description_key")
+  priceMonthly   Int                  @map("price_monthly")
+  currency       String               @default("IRR")
+  isActive       Boolean              @default(true) @map("is_active")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+  planModules    PlanModule[]
+  addons         SubscriptionModule[]
+
+  @@map("catalog_modules")
+}
+
+model PlanModule {
+  planId   String        @map("plan_id")
+  moduleId String        @map("module_id")
+  plan     Plan          @relation(fields: [planId], references: [id], onDelete: Cascade)
+  module   CatalogModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@id([planId, moduleId])
+  @@map("plan_modules")
+}
+
+model Subscription {
+  id         String               @id @default(cuid())
+  businessId String               @unique @map("business_id")
+  planId     String?              @map("plan_id")
+  status     SubscriptionStatus
+  startsAt   DateTime             @map("starts_at")
+  endsAt     DateTime?            @map("ends_at")
+  createdAt  DateTime             @default(now()) @map("created_at")
+  updatedAt  DateTime             @updatedAt @map("updated_at")
+  business   Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  plan       Plan?                @relation(fields: [planId], references: [id], onDelete: SetNull)
+  modules    SubscriptionModule[]
+  invoices   Invoice[]
+
+  @@index([status])
+  @@map("subscriptions")
+}
+
+model Invoice {
+  id             String        @id @default(cuid())
+  businessId     String        @map("business_id")
+  subscriptionId String        @map("subscription_id")
+  planId         String        @map("plan_id")
+  status         InvoiceStatus @default(open)
+  amount         Int
+  currency       String        @default("IRR")
+  lineItems      Json          @map("line_items")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  business       Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  subscription   Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  payments       Payment[]
+
+  @@index([businessId])
+  @@index([subscriptionId])
+  @@map("invoices")
+}
+
+model Payment {
+  id             String          @id @default(cuid())
+  businessId     String          @map("business_id")
+  invoiceId      String          @map("invoice_id")
+  provider       PaymentProvider
+  status         PaymentStatus   @default(pending)
+  amount         Int
+  currency       String          @default("IRR")
+  gatewayRef     String?         @unique @map("gateway_ref")
+  providerRef    String?         @map("provider_ref")
+  idempotencyKey String?         @unique @map("idempotency_key")
+  paidAt         DateTime?       @map("paid_at")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  business       Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  invoice        Invoice         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([invoiceId])
+  @@index([status])
+  @@map("payments")
+}
+
+model SubscriptionModule {
+  id             String        @id @default(cuid())
+  subscriptionId String        @map("subscription_id")
+  moduleId       String        @map("module_id")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  subscription   Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  module         CatalogModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, moduleId])
+  @@map("subscription_modules")
+}
+
+/** Install-wide license for SELF_HOSTED (not per-business). Raw key never stored. */
+model InstallationLicense {
+  id               String    @id @default(cuid())
+  keyHash          String    @unique @map("key_hash")
+  keyHint          String    @map("key_hint")
+  organizationName String?   @map("organization_name")
+  activatedAt      DateTime  @map("activated_at")
+  expiresAt        DateTime? @map("expires_at")
+  revokedAt        DateTime? @map("revoked_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@index([revokedAt, expiresAt])
+  @@map("installation_licenses")
+}
+
+enum MediaAssetStatus {
+  ready
+  processing
+  failed
+}
+
+/** Business-scoped media metadata; binaries live in object storage. */
+model MediaAsset {
+  id           String           @id @default(cuid())
+  businessId   String           @map("business_id")
+  originalName String           @map("original_name")
+  mimeType     String           @map("mime_type")
+  byteSize     Int              @map("byte_size")
+  width        Int?
+  height       Int?
+  storageKey   String           @map("storage_key")
+  thumbKey     String?          @map("thumb_key")
+  webKey       String?          @map("web_key")
+  printKey     String?          @map("print_key")
+  status       MediaAssetStatus @default(ready)
+  meta         Json?
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+  deletedAt    DateTime?        @map("deleted_at")
+  business     Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, deletedAt, createdAt])
+  @@index([businessId, originalName])
+  @@map("media_assets")
+}
+
+enum FontStyle {
+  normal
+  italic
+}
+
+/** Business-scoped font face for Theme + PDF embed. Binary in object storage. */
+model FontFace {
+  id           String    @id @default(cuid())
+  businessId   String    @map("business_id")
+  family       String
+  weight       Int       @default(400)
+  style        FontStyle @default(normal)
+  originalName String    @map("original_name")
+  mimeType     String    @map("mime_type")
+  byteSize     Int       @map("byte_size")
+  storageKey   String    @map("storage_key")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+  business     Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, deletedAt, family])
+  @@index([businessId, family, weight, style])
+  @@map("font_faces")
+}
+
+/**
+ * Document brand theme (colors / typography / optional font_faces refs).
+ * Not app chrome dark/light — see `.cursor/rules/12-design-themes.mdc`.
+ */
+model DesignTheme {
+  id         String    @id @default(cuid())
+  businessId String    @map("business_id")
+  name       String
+  isDefault  Boolean   @default(false) @map("is_default")
+  tokens     Json
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
+  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, deletedAt, isDefault])
+  @@index([businessId, deletedAt, createdAt])
+  templates DocumentTemplate[]
+  @@map("design_themes")
+}
+
+/**
+ * Template metadata (layout only). Body lives in Mongo `template_bodies`.
+ * See `.cursor/rules/13-templates-blocks.mdc`.
+ */
+model DocumentTemplate {
+  id          String       @id @default(cuid())
+  businessId  String       @map("business_id")
+  themeId     String?      @map("theme_id")
+  name        String
+  description String?
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  deletedAt   DateTime?    @map("deleted_at")
+  business    Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  theme       DesignTheme? @relation(fields: [themeId], references: [id], onDelete: SetNull)
+  documents   Document[]
+
+  @@index([businessId, deletedAt, createdAt])
+  @@index([businessId, name])
+  @@map("document_templates")
+}
+
+enum DocumentStatus {
+  draft
+  published
+}
+
+/**
+ * Document instance metadata. Body in Mongo `document_bodies`.
+ * Data ≠ Template ≠ Document — see `.cursor/rules/13-templates-blocks.mdc`.
+ */
+model Document {
+  id         String           @id @default(cuid())
+  businessId String           @map("business_id")
+  templateId String?          @map("template_id")
+  title      String
+  status     DocumentStatus   @default(draft)
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+  deletedAt  DateTime?        @map("deleted_at")
+  business   Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  template   DocumentTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  exportJobs ExportJob[]
+
+  @@index([businessId, deletedAt, createdAt])
+  @@index([businessId, status, deletedAt])
+  @@map("documents")
+}
+
+enum ExportJobStatus {
+  queued
+  processing
+  completed
+  failed
+}
+
+/** PDF (and future) export jobs — binary in ObjectStorage; queue on Redis/BullMQ. */
+model ExportJob {
+  id           String          @id @default(cuid())
+  businessId   String          @map("business_id")
+  documentId   String          @map("document_id")
+  status       ExportJobStatus @default(queued)
+  errorCode    String?         @map("error_code")
+  errorMessage String?         @map("error_message")
+  storageKey   String?         @map("storage_key")
+  byteSize     Int?            @map("byte_size")
+  mimeType     String          @default("application/pdf") @map("mime_type")
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
+  startedAt    DateTime?       @map("started_at")
+  finishedAt   DateTime?       @map("finished_at")
+  business     Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  document     Document        @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, documentId, createdAt])
+  @@index([businessId, status, createdAt])
+  @@map("export_jobs")
+}
