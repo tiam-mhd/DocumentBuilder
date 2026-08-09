@@ -31,12 +31,14 @@ export class MapController {
     @Param('businessId') businessId: string,
     @Query('source') source?: string,
     @Query('country') country?: string,
+    @Query('locale') locale?: string,
   ) {
     void user;
     const data = await this.maps.listMarkers({
       businessId,
       source,
       country,
+      locale,
     });
     return { data };
   }

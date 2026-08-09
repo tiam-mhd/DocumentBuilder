@@ -59,6 +59,10 @@ class CreateTimelineEventDto {
   @IsOptional()
   @IsObject()
   fields?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsObject()
+  translations?: Record<string, unknown>;
 }
 
 class UpdateTimelineEventDto {
@@ -90,6 +94,10 @@ class UpdateTimelineEventDto {
   @IsOptional()
   @IsObject()
   fields?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsObject()
+  translations?: Record<string, unknown>;
 }
 
 @ApiTags('content')
@@ -148,6 +156,7 @@ export class TimelineController {
       mediaId: body.mediaId,
       sortOrder: body.sortOrder,
       fields: body.fields,
+      translations: body.translations,
     });
     return { data };
   }
@@ -170,6 +179,7 @@ export class TimelineController {
       mediaId: body.mediaId,
       sortOrder: body.sortOrder,
       fields: body.fields,
+      translations: body.translations,
     });
     return { data };
   }

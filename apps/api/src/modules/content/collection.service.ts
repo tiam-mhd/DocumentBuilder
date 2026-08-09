@@ -5,6 +5,9 @@ import {
 } from '@vdb/document-schema';
 import {
   CollectionErrorCodes,
+  parseContentLocale,
+  pickLocalized,
+  type ContentLocale,
   type PublicCollectionItem,
   type PublicCollectionList,
 } from '@vdb/shared-types';
@@ -19,11 +22,13 @@ export class CollectionService {
     businessId: string;
     source: string;
     limit?: number;
+    locale?: string;
   }): Promise<PublicCollectionList> {
     const source = this.parseSource(input.source);
     const limit = Math.min(100, Math.max(1, input.limit ?? 50));
+    const locale = parseContentLocale(input.locale);
     const [items, total] = await Promise.all([
-      this.loadItems(input.businessId, source, limit),
+      this.loadItems(input.businessId, source, limit, locale),
       this.countSource(input.businessId, source),
     ]);
     return { source, items, total };
@@ -77,6 +82,7 @@ export class CollectionService {
     businessId: string,
     source: RepeaterSource,
     limit: number,
+    locale: ContentLocale,
   ): Promise<PublicCollectionItem[]> {
     switch (source) {
       case 'projects': {
@@ -85,14 +91,22 @@ export class CollectionService {
           orderBy: [{ createdAt: 'desc' }],
           take: limit,
         });
-        return rows.map((r) => ({
-          id: r.id,
-          values: {
-            title: r.title,
-            description: r.description,
-            status: r.status,
-          },
-        }));
+        return rows.map((r) => {
+          const loc = pickLocalized(
+            { title: r.title, description: r.description },
+            r.translations,
+            locale,
+            ['title', 'description'],
+          );
+          return {
+            id: r.id,
+            values: {
+              title: loc.title,
+              description: loc.description,
+              status: r.status,
+            },
+          };
+        });
       }
       case 'teamMembers': {
         const rows = await this.prisma.teamMember.findMany({
@@ -100,15 +114,27 @@ export class CollectionService {
           orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
           take: limit,
         });
-        return rows.map((r) => ({
-          id: r.id,
-          values: {
-            name: r.name,
-            roleTitle: r.roleTitle,
-            department: r.department,
-            title: r.name,
-          },
-        }));
+        return rows.map((r) => {
+          const loc = pickLocalized(
+            {
+              name: r.name,
+              roleTitle: r.roleTitle,
+              department: r.department,
+            },
+            r.translations,
+            locale,
+            ['name', 'roleTitle', 'department'],
+          );
+          return {
+            id: r.id,
+            values: {
+              name: loc.name,
+              roleTitle: loc.roleTitle,
+              department: loc.department,
+              title: loc.name,
+            },
+          };
+        });
       }
       case 'branches': {
         const rows = await this.prisma.branch.findMany({
@@ -116,17 +142,30 @@ export class CollectionService {
           orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
           take: limit,
         });
-        return rows.map((r) => ({
-          id: r.id,
-          values: {
-            name: r.name,
-            title: r.name,
-            city: r.city,
-            country: r.country,
-            phone: r.phone,
-            addressLine1: r.addressLine1,
-          },
-        }));
+        return rows.map((r) => {
+          const loc = pickLocalized(
+            {
+              name: r.name,
+              addressLine1: r.addressLine1,
+              city: r.city,
+              country: r.country,
+            },
+            r.translations,
+            locale,
+            ['name', 'addressLine1', 'city', 'country'],
+          );
+          return {
+            id: r.id,
+            values: {
+              name: loc.name,
+              title: loc.name,
+              city: loc.city,
+              country: loc.country,
+              phone: r.phone,
+              addressLine1: loc.addressLine1,
+            },
+          };
+        });
       }
       case 'services': {
         const rows = await this.prisma.businessService.findMany({
@@ -134,14 +173,22 @@ export class CollectionService {
           orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
           take: limit,
         });
-        return rows.map((r) => ({
-          id: r.id,
-          values: {
-            name: r.name,
-            title: r.name,
-            description: r.description,
-          },
-        }));
+        return rows.map((r) => {
+          const loc = pickLocalized(
+            { name: r.name, description: r.description },
+            r.translations,
+            locale,
+            ['name', 'description'],
+          );
+          return {
+            id: r.id,
+            values: {
+              name: loc.name,
+              title: loc.name,
+              description: loc.description,
+            },
+          };
+        });
       }
       case 'clients': {
         const rows = await this.prisma.client.findMany({
@@ -149,14 +196,22 @@ export class CollectionService {
           orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
           take: limit,
         });
-        return rows.map((r) => ({
-          id: r.id,
-          values: {
-            name: r.name,
-            title: r.name,
-            website: r.website ?? '',
-          },
-        }));
+        return rows.map((r) => {
+          const loc = pickLocalized(
+            { name: r.name },
+            r.translations,
+            locale,
+            ['name'],
+          );
+          return {
+            id: r.id,
+            values: {
+              name: loc.name,
+              title: loc.name,
+              website: r.website ?? '',
+            },
+          };
+        });
       }
       case 'certificates': {
         const rows = await this.prisma.certificate.findMany({
@@ -164,18 +219,26 @@ export class CollectionService {
           orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
           take: limit,
         });
-        return rows.map((r) => ({
-          id: r.id,
-          values: {
-            name: r.name,
-            title: r.name,
-            issuer: r.issuer,
-            issuedAt: r.issuedAt ? r.issuedAt.toISOString().slice(0, 10) : '',
-            expiresAt: r.expiresAt
-              ? r.expiresAt.toISOString().slice(0, 10)
-              : '',
-          },
-        }));
+        return rows.map((r) => {
+          const loc = pickLocalized(
+            { name: r.name, issuer: r.issuer },
+            r.translations,
+            locale,
+            ['name', 'issuer'],
+          );
+          return {
+            id: r.id,
+            values: {
+              name: loc.name,
+              title: loc.name,
+              issuer: loc.issuer,
+              issuedAt: r.issuedAt ? r.issuedAt.toISOString().slice(0, 10) : '',
+              expiresAt: r.expiresAt
+                ? r.expiresAt.toISOString().slice(0, 10)
+                : '',
+            },
+          };
+        });
       }
       case 'timelineEvents': {
         const rows = await this.prisma.timelineEvent.findMany({
@@ -183,16 +246,24 @@ export class CollectionService {
           orderBy: [{ occurredAt: 'desc' }, { sortOrder: 'asc' }],
           take: limit,
         });
-        return rows.map((r) => ({
-          id: r.id,
-          values: {
-            title: r.title,
-            body: r.body,
-            description: r.body,
-            occurredAt: r.occurredAt.toISOString().slice(0, 10),
-            date: r.occurredAt.toISOString().slice(0, 10),
-          },
-        }));
+        return rows.map((r) => {
+          const loc = pickLocalized(
+            { title: r.title, body: r.body },
+            r.translations,
+            locale,
+            ['title', 'body'],
+          );
+          return {
+            id: r.id,
+            values: {
+              title: loc.title,
+              body: loc.body,
+              description: loc.body,
+              occurredAt: r.occurredAt.toISOString().slice(0, 10),
+              date: r.occurredAt.toISOString().slice(0, 10),
+            },
+          };
+        });
       }
       default: {
         const _exhaustive: never = source;

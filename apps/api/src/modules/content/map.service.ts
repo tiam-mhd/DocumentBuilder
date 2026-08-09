@@ -1,5 +1,10 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { MapErrorCodes, type PublicMapMarkerList } from '@vdb/shared-types';
+import {
+  MapErrorCodes,
+  parseContentLocale,
+  pickLocalized,
+  type PublicMapMarkerList,
+} from '@vdb/shared-types';
 import { DomainException } from '../../common/errors/domain.exception';
 import { PrismaService } from '../../config/prisma/prisma.service';
 
@@ -14,9 +19,11 @@ export class MapService {
     businessId: string;
     source?: string;
     country?: string;
+    locale?: string;
   }): Promise<PublicMapMarkerList> {
     const source = this.parseSource(input.source ?? 'locations');
     const countryRestriction = input.country?.trim().toUpperCase() || null;
+    const locale = parseContentLocale(input.locale);
 
     if (source === 'none') {
       return { items: [], source, countryRestriction };
@@ -73,14 +80,22 @@ export class MapService {
       return {
         items: rows
           .filter((r) => r.location)
-          .map((r) => ({
-            id: r.location!.id,
-            name: r.name,
-            lat: r.location!.lat,
-            lng: r.location!.lng,
-            country: r.location!.country,
-            source: 'branches',
-          })),
+          .map((r) => {
+            const loc = pickLocalized(
+              { name: r.name },
+              r.translations,
+              locale,
+              ['name'],
+            );
+            return {
+              id: r.location!.id,
+              name: loc.name,
+              lat: r.location!.lat,
+              lng: r.location!.lng,
+              country: r.location!.country,
+              source: 'branches' as const,
+            };
+          }),
         source,
         countryRestriction,
       };
@@ -111,14 +126,22 @@ export class MapService {
     return {
       items: rows
         .filter((r) => r.location)
-        .map((r) => ({
-          id: r.location!.id,
-          name: r.title,
-          lat: r.location!.lat,
-          lng: r.location!.lng,
-          country: r.location!.country,
-          source: 'projects',
-        })),
+        .map((r) => {
+          const loc = pickLocalized(
+            { title: r.title },
+            r.translations,
+            locale,
+            ['title'],
+          );
+          return {
+            id: r.location!.id,
+            name: loc.title,
+            lat: r.location!.lat,
+            lng: r.location!.lng,
+            country: r.location!.country,
+            source: 'projects' as const,
+          };
+        }),
       source,
       countryRestriction,
     };

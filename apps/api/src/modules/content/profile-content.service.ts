@@ -6,6 +6,7 @@ import {
   type Client,
 } from '@prisma/client';
 import {
+  asEntityTranslations,
   ProfileContentErrorCodes,
   type PublicBusinessService,
   type PublicBusinessServiceList,
@@ -14,8 +15,16 @@ import {
   type PublicClient,
   type PublicClientList,
 } from '@vdb/shared-types';
+import {
+  parseTranslationsInput,
+  translationsToJson,
+} from '../../common/content-locale';
 import { DomainException } from '../../common/errors/domain.exception';
 import { PrismaService } from '../../config/prisma/prisma.service';
+
+const SERVICE_TRANSLATION_FIELDS = ['name', 'description'] as const;
+const CLIENT_TRANSLATION_FIELDS = ['name'] as const;
+const CERTIFICATE_TRANSLATION_FIELDS = ['name', 'issuer'] as const;
 
 const MAX_FIELDS_KEYS = 40;
 const MAX_FIELD_STRING = 4000;
@@ -75,6 +84,7 @@ export class ProfileContentService {
     iconMediaId?: string | null;
     sortOrder?: number;
     fields?: Record<string, unknown>;
+    translations?: Record<string, unknown>;
   }): Promise<PublicBusinessService> {
     const name = this.requireName(input.name);
     const iconMediaId = await this.resolveOptionalMedia(
@@ -89,6 +99,12 @@ export class ProfileContentService {
         iconMediaId,
         sortOrder: input.sortOrder ?? 0,
         fields: this.normalizeFields(input.fields ?? {}) as Prisma.InputJsonValue,
+        translations: translationsToJson(
+          parseTranslationsInput(
+            input.translations,
+            SERVICE_TRANSLATION_FIELDS,
+          ),
+        ),
       },
     });
     return this.toPublicService(row);
@@ -102,6 +118,7 @@ export class ProfileContentService {
     iconMediaId?: string | null;
     sortOrder?: number;
     fields?: Record<string, unknown>;
+    translations?: Record<string, unknown>;
   }): Promise<PublicBusinessService> {
     await this.requireService(input.businessId, input.serviceId);
     const data: Prisma.BusinessServiceUpdateInput = {};
@@ -120,6 +137,14 @@ export class ProfileContentService {
       data.fields = this.normalizeFields(
         input.fields,
       ) as Prisma.InputJsonValue;
+    }
+    if (input.translations !== undefined) {
+      data.translations = translationsToJson(
+        parseTranslationsInput(
+          input.translations,
+          SERVICE_TRANSLATION_FIELDS,
+        ),
+      );
     }
     const row = await this.prisma.businessService.update({
       where: { id: input.serviceId },
@@ -183,6 +208,7 @@ export class ProfileContentService {
     logoMediaId?: string | null;
     sortOrder?: number;
     fields?: Record<string, unknown>;
+    translations?: Record<string, unknown>;
   }): Promise<PublicClient> {
     const name = this.requireName(input.name);
     const logoMediaId = await this.resolveOptionalMedia(
@@ -197,6 +223,9 @@ export class ProfileContentService {
         logoMediaId,
         sortOrder: input.sortOrder ?? 0,
         fields: this.normalizeFields(input.fields ?? {}) as Prisma.InputJsonValue,
+        translations: translationsToJson(
+          parseTranslationsInput(input.translations, CLIENT_TRANSLATION_FIELDS),
+        ),
       },
     });
     return this.toPublicClient(row);
@@ -210,6 +239,7 @@ export class ProfileContentService {
     logoMediaId?: string | null;
     sortOrder?: number;
     fields?: Record<string, unknown>;
+    translations?: Record<string, unknown>;
   }): Promise<PublicClient> {
     await this.requireClient(input.businessId, input.clientId);
     const data: Prisma.ClientUpdateInput = {};
@@ -228,6 +258,11 @@ export class ProfileContentService {
       data.fields = this.normalizeFields(
         input.fields,
       ) as Prisma.InputJsonValue;
+    }
+    if (input.translations !== undefined) {
+      data.translations = translationsToJson(
+        parseTranslationsInput(input.translations, CLIENT_TRANSLATION_FIELDS),
+      );
     }
     const row = await this.prisma.client.update({
       where: { id: input.clientId },
@@ -298,6 +333,7 @@ export class ProfileContentService {
     documentMediaId?: string | null;
     sortOrder?: number;
     fields?: Record<string, unknown>;
+    translations?: Record<string, unknown>;
   }): Promise<PublicCertificate> {
     const name = this.requireName(input.name);
     const documentMediaId = await this.resolveOptionalMedia(
@@ -317,6 +353,12 @@ export class ProfileContentService {
         documentMediaId,
         sortOrder: input.sortOrder ?? 0,
         fields: this.normalizeFields(input.fields ?? {}) as Prisma.InputJsonValue,
+        translations: translationsToJson(
+          parseTranslationsInput(
+            input.translations,
+            CERTIFICATE_TRANSLATION_FIELDS,
+          ),
+        ),
       },
     });
     return this.toPublicCertificate(row);
@@ -332,6 +374,7 @@ export class ProfileContentService {
     documentMediaId?: string | null;
     sortOrder?: number;
     fields?: Record<string, unknown>;
+    translations?: Record<string, unknown>;
   }): Promise<PublicCertificate> {
     const existing = await this.requireCertificate(
       input.businessId,
@@ -364,6 +407,14 @@ export class ProfileContentService {
       data.fields = this.normalizeFields(
         input.fields,
       ) as Prisma.InputJsonValue;
+    }
+    if (input.translations !== undefined) {
+      data.translations = translationsToJson(
+        parseTranslationsInput(
+          input.translations,
+          CERTIFICATE_TRANSLATION_FIELDS,
+        ),
+      );
     }
     const row = await this.prisma.certificate.update({
       where: { id: input.certificateId },
@@ -542,6 +593,7 @@ export class ProfileContentService {
       businessId: row.businessId,
       name: row.name,
       description: row.description,
+      translations: asEntityTranslations(row.translations),
       iconMediaId: row.iconMediaId,
       sortOrder: row.sortOrder,
       fields: this.fieldsOf(row),
@@ -556,6 +608,7 @@ export class ProfileContentService {
       businessId: row.businessId,
       name: row.name,
       website: row.website,
+      translations: asEntityTranslations(row.translations),
       logoMediaId: row.logoMediaId,
       sortOrder: row.sortOrder,
       fields: this.fieldsOf(row),
@@ -570,6 +623,7 @@ export class ProfileContentService {
       businessId: row.businessId,
       name: row.name,
       issuer: row.issuer,
+      translations: asEntityTranslations(row.translations),
       issuedAt: row.issuedAt?.toISOString() ?? null,
       expiresAt: row.expiresAt?.toISOString() ?? null,
       documentMediaId: row.documentMediaId,

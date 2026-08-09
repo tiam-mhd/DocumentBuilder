@@ -1,4 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { AssetsModule } from '../assets/assets.module';
 import { BillingModule } from '../billing/billing.module';
 import { IdentityModule } from '../identity/identity.module';
 import { TenancyModule } from '../tenancy/tenancy.module';
@@ -7,6 +8,9 @@ import { CollectionService } from './collection.service';
 import { GalleryController } from './gallery.controller';
 import { GalleryService } from './gallery.service';
 import { GatesProbeController } from './gates-probe.controller';
+import { ImportController } from './import.controller';
+import { ImportQueueService } from './import-queue.service';
+import { ImportService } from './import.service';
 import { LocationController } from './location.controller';
 import { LocationService } from './location.service';
 import { MapController } from './map.controller';
@@ -24,16 +28,18 @@ import { TeamService } from './team.service';
 import { TimelineController } from './timeline.controller';
 import { TimelineService } from './timeline.service';
 
-/** Content — business entities + map + org chart + timeline + QR + collections. */
+/** Content — business entities + map + org chart + timeline + QR + collections + import. */
 @Module({
   imports: [
     IdentityModule,
     forwardRef(() => TenancyModule),
     forwardRef(() => BillingModule),
+    AssetsModule,
   ],
   controllers: [
     GatesProbeController,
     ProjectController,
+    ImportController,
     TeamController,
     ProfileContentController,
     GalleryController,
@@ -55,6 +61,8 @@ import { TimelineService } from './timeline.service';
     TimelineService,
     QrService,
     CollectionService,
+    ImportQueueService,
+    ImportService,
   ],
   exports: [
     LocationService,
@@ -67,6 +75,7 @@ import { TimelineService } from './timeline.service';
     TimelineService,
     QrService,
     CollectionService,
+    ImportService,
   ],
 })
 export class ContentModule {}

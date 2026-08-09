@@ -39,6 +39,7 @@ export class CollectionController {
     @Param('businessId') businessId: string,
     @Param('source') source: string,
     @Query('limit') limitRaw?: string,
+    @Query('locale') locale?: string,
   ) {
     await this.tenancy.assertMembership(user.userId, businessId);
     await this.assertSourceModule(businessId, source);
@@ -46,6 +47,7 @@ export class CollectionController {
       businessId,
       source,
       limit: limitRaw ? Number(limitRaw) : 50,
+      locale,
     });
     return { data };
   }

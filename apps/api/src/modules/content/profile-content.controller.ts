@@ -55,6 +55,10 @@ class CreateServiceDto {
   @IsOptional()
   @IsObject()
   fields?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsObject()
+  translations?: Record<string, unknown>;
 }
 
 class UpdateServiceDto {
@@ -81,6 +85,10 @@ class UpdateServiceDto {
   @IsOptional()
   @IsObject()
   fields?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsObject()
+  translations?: Record<string, unknown>;
 }
 
 class CreateClientDto {
@@ -106,6 +114,10 @@ class CreateClientDto {
   @IsOptional()
   @IsObject()
   fields?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsObject()
+  translations?: Record<string, unknown>;
 }
 
 class UpdateClientDto {
@@ -132,6 +144,10 @@ class UpdateClientDto {
   @IsOptional()
   @IsObject()
   fields?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsObject()
+  translations?: Record<string, unknown>;
 }
 
 class CreateCertificateDto {
@@ -165,6 +181,10 @@ class CreateCertificateDto {
   @IsOptional()
   @IsObject()
   fields?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsObject()
+  translations?: Record<string, unknown>;
 }
 
 class UpdateCertificateDto {
@@ -199,6 +219,10 @@ class UpdateCertificateDto {
   @IsOptional()
   @IsObject()
   fields?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsObject()
+  translations?: Record<string, unknown>;
 }
 
 @ApiTags('content')
@@ -260,6 +284,7 @@ export class ProfileContentController {
       iconMediaId: body.iconMediaId,
       sortOrder: body.sortOrder,
       fields: body.fields,
+      translations: body.translations,
     });
     return { data };
   }
@@ -283,6 +308,7 @@ export class ProfileContentController {
       iconMediaId: body.iconMediaId,
       sortOrder: body.sortOrder,
       fields: body.fields,
+      translations: body.translations,
     });
     return { data };
   }
@@ -349,6 +375,7 @@ export class ProfileContentController {
       logoMediaId: body.logoMediaId,
       sortOrder: body.sortOrder,
       fields: body.fields,
+      translations: body.translations,
     });
     return { data };
   }
@@ -372,6 +399,7 @@ export class ProfileContentController {
       logoMediaId: body.logoMediaId,
       sortOrder: body.sortOrder,
       fields: body.fields,
+      translations: body.translations,
     });
     return { data };
   }
@@ -440,6 +468,7 @@ export class ProfileContentController {
       documentMediaId: body.documentMediaId,
       sortOrder: body.sortOrder,
       fields: body.fields,
+      translations: body.translations,
     });
     return { data };
   }
@@ -465,6 +494,7 @@ export class ProfileContentController {
       documentMediaId: body.documentMediaId,
       sortOrder: body.sortOrder,
       fields: body.fields,
+      translations: body.translations,
     });
     return { data };
   }

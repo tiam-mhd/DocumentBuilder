@@ -1,15 +1,30 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { Prisma, type Branch, type TeamMember } from '@prisma/client';
 import {
+  asEntityTranslations,
   TeamErrorCodes,
   type PublicBranch,
   type PublicBranchList,
   type PublicTeamMember,
   type PublicTeamMemberList,
 } from '@vdb/shared-types';
+import {
+  parseTranslationsInput,
+  translationsToJson,
+} from '../../common/content-locale';
 import { DomainException } from '../../common/errors/domain.exception';
 import { PrismaService } from '../../config/prisma/prisma.service';
 import { LocationService } from './location.service';
+
+const MEMBER_TRANSLATION_FIELDS = ['name', 'roleTitle', 'department'] as const;
+const BRANCH_TRANSLATION_FIELDS = [
+  'name',
+  'addressLine1',
+  'addressLine2',
+  'city',
+  'province',
+  'country',
+] as const;
 
 const MAX_FIELDS_KEYS = 40;
 const MAX_FIELD_STRING = 4000;
@@ -78,6 +93,7 @@ export class TeamService {
     parentMemberId?: string | null;
     sortOrder?: number;
     fields?: Record<string, unknown>;
+    translations?: Record<string, unknown>;
   }): Promise<PublicTeamMember> {
     const name = input.name.trim();
     if (name.length < 1 || name.length > 160) {
@@ -111,6 +127,12 @@ export class TeamService {
         parentMemberId,
         sortOrder: input.sortOrder ?? 0,
         fields: this.normalizeFields(input.fields ?? {}) as Prisma.InputJsonValue,
+        translations: translationsToJson(
+          parseTranslationsInput(
+            input.translations,
+            MEMBER_TRANSLATION_FIELDS,
+          ),
+        ),
       },
       include: { branch: true },
     });
@@ -128,6 +150,7 @@ export class TeamService {
     parentMemberId?: string | null;
     sortOrder?: number;
     fields?: Record<string, unknown>;
+    translations?: Record<string, unknown>;
   }): Promise<PublicTeamMember> {
     await this.requireMember(input.businessId, input.memberId);
     const data: Prisma.TeamMemberUpdateInput = {};
@@ -178,6 +201,14 @@ export class TeamService {
       data.fields = this.normalizeFields(
         input.fields,
       ) as Prisma.InputJsonValue;
+    }
+    if (input.translations !== undefined) {
+      data.translations = translationsToJson(
+        parseTranslationsInput(
+          input.translations,
+          MEMBER_TRANSLATION_FIELDS,
+        ),
+      );
     }
     const row = await this.prisma.teamMember.update({
       where: { id: input.memberId },
@@ -256,6 +287,7 @@ export class TeamService {
     locationId?: string | null;
     sortOrder?: number;
     fields?: Record<string, unknown>;
+    translations?: Record<string, unknown>;
   }): Promise<PublicBranch> {
     const name = input.name.trim();
     if (name.length < 1 || name.length > 160) {
@@ -283,6 +315,12 @@ export class TeamService {
         locationId,
         sortOrder: input.sortOrder ?? 0,
         fields: this.normalizeFields(input.fields ?? {}) as Prisma.InputJsonValue,
+        translations: translationsToJson(
+          parseTranslationsInput(
+            input.translations,
+            BRANCH_TRANSLATION_FIELDS,
+          ),
+        ),
       },
       include: { location: true },
     });
@@ -303,6 +341,7 @@ export class TeamService {
     locationId?: string | null;
     sortOrder?: number;
     fields?: Record<string, unknown>;
+    translations?: Record<string, unknown>;
   }): Promise<PublicBranch> {
     await this.requireBranch(input.businessId, input.branchId);
     const data: Prisma.BranchUpdateInput = {};
@@ -348,6 +387,14 @@ export class TeamService {
       data.fields = this.normalizeFields(
         input.fields,
       ) as Prisma.InputJsonValue;
+    }
+    if (input.translations !== undefined) {
+      data.translations = translationsToJson(
+        parseTranslationsInput(
+          input.translations,
+          BRANCH_TRANSLATION_FIELDS,
+        ),
+      );
     }
     const row = await this.prisma.branch.update({
       where: { id: input.branchId },
@@ -553,6 +600,7 @@ export class TeamService {
       name: row.name,
       roleTitle: row.roleTitle,
       department: row.department,
+      translations: asEntityTranslations(row.translations),
       photoMediaId: row.photoMediaId,
       sortOrder: row.sortOrder,
       fields:
@@ -580,6 +628,7 @@ export class TeamService {
       postalCode: row.postalCode,
       country: row.country,
       phone: row.phone,
+      translations: asEntityTranslations(row.translations),
       locationId: row.locationId,
       locationName: row.location?.name ?? null,
       sortOrder: row.sortOrder,

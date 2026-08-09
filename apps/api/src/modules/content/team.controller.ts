@@ -68,6 +68,10 @@ class CreateMemberDto {
   @IsOptional()
   @IsObject()
   fields?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsObject()
+  translations?: Record<string, unknown>;
 }
 
 class UpdateMemberDto {
@@ -107,6 +111,10 @@ class UpdateMemberDto {
   @IsOptional()
   @IsObject()
   fields?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsObject()
+  translations?: Record<string, unknown>;
 }
 
 class CreateBranchDto {
@@ -162,6 +170,10 @@ class CreateBranchDto {
   @IsOptional()
   @IsObject()
   fields?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsObject()
+  translations?: Record<string, unknown>;
 }
 
 class UpdateBranchDto {
@@ -218,6 +230,10 @@ class UpdateBranchDto {
   @IsOptional()
   @IsObject()
   fields?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsObject()
+  translations?: Record<string, unknown>;
 }
 
 @ApiTags('content')
@@ -284,6 +300,7 @@ export class TeamController {
       parentMemberId: body.parentMemberId,
       sortOrder: body.sortOrder,
       fields: body.fields,
+      translations: body.translations,
     });
     return { data };
   }
@@ -310,6 +327,7 @@ export class TeamController {
       parentMemberId: body.parentMemberId,
       sortOrder: body.sortOrder,
       fields: body.fields,
+      translations: body.translations,
     });
     return { data };
   }
@@ -382,6 +400,7 @@ export class TeamController {
       locationId: body.locationId,
       sortOrder: body.sortOrder,
       fields: body.fields,
+      translations: body.translations,
     });
     return { data };
   }
@@ -411,6 +430,7 @@ export class TeamController {
       locationId: body.locationId,
       sortOrder: body.sortOrder,
       fields: body.fields,
+      translations: body.translations,
     });
     return { data };
   }

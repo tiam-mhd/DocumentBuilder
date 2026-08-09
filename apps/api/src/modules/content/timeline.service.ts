@@ -1,16 +1,24 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { Prisma, type TimelineEvent } from '@prisma/client';
 import {
+  asEntityTranslations,
+  pickLocalized,
+  parseContentLocale,
   TimelineErrorCodes,
   type PublicTimelineEvent,
   type PublicTimelineEventList,
 } from '@vdb/shared-types';
+import {
+  parseTranslationsInput,
+  translationsToJson,
+} from '../../common/content-locale';
 import { DomainException } from '../../common/errors/domain.exception';
 import { PrismaService } from '../../config/prisma/prisma.service';
 
 const MAX_BODY = 8000;
 const MAX_FIELDS_KEYS = 40;
 const MAX_FIELD_STRING = 4000;
+const EVENT_TRANSLATION_FIELDS = ['title', 'body'] as const;
 
 @Injectable()
 export class TimelineService {
@@ -60,8 +68,10 @@ export class TimelineService {
   async listForBlock(input: {
     businessId: string;
     limit: number;
+    locale?: string;
   }): Promise<PublicTimelineEvent[]> {
     const limit = Math.min(100, Math.max(1, input.limit));
+    const locale = parseContentLocale(input.locale);
     const rows = await this.prisma.timelineEvent.findMany({
       where: { businessId: input.businessId, deletedAt: null },
       orderBy: [
@@ -71,7 +81,16 @@ export class TimelineService {
       ],
       take: limit,
     });
-    return rows.map((r) => this.toPublic(r));
+    return rows.map((r) => {
+      const pub = this.toPublic(r);
+      const loc = pickLocalized(
+        { title: pub.title, body: pub.body },
+        r.translations,
+        locale,
+        EVENT_TRANSLATION_FIELDS,
+      );
+      return { ...pub, title: loc.title, body: loc.body };
+    });
   }
 
   async get(businessId: string, eventId: string): Promise<PublicTimelineEvent> {
@@ -86,6 +105,7 @@ export class TimelineService {
     mediaId?: string | null;
     sortOrder?: number;
     fields?: Record<string, unknown>;
+    translations?: Record<string, unknown>;
   }): Promise<PublicTimelineEvent> {
     const title = this.requireTitle(input.title);
     const occurredAt = this.parseDate(input.occurredAt);
@@ -102,6 +122,9 @@ export class TimelineService {
         mediaId,
         sortOrder: input.sortOrder ?? 0,
         fields: this.normalizeFields(input.fields ?? {}) as Prisma.InputJsonValue,
+        translations: translationsToJson(
+          parseTranslationsInput(input.translations, EVENT_TRANSLATION_FIELDS),
+        ),
       },
     });
     return this.toPublic(row);
@@ -116,6 +139,7 @@ export class TimelineService {
     mediaId?: string | null;
     sortOrder?: number;
     fields?: Record<string, unknown>;
+    translations?: Record<string, unknown>;
   }): Promise<PublicTimelineEvent> {
     await this.requireEvent(input.businessId, input.eventId);
     const data: Prisma.TimelineEventUpdateInput = {};
@@ -137,6 +161,11 @@ export class TimelineService {
       data.fields = this.normalizeFields(
         input.fields,
       ) as Prisma.InputJsonValue;
+    }
+    if (input.translations !== undefined) {
+      data.translations = translationsToJson(
+        parseTranslationsInput(input.translations, EVENT_TRANSLATION_FIELDS),
+      );
     }
     const row = await this.prisma.timelineEvent.update({
       where: { id: input.eventId },
@@ -267,6 +296,7 @@ export class TimelineService {
       occurredAt: row.occurredAt.toISOString(),
       title: row.title,
       body: row.body,
+      translations: asEntityTranslations(row.translations),
       mediaId: row.mediaId,
       sortOrder: row.sortOrder,
       fields:

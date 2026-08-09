@@ -1,11 +1,15 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import {
   OrgChartErrorCodes,
+  parseContentLocale,
+  pickLocalized,
   type PublicOrgChartNode,
   type PublicOrgChartTree,
 } from '@vdb/shared-types';
 import { DomainException } from '../../common/errors/domain.exception';
 import { PrismaService } from '../../config/prisma/prisma.service';
+
+const MEMBER_LOCALIZED_FIELDS = ['name', 'roleTitle', 'department'] as const;
 
 @Injectable()
 export class OrgChartService {
@@ -14,7 +18,9 @@ export class OrgChartService {
   async getTree(input: {
     businessId: string;
     rootMemberId?: string | null;
+    locale?: string;
   }): Promise<PublicOrgChartTree> {
+    const locale = parseContentLocale(input.locale);
     const rows = await this.prisma.teamMember.findMany({
       where: { businessId: input.businessId, deletedAt: null },
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
@@ -22,19 +28,31 @@ export class OrgChartService {
     });
 
     const byId = new Map(
-      rows.map((r) => [
-        r.id,
-        {
-          id: r.id,
-          name: r.name,
-          roleTitle: r.roleTitle,
-          department: r.department,
-          photoMediaId: r.photoMediaId,
-          parentMemberId: r.parentMemberId,
-          sortOrder: r.sortOrder,
-          children: [] as PublicOrgChartNode[],
-        } satisfies PublicOrgChartNode,
-      ]),
+      rows.map((r) => {
+        const loc = pickLocalized(
+          {
+            name: r.name,
+            roleTitle: r.roleTitle,
+            department: r.department,
+          },
+          r.translations,
+          locale,
+          MEMBER_LOCALIZED_FIELDS,
+        );
+        return [
+          r.id,
+          {
+            id: r.id,
+            name: loc.name,
+            roleTitle: loc.roleTitle,
+            department: loc.department,
+            photoMediaId: r.photoMediaId,
+            parentMemberId: r.parentMemberId,
+            sortOrder: r.sortOrder,
+            children: [] as PublicOrgChartNode[],
+          } satisfies PublicOrgChartNode,
+        ] as const;
+      }),
     );
 
     const roots: PublicOrgChartNode[] = [];

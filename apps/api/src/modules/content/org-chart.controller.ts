@@ -30,11 +30,13 @@ export class OrgChartController {
     @CurrentUser() user: RequestUser,
     @Param('businessId') businessId: string,
     @Query('rootMemberId') rootMemberId?: string,
+    @Query('locale') locale?: string,
   ) {
     void user;
     const data = await this.orgChart.getTree({
       businessId,
       rootMemberId: rootMemberId || null,
+      locale,
     });
     return { data };
   }

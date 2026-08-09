@@ -6,6 +6,7 @@ import {
   type ProjectCategory,
 } from '@prisma/client';
 import {
+  asEntityTranslations,
   ProjectErrorCodes,
   ProjectStatus,
   type ProjectStatusValue,
@@ -14,9 +15,16 @@ import {
   type PublicProjectCategoryList,
   type PublicProjectList,
 } from '@vdb/shared-types';
+import {
+  parseTranslationsInput,
+  translationsToJson,
+} from '../../common/content-locale';
 import { DomainException } from '../../common/errors/domain.exception';
 import { PrismaService } from '../../config/prisma/prisma.service';
 import { LocationService } from './location.service';
+
+const CATEGORY_TRANSLATION_FIELDS = ['name'] as const;
+const PROJECT_TRANSLATION_FIELDS = ['title', 'description'] as const;
 
 const MAX_FIELDS_KEYS = 40;
 const MAX_MEDIA_IDS = 40;
@@ -58,6 +66,7 @@ export class ProjectService {
     businessId: string;
     name: string;
     sortOrder?: number;
+    translations?: Record<string, unknown>;
   }): Promise<PublicProjectCategory> {
     const name = input.name.trim();
     if (name.length < 1 || name.length > 120) {
@@ -72,6 +81,12 @@ export class ProjectService {
         businessId: input.businessId,
         name,
         sortOrder: input.sortOrder ?? 0,
+        translations: translationsToJson(
+          parseTranslationsInput(
+            input.translations,
+            CATEGORY_TRANSLATION_FIELDS,
+          ),
+        ),
       },
     });
     return this.toPublicCategory(row);
@@ -82,9 +97,10 @@ export class ProjectService {
     categoryId: string;
     name?: string;
     sortOrder?: number;
+    translations?: Record<string, unknown>;
   }): Promise<PublicProjectCategory> {
     await this.requireCategory(input.businessId, input.categoryId);
-    const data: { name?: string; sortOrder?: number } = {};
+    const data: Prisma.ProjectCategoryUpdateInput = {};
     if (input.name !== undefined) {
       const name = input.name.trim();
       if (name.length < 1 || name.length > 120) {
@@ -97,6 +113,14 @@ export class ProjectService {
       data.name = name;
     }
     if (input.sortOrder !== undefined) data.sortOrder = input.sortOrder;
+    if (input.translations !== undefined) {
+      data.translations = translationsToJson(
+        parseTranslationsInput(
+          input.translations,
+          CATEGORY_TRANSLATION_FIELDS,
+        ),
+      );
+    }
     const row = await this.prisma.projectCategory.update({
       where: { id: input.categoryId },
       data,
@@ -195,6 +219,7 @@ export class ProjectService {
     mediaIds?: string[];
     locationId?: string | null;
     fields?: Record<string, unknown>;
+    translations?: Record<string, unknown>;
   }): Promise<PublicProject> {
     const title = input.title.trim();
     if (title.length < 1 || title.length > 200) {
@@ -236,6 +261,12 @@ export class ProjectService {
         mediaIds: mediaIds as Prisma.InputJsonValue,
         locationId,
         fields: fields as Prisma.InputJsonValue,
+        translations: translationsToJson(
+          parseTranslationsInput(
+            input.translations,
+            PROJECT_TRANSLATION_FIELDS,
+          ),
+        ),
       },
       include: { category: true, location: true },
     });
@@ -253,6 +284,7 @@ export class ProjectService {
     mediaIds?: string[];
     locationId?: string | null;
     fields?: Record<string, unknown>;
+    translations?: Record<string, unknown>;
   }): Promise<PublicProject> {
     await this.requireProject(input.businessId, input.projectId);
     const data: Prisma.ProjectUpdateInput = {};
@@ -324,6 +356,14 @@ export class ProjectService {
       data.fields = this.normalizeFields(
         input.fields,
       ) as Prisma.InputJsonValue;
+    }
+    if (input.translations !== undefined) {
+      data.translations = translationsToJson(
+        parseTranslationsInput(
+          input.translations,
+          PROJECT_TRANSLATION_FIELDS,
+        ),
+      );
     }
     const row = await this.prisma.project.update({
       where: { id: input.projectId },
@@ -500,6 +540,7 @@ export class ProjectService {
       id: row.id,
       businessId: row.businessId,
       name: row.name,
+      translations: asEntityTranslations(row.translations),
       sortOrder: row.sortOrder,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
@@ -519,6 +560,7 @@ export class ProjectService {
       categoryName: row.category?.name ?? null,
       title: row.title,
       description: row.description,
+      translations: asEntityTranslations(row.translations),
       status: row.status as ProjectStatusValue,
       coverMediaId: row.coverMediaId,
       mediaIds: this.asStringArray(row.mediaIds),

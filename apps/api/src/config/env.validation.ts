@@ -30,6 +30,10 @@ export type AppEnv = {
   STORAGE_LOCAL_ROOT: string;
   MEDIA_MAX_BYTES: number;
   FONT_MAX_BYTES: number;
+  IMPORT_MAX_BYTES: number;
+  IMPORT_MAX_ROWS: number;
+  IMPORT_SYNC_MAX_ROWS: number;
+  BACKUP_MAX_BYTES: number;
   PDF_RENDERER: 'fake' | 'playwright';
   /** Empty or `none` = placeholder box in PDF; otherwise URL template with {lat},{lng},{zoom},{w},{h},{markers}. */
   MAP_STATIC_URL_TEMPLATE: string;
@@ -163,6 +167,10 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
     STORAGE_LOCAL_ROOT: localRoot,
     MEDIA_MAX_BYTES: Number(config.MEDIA_MAX_BYTES ?? 10 * 1024 * 1024),
     FONT_MAX_BYTES: Number(config.FONT_MAX_BYTES ?? 5 * 1024 * 1024),
+    IMPORT_MAX_BYTES: Number(config.IMPORT_MAX_BYTES ?? 5 * 1024 * 1024),
+    IMPORT_MAX_ROWS: Number(config.IMPORT_MAX_ROWS ?? 5000),
+    IMPORT_SYNC_MAX_ROWS: Number(config.IMPORT_SYNC_MAX_ROWS ?? 100),
+    BACKUP_MAX_BYTES: Number(config.BACKUP_MAX_BYTES ?? 100 * 1024 * 1024),
     PDF_RENDERER:
       String(config.PDF_RENDERER ?? 'fake') === 'playwright'
         ? 'playwright'

@@ -44,6 +44,10 @@ class CreateCategoryDto {
   @IsInt()
   @Min(0)
   sortOrder?: number;
+
+  @IsOptional()
+  @IsObject()
+  translations?: Record<string, unknown>;
 }
 
 class UpdateCategoryDto {
@@ -57,6 +61,10 @@ class UpdateCategoryDto {
   @IsInt()
   @Min(0)
   sortOrder?: number;
+
+  @IsOptional()
+  @IsObject()
+  translations?: Record<string, unknown>;
 }
 
 class CreateProjectDto {
@@ -94,6 +102,10 @@ class CreateProjectDto {
   @IsOptional()
   @IsObject()
   fields?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsObject()
+  translations?: Record<string, unknown>;
 }
 
 class UpdateProjectDto {
@@ -132,6 +144,10 @@ class UpdateProjectDto {
   @IsOptional()
   @IsObject()
   fields?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsObject()
+  translations?: Record<string, unknown>;
 }
 
 @ApiTags('content')
@@ -172,6 +188,7 @@ export class ProjectController {
       businessId,
       name: body.name,
       sortOrder: body.sortOrder,
+      translations: body.translations,
     });
     return { data };
   }
@@ -190,6 +207,7 @@ export class ProjectController {
       categoryId,
       name: body.name,
       sortOrder: body.sortOrder,
+      translations: body.translations,
     });
     return { data };
   }
@@ -247,6 +265,7 @@ export class ProjectController {
       mediaIds: body.mediaIds,
       locationId: body.locationId,
       fields: body.fields,
+      translations: body.translations,
     });
     return { data };
   }
@@ -283,6 +302,7 @@ export class ProjectController {
       mediaIds: body.mediaIds,
       locationId: body.locationId,
       fields: body.fields,
+      translations: body.translations,
     });
     return { data };
   }
