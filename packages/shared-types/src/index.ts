@@ -23,6 +23,89 @@ export function isSubscriptionWritable(
   );
 }
 
+/**
+ * Document / Business content locale (ADR 015).
+ * Separate from Next.js UI chrome locale (next-intl).
+ * Canonical PG columns hold `fa`; other locales live under `translations`.
+ */
+export const CONTENT_LOCALES = ['fa', 'en'] as const;
+export type ContentLocale = (typeof CONTENT_LOCALES)[number];
+export const DEFAULT_CONTENT_LOCALE: ContentLocale = 'fa';
+
+/** Non-default locale bags keyed by locale code (MVP: `en` only). */
+export type EntityTranslations = Partial<
+  Record<Exclude<ContentLocale, 'fa'>, Record<string, string>>
+>;
+
+export function isContentLocale(value: unknown): value is ContentLocale {
+  return value === 'fa' || value === 'en';
+}
+
+export function parseContentLocale(raw: unknown): ContentLocale {
+  return isContentLocale(raw) ? raw : DEFAULT_CONTENT_LOCALE;
+}
+
+export function contentLocaleDir(locale: ContentLocale): 'rtl' | 'ltr' {
+  return locale === 'en' ? 'ltr' : 'rtl';
+}
+
+export function asEntityTranslations(raw: unknown): EntityTranslations {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out: EntityTranslations = {};
+  const en = (raw as Record<string, unknown>).en;
+  if (en && typeof en === 'object' && !Array.isArray(en)) {
+    const bag: Record<string, string> = {};
+    for (const [k, v] of Object.entries(en)) {
+      if (typeof v === 'string' && v.trim().length > 0) {
+        bag[k] = v.trim();
+      }
+    }
+    if (Object.keys(bag).length > 0) out.en = bag;
+  }
+  return out;
+}
+
+/**
+ * Resolve localized string fields. `fa` uses canonical columns;
+ * other locales use `translations.<locale>` with fallback to columns.
+ */
+export function pickLocalized<T extends Record<string, string>>(
+  base: T,
+  translations: unknown,
+  locale: ContentLocale,
+  fields: readonly (keyof T & string)[],
+): T {
+  if (locale === DEFAULT_CONTENT_LOCALE) {
+    return { ...base };
+  }
+  const bag = asEntityTranslations(translations).en ?? {};
+  const out = { ...base };
+  for (const field of fields) {
+    const translated = bag[field];
+    if (typeof translated === 'string' && translated.trim().length > 0) {
+      out[field] = translated as T[keyof T & string];
+    }
+  }
+  return out;
+}
+
+/** Normalize write payload; only `en` + allowlisted fields kept. */
+export function normalizeEntityTranslations(
+  raw: unknown,
+  allowedFields: readonly string[],
+): EntityTranslations {
+  const parsed = asEntityTranslations(raw);
+  if (!parsed.en) return {};
+  const allow = new Set(allowedFields);
+  const bag: Record<string, string> = {};
+  for (const [k, v] of Object.entries(parsed.en)) {
+    if (!allow.has(k)) continue;
+    const trimmed = v.trim().slice(0, 4000);
+    if (trimmed) bag[k] = trimmed;
+  }
+  return Object.keys(bag).length > 0 ? { en: bag } : {};
+}
+
 export type PublicSubscription = {
   id: string;
   businessId: string;
@@ -480,11 +563,26 @@ export type PublicBlockRegistry = {
 
 export const DocumentStatus = {
   Draft: 'draft',
+  Review: 'review',
+  Approved: 'approved',
   Published: 'published',
 } as const;
 
 export type DocumentStatusValue =
   (typeof DocumentStatus)[keyof typeof DocumentStatus];
+
+/** Statuses that lock document body edits (ADR 020/021). */
+export const DOCUMENT_BODY_LOCKED_STATUSES: readonly DocumentStatusValue[] = [
+  DocumentStatus.Review,
+  DocumentStatus.Approved,
+  DocumentStatus.Published,
+] as const;
+
+/** Statuses allowed for final PDF export (ADR 021). */
+export const DOCUMENT_EXPORT_ALLOWED_STATUSES: readonly DocumentStatusValue[] = [
+  DocumentStatus.Approved,
+  DocumentStatus.Published,
+] as const;
 
 export const DocumentErrorCodes = {
   NotFound: 'DOCUMENT_NOT_FOUND',
@@ -494,6 +592,15 @@ export const DocumentErrorCodes = {
   TemplateRequired: 'DOCUMENT_TEMPLATE_REQUIRED',
   TemplateNotFound: 'DOCUMENT_TEMPLATE_NOT_FOUND',
   StorageError: 'DOCUMENT_STORAGE_ERROR',
+  PublishedLocked: 'DOCUMENT_PUBLISHED_LOCKED',
+  VersionNotFound: 'DOCUMENT_VERSION_NOT_FOUND',
+  WorkflowRequired: 'DOCUMENT_WORKFLOW_REQUIRED',
+  WorkflowInvalid: 'DOCUMENT_WORKFLOW_INVALID',
+  WorkflowForbidden: 'DOCUMENT_WORKFLOW_FORBIDDEN',
+  NotApprovedForExport: 'DOCUMENT_NOT_APPROVED_FOR_EXPORT',
+  CommentNotFound: 'DOCUMENT_COMMENT_NOT_FOUND',
+  CommentInvalidBody: 'DOCUMENT_COMMENT_INVALID_BODY',
+  CommentForbidden: 'DOCUMENT_COMMENT_FORBIDDEN',
 } as const;
 
 export type DocumentErrorCode =
@@ -505,7 +612,11 @@ export type PublicDocument = {
   businessId: string;
   templateId: string | null;
   title: string;
+  /** Document content locale (ADR 015) — drives PDF dir/lang + collections. */
+  locale: ContentLocale | string;
   status: DocumentStatusValue | string;
+  /** Latest version number if any snapshots exist. */
+  latestVersionNumber: number | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -519,6 +630,117 @@ export type PublicDocumentList = {
   page: number;
   pageSize: number;
   total: number;
+};
+
+export const DocumentVersionSource = {
+  Publish: 'publish',
+  Manual: 'manual',
+} as const;
+
+export type DocumentVersionSourceValue =
+  (typeof DocumentVersionSource)[keyof typeof DocumentVersionSource];
+
+export type PublicDocumentVersion = {
+  id: string;
+  businessId: string;
+  documentId: string;
+  versionNumber: number;
+  source: DocumentVersionSourceValue | string;
+  note: string | null;
+  title: string;
+  locale: ContentLocale | string;
+  status: DocumentStatusValue | string;
+  createdByUserId: string | null;
+  createdAt: string;
+  /** Lightweight stats for list/compare. */
+  stats: {
+    schemaVersion: number | null;
+    pageCount: number;
+    blockCount: number;
+    masterCount: number;
+  };
+};
+
+export type PublicDocumentVersionDetail = PublicDocumentVersion & {
+  body: unknown;
+};
+
+export type PublicDocumentVersionList = {
+  items: PublicDocumentVersion[];
+  total: number;
+};
+
+export type PublicDocumentVersionCompare = {
+  left: PublicDocumentVersion;
+  right: PublicDocumentVersion;
+  diff: {
+    title: boolean;
+    locale: boolean;
+    status: boolean;
+    schemaVersion: boolean;
+    pageCount: boolean;
+    blockCount: boolean;
+    masterCount: boolean;
+  };
+};
+
+export type PublicDocumentComment = {
+  id: string;
+  businessId: string;
+  documentId: string;
+  authorUserId: string;
+  body: string;
+  pageId: string | null;
+  blockId: string | null;
+  resolvedAt: string | null;
+  resolvedByUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PublicDocumentCommentList = {
+  items: PublicDocumentComment[];
+  total: number;
+  unresolvedCount: number;
+};
+
+export const AuditActions = {
+  AuthLogin: 'auth.login',
+  BusinessCreate: 'business.create',
+  BusinessDelete: 'business.delete',
+  BillingPaymentSucceeded: 'billing.payment.succeeded',
+  BillingLicenseActivated: 'billing.license.activated',
+  ExportPdfEnqueued: 'export.pdf.enqueued',
+  DocumentDelete: 'document.delete',
+  DocumentWorkflowSubmit: 'document.workflow.submit',
+  DocumentWorkflowApprove: 'document.workflow.approve',
+  DocumentWorkflowReject: 'document.workflow.reject',
+  DocumentWorkflowPublish: 'document.workflow.publish',
+  DocumentWorkflowUnpublish: 'document.workflow.unpublish',
+  DocumentWorkflowReopen: 'document.workflow.reopen',
+  WorkspaceBackupCompleted: 'workspace.backup.completed',
+  WorkspaceRestoreCompleted: 'workspace.restore.completed',
+} as const;
+
+export type AuditAction =
+  (typeof AuditActions)[keyof typeof AuditActions];
+
+export type PublicAuditEvent = {
+  id: string;
+  businessId: string | null;
+  userId: string | null;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  meta: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type PublicAuditEventList = {
+  items: PublicAuditEvent[];
+  total: number;
+  page: number;
+  pageSize: number;
 };
 
 export const ExportJobStatus = {
@@ -587,6 +809,7 @@ export type PublicProjectCategory = {
   id: string;
   businessId: string;
   name: string;
+  translations: EntityTranslations;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -606,6 +829,7 @@ export type PublicProject = {
   categoryName: string | null;
   title: string;
   description: string;
+  translations: EntityTranslations;
   status: ProjectStatusValue | string;
   coverMediaId: string | null;
   mediaIds: string[];
@@ -649,6 +873,7 @@ export type PublicTeamMember = {
   name: string;
   roleTitle: string;
   department: string;
+  translations: EntityTranslations;
   photoMediaId: string | null;
   sortOrder: number;
   fields: Record<string, unknown>;
@@ -674,6 +899,7 @@ export type PublicBranch = {
   postalCode: string;
   country: string;
   phone: string;
+  translations: EntityTranslations;
   /** Optional FK to shared Location entity. */
   locationId: string | null;
   locationName: string | null;
@@ -711,6 +937,7 @@ export type PublicBusinessService = {
   businessId: string;
   name: string;
   description: string;
+  translations: EntityTranslations;
   iconMediaId: string | null;
   sortOrder: number;
   fields: Record<string, unknown>;
@@ -730,6 +957,7 @@ export type PublicClient = {
   businessId: string;
   name: string;
   website: string;
+  translations: EntityTranslations;
   logoMediaId: string | null;
   sortOrder: number;
   fields: Record<string, unknown>;
@@ -749,6 +977,7 @@ export type PublicCertificate = {
   businessId: string;
   name: string;
   issuer: string;
+  translations: EntityTranslations;
   issuedAt: string | null;
   expiresAt: string | null;
   documentMediaId: string | null;
@@ -907,6 +1136,7 @@ export type PublicTimelineEvent = {
   occurredAt: string;
   title: string;
   body: string;
+  translations: EntityTranslations;
   mediaId: string | null;
   sortOrder: number;
   fields: Record<string, unknown>;
@@ -955,3 +1185,225 @@ export type PublicCollectionList = {
   /** Total matching rows (not limited by page size). */
   total: number;
 };
+
+/** Bulk content import (Excel/CSV) — ADR 019; MVP entity = projects. */
+export const ImportJobStatus = {
+  Uploaded: 'uploaded',
+  Mapped: 'mapped',
+  Queued: 'queued',
+  Processing: 'processing',
+  Completed: 'completed',
+  Failed: 'failed',
+} as const;
+
+export type ImportJobStatusValue =
+  (typeof ImportJobStatus)[keyof typeof ImportJobStatus];
+
+export const ImportEntityType = {
+  Projects: 'projects',
+} as const;
+
+export type ImportEntityTypeValue =
+  (typeof ImportEntityType)[keyof typeof ImportEntityType];
+
+export const ImportFileFormat = {
+  Csv: 'csv',
+  Xlsx: 'xlsx',
+} as const;
+
+export type ImportFileFormatValue =
+  (typeof ImportFileFormat)[keyof typeof ImportFileFormat];
+
+/** Target fields for project column mapping. */
+export const ProjectImportField = {
+  Title: 'title',
+  Description: 'description',
+  Status: 'status',
+  Category: 'category',
+  Location: 'location',
+  TitleEn: 'titleEn',
+  DescriptionEn: 'descriptionEn',
+  Year: 'year',
+} as const;
+
+export type ProjectImportFieldValue =
+  (typeof ProjectImportField)[keyof typeof ProjectImportField];
+
+export const PROJECT_IMPORT_FIELDS = Object.values(ProjectImportField);
+
+export const ImportErrorCodes = {
+  NotFound: 'IMPORT_NOT_FOUND',
+  FileRequired: 'IMPORT_FILE_REQUIRED',
+  FileTooLarge: 'IMPORT_FILE_TOO_LARGE',
+  InvalidFormat: 'IMPORT_INVALID_FORMAT',
+  ParseFailed: 'IMPORT_PARSE_FAILED',
+  TooManyRows: 'IMPORT_TOO_MANY_ROWS',
+  MappingRequired: 'IMPORT_MAPPING_REQUIRED',
+  TitleColumnRequired: 'IMPORT_TITLE_COLUMN_REQUIRED',
+  InvalidMapping: 'IMPORT_INVALID_MAPPING',
+  InvalidState: 'IMPORT_INVALID_STATE',
+  Empty: 'IMPORT_EMPTY',
+  CommitFailed: 'IMPORT_COMMIT_FAILED',
+} as const;
+
+export type ImportErrorCode =
+  (typeof ImportErrorCodes)[keyof typeof ImportErrorCodes];
+
+export type ImportColumnMapping = Partial<
+  Record<ProjectImportFieldValue, string>
+>;
+
+export type ImportRowError = {
+  row: number;
+  code: string;
+  message: string;
+};
+
+export type ImportPreview = {
+  headers: string[];
+  totalRows: number;
+  sampleRows: Record<string, string>[];
+  /** Mapped sample (after mapping applied). */
+  mappedSample?: Record<string, string>[];
+  errorCount: number;
+  sampleErrors: ImportRowError[];
+};
+
+export type ImportResult = {
+  created: number;
+  skipped: number;
+  errors: ImportRowError[];
+};
+
+export type PublicImportJob = {
+  id: string;
+  businessId: string;
+  entityType: ImportEntityTypeValue | string;
+  status: ImportJobStatusValue | string;
+  format: ImportFileFormatValue | string;
+  originalFilename: string;
+  mimeType: string;
+  byteSize: number;
+  mapping: ImportColumnMapping | null;
+  preview: ImportPreview | null;
+  result: ImportResult | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+};
+
+/** ZIP package kind — see ADR 024. */
+export const BUSINESS_BACKUP_KIND = 'vdb.business-backup' as const;
+export const BUSINESS_BACKUP_FORMAT_VERSION = 1 as const;
+
+export const WorkspaceBackupStatus = {
+  Queued: 'queued',
+  Processing: 'processing',
+  Completed: 'completed',
+  Failed: 'failed',
+} as const;
+
+export type WorkspaceBackupStatusValue =
+  (typeof WorkspaceBackupStatus)[keyof typeof WorkspaceBackupStatus];
+
+export const WorkspaceRestoreStatus = {
+  Uploaded: 'uploaded',
+  Queued: 'queued',
+  Processing: 'processing',
+  Completed: 'completed',
+  Failed: 'failed',
+} as const;
+
+export type WorkspaceRestoreStatusValue =
+  (typeof WorkspaceRestoreStatus)[keyof typeof WorkspaceRestoreStatus];
+
+export const BackupErrorCodes = {
+  NotFound: 'BACKUP_NOT_FOUND',
+  NotReady: 'BACKUP_NOT_READY',
+  Failed: 'BACKUP_FAILED',
+  QueueUnavailable: 'BACKUP_QUEUE_UNAVAILABLE',
+  InvalidPackage: 'BACKUP_INVALID_PACKAGE',
+  UnsupportedVersion: 'BACKUP_UNSUPPORTED_VERSION',
+  FileRequired: 'BACKUP_FILE_REQUIRED',
+  FileTooLarge: 'BACKUP_FILE_TOO_LARGE',
+  RestoreNotFound: 'BACKUP_RESTORE_NOT_FOUND',
+  RestoreInvalidState: 'BACKUP_RESTORE_INVALID_STATE',
+  TargetNotEmpty: 'BACKUP_RESTORE_TARGET_NOT_EMPTY',
+  RestoreFailed: 'BACKUP_RESTORE_FAILED',
+} as const;
+
+export type BackupErrorCode =
+  (typeof BackupErrorCodes)[keyof typeof BackupErrorCodes];
+
+export type BusinessBackupCounts = {
+  designThemes: number;
+  fontFaces: number;
+  mediaAssets: number;
+  templates: number;
+  documents: number;
+  documentVersions: number;
+  documentComments: number;
+  projectCategories: number;
+  projects: number;
+  branches: number;
+  teamMembers: number;
+  services: number;
+  clients: number;
+  certificates: number;
+  galleries: number;
+  galleryItems: number;
+  locations: number;
+  timelineEvents: number;
+  templateBodies: number;
+  documentBodies: number;
+  documentVersionBodies: number;
+  mediaFiles: number;
+  fontFiles: number;
+};
+
+export type BusinessBackupManifest = {
+  kind: typeof BUSINESS_BACKUP_KIND;
+  formatVersion: number;
+  createdAt: string;
+  source: { businessId: string; name: string };
+  counts: BusinessBackupCounts;
+};
+
+export type PublicWorkspaceBackupJob = {
+  id: string;
+  businessId: string;
+  status: WorkspaceBackupStatusValue | string;
+  byteSize: number | null;
+  mimeType: string;
+  manifest: BusinessBackupManifest | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  downloadUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+};
+
+export type PublicWorkspaceRestoreJob = {
+  id: string;
+  businessId: string;
+  status: WorkspaceRestoreStatusValue | string;
+  originalFilename: string;
+  byteSize: number;
+  mimeType: string;
+  preview: BusinessBackupManifest | null;
+  result: { remappedEntities: number } | null;
+  confirmReplace: boolean;
+  targetEmpty: boolean | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+};
+

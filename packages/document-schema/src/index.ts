@@ -207,6 +207,97 @@ export function evaluateVisibilityCondition(
   }
 }
 
+export type BlockBreakRules = {
+  /** Prefer not splitting this block across pages (atomic unit). */
+  keepTogether?: boolean;
+  /** Prefer staying with the following sibling (orphan titles). */
+  keepWithNext?: boolean;
+  /** Force a page break before this block. */
+  breakBefore?: boolean;
+  /** Force a page break after this block. */
+  breakAfter?: boolean;
+};
+
+export const BlockBreakRulesSchema = z.object({
+  keepTogether: z.boolean().optional(),
+  keepWithNext: z.boolean().optional(),
+  breakBefore: z.boolean().optional(),
+  breakAfter: z.boolean().optional(),
+});
+
+/** Clickable link on a block (ADR 018 — Interactive PDF). */
+export const BLOCK_LINK_KINDS = [
+  'external',
+  'email',
+  'phone',
+  'internal',
+] as const;
+export type BlockLinkKind = (typeof BLOCK_LINK_KINDS)[number];
+
+export type BlockLink = {
+  kind: BlockLinkKind;
+  /**
+   * external: URL · email: address · phone: number ·
+   * internal: target block id (renders as `#h-{id}`).
+   */
+  target: string;
+};
+
+export const BlockLinkSchema = z.object({
+  kind: z.enum(BLOCK_LINK_KINDS),
+  target: z.string().min(1).max(2000),
+});
+
+/**
+ * Resolve a safe href for PDF/HTML. Invalid → null (render without link).
+ * Never uses eval; schemes are whitelist-only.
+ */
+export function resolveBlockLinkHref(link: BlockLink | null | undefined): string | null {
+  if (!link || typeof link.target !== 'string') return null;
+  const target = link.target.trim();
+  if (!target || target.length > 2000) return null;
+
+  switch (link.kind) {
+    case 'internal': {
+      // Block ids are cuid-like / schema ids — allow alnum _ -
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(target)) return null;
+      return `#h-${target}`;
+    }
+    case 'email': {
+      const addr = target.replace(/^mailto:/i, '');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addr)) return null;
+      return `mailto:${addr}`;
+    }
+    case 'phone': {
+      const num = target.replace(/^tel:/i, '').replace(/[^\d+]/g, '');
+      if (num.length < 5 || num.length > 20) return null;
+      return `tel:${num}`;
+    }
+    case 'external': {
+      let url = target;
+      if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) {
+        url = `https://${url}`;
+      }
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          return null;
+        }
+        return parsed.toString();
+      } catch {
+        return null;
+      }
+    }
+    default:
+      return null;
+  }
+}
+
+/** Stable HTML/PDF fragment id for headings & internal links (ADR 012/018). */
+export function blockAnchorId(blockId: string): string {
+  return `h-${blockId}`;
+}
+
 export type BlockNode = {
   id: string;
   type: BlockType;
@@ -214,6 +305,10 @@ export type BlockNode = {
   children?: BlockNode[];
   /** Optional visibility condition (ADR 014). Absent = always show. */
   when?: BlockVisibilityCondition | null;
+  /** Optional page-break / keep rules (ADR 017). */
+  breakRules?: BlockBreakRules | null;
+  /** Optional clickable link (ADR 018). */
+  link?: BlockLink | null;
 };
 
 export function isBlockVisible(
@@ -231,6 +326,8 @@ export const BlockNodeSchema: z.ZodType<BlockNode> = z.lazy(() =>
       props: z.record(z.string(), z.unknown()).default({}),
       children: z.array(BlockNodeSchema).optional(),
       when: VisibilityConditionSchema.nullable().optional(),
+      breakRules: BlockBreakRulesSchema.nullable().optional(),
+      link: BlockLinkSchema.nullable().optional(),
     })
     .superRefine((node, ctx) => {
       const entry = BLOCK_REGISTRY.find((e) => e.type === node.type);
@@ -304,6 +401,8 @@ export const PageConfigSchema = z.object({
       left: z.number().nonnegative(),
     })
     .default({ top: 20, right: 20, bottom: 20, left: 20 }),
+  /** When true (default), export/preview run estimate-based smart pagination (ADR 017). */
+  autoPaginate: z.boolean().default(true),
 });
 
 export type PageConfig = z.infer<typeof PageConfigSchema>;
@@ -335,6 +434,8 @@ export const DocumentBodySchema = z.object({
   documentId: z.string().min(1),
   templateId: z.string().nullable().default(null),
   title: z.string().default(''),
+  /** Content locale for preview/PDF (ADR 015). Default fa. */
+  locale: z.enum(['fa', 'en']).default('fa'),
   dataRefs: z.record(z.string(), z.unknown()).default({}),
   page: PageConfigSchema.default({}),
   masters: z.array(MasterPageSchema).default([]),
@@ -459,6 +560,8 @@ export function cloneBlocksWithNewIds(blocks: BlockNode[]): BlockNode[] {
       ? cloneBlocksWithNewIds(block.children)
       : undefined,
     ...(block.when ? { when: { ...block.when } } : {}),
+    ...(block.breakRules ? { breakRules: { ...block.breakRules } } : {}),
+    ...(block.link ? { link: { ...block.link } } : {}),
   }));
 }
 
@@ -896,55 +999,375 @@ export function parseRepeaterBlockProps(
   return RepeaterBlockPropsSchema.parse(props ?? {});
 }
 
-const ITEM_PLACEHOLDER = /\{\{\s*item\.([a-zA-Z][a-zA-Z0-9_]*)\s*\}\}/g;
+const ANY_PLACEHOLDER = /\{\{\s*([^}]+?)\s*\}\}/g;
+export const BINDING_EXPR_MAX_LEN = 120;
+
+/** Context for safe placeholder resolution (ADR 016). */
+export type BindingCollectionSnapshot = {
+  total: number;
+  items: Array<{ values: Record<string, string> }>;
+};
+
+export type BindingContext = {
+  business: { name: string };
+  collections: Partial<Record<RepeaterSource, BindingCollectionSnapshot>>;
+  /** Set inside repeater card expansion. */
+  item?: Record<string, string>;
+};
+
+export type BindingExpression =
+  | { kind: 'business'; field: 'name' }
+  | { kind: 'item'; field: string }
+  | {
+      kind: 'count';
+      source: RepeaterSource;
+      where?: { field: string; value: string };
+    };
+
+export type BindingCatalogEntry = {
+  id: string;
+  /** Exact placeholder text to insert, including braces. */
+  expression: string;
+  /** i18n key suffix under editor.bindings.* */
+  labelKey: string;
+  /** Optional module gate for UI hint (still enforced on collection fetch). */
+  moduleCode: string | null;
+  /** Only meaningful inside repeater children. */
+  repeaterOnly: boolean;
+};
+
+/** Editor insert catalog — keep in sync with parseBindingExpression. */
+export const BINDING_CATALOG: readonly BindingCatalogEntry[] = [
+  {
+    id: 'business.name',
+    expression: '{{business.name}}',
+    labelKey: 'businessName',
+    moduleCode: null,
+    repeaterOnly: false,
+  },
+  {
+    id: 'item.title',
+    expression: '{{item.title}}',
+    labelKey: 'itemTitle',
+    moduleCode: null,
+    repeaterOnly: true,
+  },
+  {
+    id: 'item.name',
+    expression: '{{item.name}}',
+    labelKey: 'itemName',
+    moduleCode: null,
+    repeaterOnly: true,
+  },
+  {
+    id: 'item.description',
+    expression: '{{item.description}}',
+    labelKey: 'itemDescription',
+    moduleCode: null,
+    repeaterOnly: true,
+  },
+  {
+    id: 'count.projects',
+    expression: '{{count(projects)}}',
+    labelKey: 'countProjects',
+    moduleCode: 'module.projects',
+    repeaterOnly: false,
+  },
+  {
+    id: 'count.projects.published',
+    expression: '{{count(projects where status=published)}}',
+    labelKey: 'countProjectsPublished',
+    moduleCode: 'module.projects',
+    repeaterOnly: false,
+  },
+  {
+    id: 'count.teamMembers',
+    expression: '{{count(teamMembers)}}',
+    labelKey: 'countTeamMembers',
+    moduleCode: null,
+    repeaterOnly: false,
+  },
+  {
+    id: 'count.branches',
+    expression: '{{count(branches)}}',
+    labelKey: 'countBranches',
+    moduleCode: null,
+    repeaterOnly: false,
+  },
+  {
+    id: 'count.services',
+    expression: '{{count(services)}}',
+    labelKey: 'countServices',
+    moduleCode: null,
+    repeaterOnly: false,
+  },
+  {
+    id: 'count.clients',
+    expression: '{{count(clients)}}',
+    labelKey: 'countClients',
+    moduleCode: null,
+    repeaterOnly: false,
+  },
+  {
+    id: 'count.certificates',
+    expression: '{{count(certificates)}}',
+    labelKey: 'countCertificates',
+    moduleCode: null,
+    repeaterOnly: false,
+  },
+  {
+    id: 'count.timelineEvents',
+    expression: '{{count(timelineEvents)}}',
+    labelKey: 'countTimelineEvents',
+    moduleCode: 'module.timeline',
+    repeaterOnly: false,
+  },
+] as const;
+
+const BUSINESS_RE = /^business\.name$/;
+const ITEM_RE = /^item\.([a-zA-Z][a-zA-Z0-9_]*)$/;
+const COUNT_RE =
+  /^count\(\s*([a-zA-Z][a-zA-Z0-9_]*)\s*(?:where\s+([a-zA-Z][a-zA-Z0-9_]*)\s*=\s*(?:'([a-zA-Z0-9_.-]{1,64})'|([a-zA-Z0-9_.-]{1,64})))?\s*\)$/;
+
+/** Parse a single expression body (no braces). Invalid → null. */
+export function parseBindingExpression(raw: string): BindingExpression | null {
+  const expr = raw.trim().replace(/\s+/g, ' ');
+  if (!expr || expr.length > BINDING_EXPR_MAX_LEN) return null;
+
+  if (BUSINESS_RE.test(expr)) {
+    return { kind: 'business', field: 'name' };
+  }
+
+  const item = ITEM_RE.exec(expr);
+  if (item?.[1]) {
+    return { kind: 'item', field: item[1] };
+  }
+
+  const count = COUNT_RE.exec(expr);
+  if (count?.[1]) {
+    const source = count[1];
+    if (!(REPEATER_SOURCES as readonly string[]).includes(source)) {
+      return null;
+    }
+    const field = count[2];
+    const value = count[3] ?? count[4];
+    if (field && value) {
+      return {
+        kind: 'count',
+        source: source as RepeaterSource,
+        where: { field, value },
+      };
+    }
+    if (field || value) return null;
+    return { kind: 'count', source: source as RepeaterSource };
+  }
+
+  return null;
+}
+
+export function resolveBindingExpression(
+  expr: BindingExpression,
+  ctx: BindingContext,
+): string {
+  switch (expr.kind) {
+    case 'business':
+      return ctx.business.name ?? '';
+    case 'item':
+      return ctx.item?.[expr.field] ?? '';
+    case 'count': {
+      const snap = ctx.collections[expr.source];
+      if (!snap) return '0';
+      if (!expr.where) return String(snap.total);
+      const n = snap.items.filter(
+        (it) => (it.values[expr.where!.field] ?? '') === expr.where!.value,
+      ).length;
+      return String(n);
+    }
+    default: {
+      const _exhaustive: never = expr;
+      void _exhaustive;
+      return '';
+    }
+  }
+}
+
+/**
+ * Replace all `{{ … }}` placeholders. Unknown/invalid → empty.
+ * Never uses eval.
+ */
+export function applyBindings(template: string, ctx: BindingContext): string {
+  return template.replace(ANY_PLACEHOLDER, (_m, raw: string) => {
+    const parsed = parseBindingExpression(String(raw ?? ''));
+    if (!parsed) return '';
+    return resolveBindingExpression(parsed, ctx);
+  });
+}
 
 /** Replace `{{item.key}}` placeholders; unknown keys → empty. */
 export function bindItemPlaceholders(
   template: string,
   values: Record<string, string>,
 ): string {
-  return template.replace(ITEM_PLACEHOLDER, (_m, key: string) => {
-    return values[key] ?? '';
+  return applyBindings(template, {
+    business: { name: '' },
+    collections: {},
+    item: values,
   });
+}
+
+function isBindingContext(
+  value: Record<string, string> | BindingContext,
+): value is BindingContext {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'business' in value &&
+    'collections' in value
+  );
+}
+
+function toBindingContext(
+  valuesOrCtx: Record<string, string> | BindingContext,
+): BindingContext {
+  if (isBindingContext(valuesOrCtx)) return valuesOrCtx;
+  return { business: { name: '' }, collections: {}, item: valuesOrCtx };
 }
 
 function bindStringProp(
   props: Record<string, unknown>,
   key: string,
-  values: Record<string, string>,
+  ctx: BindingContext,
 ): void {
   if (typeof props[key] === 'string') {
-    props[key] = bindItemPlaceholders(props[key] as string, values);
+    props[key] = applyBindings(props[key] as string, ctx);
   }
 }
 
-/** Deep-clone blocks and apply item bindings to string props. */
+function bindProps(
+  props: Record<string, unknown>,
+  ctx: BindingContext,
+): Record<string, unknown> {
+  const next = { ...props };
+  bindStringProp(next, 'content', ctx);
+  bindStringProp(next, 'title', ctx);
+  bindStringProp(next, 'alt', ctx);
+  bindStringProp(next, 'value', ctx);
+  bindStringProp(next, 'caption', ctx);
+  bindStringProp(next, 'emptyMessage', ctx);
+  return next;
+}
+
+/**
+ * Deep-clone blocks and apply bindings to string props.
+ * Accepts legacy item-value map or full BindingContext.
+ * When `bindRepeaterChildren` is false (document-level pass), repeater card
+ * templates are left unbound. When true (card expansion), nested repeaters
+ * drop children (unsupported).
+ */
 export function bindBlockTree(
   blocks: BlockNode[],
-  values: Record<string, string>,
+  valuesOrCtx: Record<string, string> | BindingContext,
+  opts?: { bindRepeaterChildren?: boolean },
 ): BlockNode[] {
+  const ctx = toBindingContext(valuesOrCtx);
+  const bindRepeaterChildren = opts?.bindRepeaterChildren ?? true;
   return blocks.map((b) => {
-    const props: Record<string, unknown> = { ...b.props };
-    bindStringProp(props, 'content', values);
-    bindStringProp(props, 'title', values);
-    bindStringProp(props, 'alt', values);
-    bindStringProp(props, 'value', values);
-    bindStringProp(props, 'caption', values);
-    bindStringProp(props, 'emptyMessage', values);
-    const children =
-      b.type === 'repeater'
-        ? [] // nested repeater unsupported — drop children
-        : b.children
-          ? bindBlockTree(b.children, values)
-          : undefined;
+    const props = bindProps(b.props, ctx);
+    let children: BlockNode[] | undefined;
+    if (b.type === 'repeater') {
+      children = bindRepeaterChildren
+        ? []
+        : b.children?.map(cloneBlockShallow);
+    } else if (b.children) {
+      children = bindBlockTree(b.children, ctx, opts);
+    }
     return {
       id: b.id,
       type: b.type,
       props,
       ...(children ? { children } : {}),
       ...(b.when ? { when: { ...b.when } } : {}),
+      ...(b.breakRules ? { breakRules: { ...b.breakRules } } : {}),
+      ...(b.link ? { link: { ...b.link } } : {}),
     };
   });
+}
+
+function cloneBlockShallow(b: BlockNode): BlockNode {
+  return {
+    id: b.id,
+    type: b.type,
+    props: { ...b.props },
+    ...(b.children ? { children: b.children.map(cloneBlockShallow) } : {}),
+    ...(b.when ? { when: { ...b.when } } : {}),
+    ...(b.breakRules ? { breakRules: { ...b.breakRules } } : {}),
+    ...(b.link ? { link: { ...b.link } } : {}),
+  };
+}
+
+/**
+ * Resolve document-level bindings; leave repeater card templates intact.
+ */
+export function bindDocumentBlocks(
+  blocks: BlockNode[],
+  ctx: BindingContext,
+): BlockNode[] {
+  return bindBlockTree(blocks, ctx, { bindRepeaterChildren: false });
+}
+
+function collectBindingSourcesFromString(
+  text: string,
+  out: Set<RepeaterSource>,
+): void {
+  let m: RegExpExecArray | null;
+  const re = /\{\{\s*([^}]+?)\s*\}\}/g;
+  while ((m = re.exec(text))) {
+    const parsed = parseBindingExpression(m[1] ?? '');
+    if (parsed?.kind === 'count') out.add(parsed.source);
+  }
+}
+
+function collectBindingSourcesFromBlocks(
+  blocks: BlockNode[],
+  out: Set<RepeaterSource>,
+): void {
+  for (const b of blocks) {
+    for (const key of [
+      'content',
+      'title',
+      'alt',
+      'value',
+      'caption',
+      'emptyMessage',
+    ] as const) {
+      const v = b.props[key];
+      if (typeof v === 'string') collectBindingSourcesFromString(v, out);
+    }
+    if (b.type === 'repeater') {
+      const props = parseRepeaterBlockProps(b.props);
+      out.add(props.source);
+    }
+    if (b.children?.length) collectBindingSourcesFromBlocks(b.children, out);
+  }
+}
+
+/** Collection sources needed for count() and/or repeaters in a body. */
+export function documentCollectBindingSources(body: {
+  pages?: { blocks: BlockNode[] }[];
+  masters?: {
+    header?: { blocks?: BlockNode[] };
+    footer?: { blocks?: BlockNode[] };
+  }[];
+}): RepeaterSource[] {
+  const out = new Set<RepeaterSource>();
+  for (const page of body.pages ?? []) {
+    collectBindingSourcesFromBlocks(page.blocks ?? [], out);
+  }
+  for (const master of body.masters ?? []) {
+    collectBindingSourcesFromBlocks(master.header?.blocks ?? [], out);
+    collectBindingSourcesFromBlocks(master.footer?.blocks ?? [], out);
+  }
+  return [...out];
 }
 
 function collectRepeaterSourcesFromBlocks(
@@ -1074,6 +1497,13 @@ function walkBlocks(
   }
 }
 
+export function walkDocumentBlocks(
+  blocks: BlockNode[],
+  visit: (b: BlockNode) => void,
+): void {
+  walkBlocks(blocks, visit);
+}
+
 /** True if any page/master band contains the given block type. */
 export function documentContainsBlockType(
   body: {
@@ -1119,3 +1549,290 @@ export const MASTER_RENDER_CONTRACT = {
     'page-number',
   ] as const,
 } as const;
+
+// ─── Smart pagination (ADR 017) ─────────────────────────────────────────────
+
+export type ResolvedBreakRules = {
+  keepTogether: boolean;
+  keepWithNext: boolean;
+  breakBefore: boolean;
+  breakAfter: boolean;
+};
+
+/** Type defaults merged under author `breakRules`. */
+export function defaultBreakRulesForBlock(
+  block: BlockNode,
+): ResolvedBreakRules {
+  const heading = Number(block.props.headingLevel);
+  const isHeading =
+    block.type === 'section' ||
+    (block.type === 'text' &&
+      (heading === 1 || heading === 2 || heading === 3));
+  const mediaLike =
+    block.type === 'image' ||
+    block.type === 'gallery' ||
+    block.type === 'map' ||
+    block.type === 'orgChart' ||
+    block.type === 'timeline' ||
+    block.type === 'qr';
+  return {
+    keepTogether: mediaLike || block.type === 'toc',
+    keepWithNext: isHeading,
+    breakBefore: false,
+    breakAfter: false,
+  };
+}
+
+export function effectiveBreakRules(block: BlockNode): ResolvedBreakRules {
+  const base = defaultBreakRulesForBlock(block);
+  const o = block.breakRules ?? {};
+  return {
+    keepTogether: o.keepTogether ?? base.keepTogether,
+    keepWithNext: o.keepWithNext ?? base.keepWithNext,
+    breakBefore: o.breakBefore ?? base.breakBefore,
+    breakAfter: o.breakAfter ?? base.breakAfter,
+  };
+}
+
+/** Abstract content capacity for one page body (estimate units). */
+export function pageContentCapacity(page: PageConfig): number {
+  const pageHMm =
+    page.size === 'A3'
+      ? page.orientation === 'landscape'
+        ? 297
+        : 420
+      : page.orientation === 'landscape'
+        ? 210
+        : 297;
+  const usable =
+    pageHMm - page.marginsMm.top - page.marginsMm.bottom - 28 /* chrome */;
+  // ~1 unit ≈ 2.5mm of flow
+  return Math.max(40, Math.round(usable / 2.5));
+}
+
+export function estimateBlockHeight(block: BlockNode): number {
+  switch (block.type) {
+    case 'divider':
+      return 2;
+    case 'headerSlot':
+    case 'footerSlot':
+      return 0;
+    case 'text': {
+      const content = String(block.props.content ?? '');
+      const lines = Math.max(1, Math.ceil(content.length / 72));
+      const heading = Number(block.props.headingLevel);
+      if (heading === 1 || heading === 2 || heading === 3) {
+        return 5 + Math.min(lines, 3);
+      }
+      return 3 + lines * 2;
+    }
+    case 'section': {
+      const title = String(block.props.title ?? '').trim() ? 5 : 0;
+      const kids = (block.children ?? []).reduce(
+        (s, c) => s + estimateBlockHeight(c),
+        0,
+      );
+      return title + kids + 2;
+    }
+    case 'image':
+    case 'gallery':
+      return 22;
+    case 'map':
+    case 'orgChart':
+    case 'timeline':
+      return Math.min(
+        48,
+        Math.max(18, Number(block.props.heightPx ?? 320) / 12),
+      );
+    case 'qr':
+      return 14;
+    case 'toc':
+      return 16;
+    case 'repeater': {
+      const card = (block.children ?? []).reduce(
+        (s, c) => s + estimateBlockHeight(c),
+        0,
+      );
+      return Math.max(8, card + 2);
+    }
+    default:
+      return 8;
+  }
+}
+
+export type PaginationRepeaterItems = Record<
+  string,
+  Array<{ id: string; values: Record<string, string> }>
+>;
+
+export type PaginateOptions = {
+  visibility?: VisibilityContext | null;
+  /** Pre-resolved repeater items keyed by block id (export / preview). */
+  repeaterItemsByBlockId?: PaginationRepeaterItems;
+  binding?: BindingContext;
+};
+
+type FlowUnit = {
+  blocks: BlockNode[];
+  height: number;
+  breakBefore: boolean;
+  breakAfter: boolean;
+  keepWithNext: boolean;
+};
+
+function expandTopLevelToUnits(
+  blocks: BlockNode[],
+  opts: PaginateOptions,
+): FlowUnit[] {
+  const units: FlowUnit[] = [];
+  const visibility = opts.visibility ?? null;
+  for (const block of blocks) {
+    if (!isBlockVisible(block, visibility)) continue;
+    const rules = effectiveBreakRules(block);
+
+    if (block.type === 'repeater') {
+      const props = parseRepeaterBlockProps(block.props);
+      const items = opts.repeaterItemsByBlockId?.[block.id] ?? [];
+      if (items.length === 0) {
+        const empty: BlockNode = {
+          id: `${block.id}__empty`,
+          type: 'text',
+          props: {
+            content: props.emptyMessage.trim() || '—',
+          },
+          breakRules: { keepTogether: true },
+        };
+        units.push({
+          blocks: [empty],
+          height: estimateBlockHeight(empty),
+          breakBefore: rules.breakBefore,
+          breakAfter: rules.breakAfter,
+          keepWithNext: false,
+        });
+        continue;
+      }
+      items.forEach((item, index) => {
+        const cardChildren = bindBlockTree(block.children ?? [], {
+          ...(opts.binding ?? { business: { name: '' }, collections: {} }),
+          item: item.values,
+        });
+        const card: BlockNode = {
+          id: `${block.id}__card_${item.id}`,
+          type: 'section',
+          props: { title: '', headingLevel: 3 },
+          children: cardChildren,
+          breakRules: { keepTogether: true },
+        };
+        const height = Math.max(
+          6,
+          cardChildren.reduce((s, c) => s + estimateBlockHeight(c), 0) + 2,
+        );
+        units.push({
+          blocks: [card],
+          height,
+          breakBefore: rules.breakBefore && index === 0,
+          breakAfter: rules.breakAfter && index === items.length - 1,
+          keepWithNext: false,
+        });
+      });
+      continue;
+    }
+
+    units.push({
+      blocks: [block],
+      height: Math.max(1, estimateBlockHeight(block)),
+      breakBefore: rules.breakBefore,
+      breakAfter: rules.breakAfter,
+      keepWithNext: rules.keepWithNext,
+    });
+  }
+  return units;
+}
+
+function packUnits(units: FlowUnit[], capacity: number): BlockNode[][] {
+  const pages: BlockNode[][] = [];
+  let current: BlockNode[] = [];
+  let used = 0;
+
+  const flush = () => {
+    if (current.length === 0) return;
+    pages.push(current);
+    current = [];
+    used = 0;
+  };
+
+  for (let i = 0; i < units.length; i++) {
+    const unit = units[i]!;
+    const next = units[i + 1];
+    let groupHeight = unit.height;
+    let groupBlocks = [...unit.blocks];
+    let groupBreakAfter = unit.breakAfter;
+
+    if (unit.keepWithNext && next && !next.breakBefore) {
+      groupHeight += next.height;
+      groupBlocks = [...groupBlocks, ...next.blocks];
+      groupBreakAfter = next.breakAfter;
+      i += 1;
+    }
+
+    if (unit.breakBefore && current.length > 0) {
+      flush();
+    }
+
+    const fits = used === 0 || used + groupHeight <= capacity;
+    if (!fits) {
+      flush();
+    }
+
+    if (groupHeight > capacity && current.length > 0) {
+      flush();
+    }
+
+    current.push(...groupBlocks);
+    used += groupHeight;
+
+    if (groupBreakAfter) {
+      flush();
+    }
+  }
+
+  flush();
+  if (pages.length === 0) pages.push([]);
+  return pages;
+}
+
+/**
+ * Estimate-based smart pagination (ADR 017).
+ * Expands repeaters into card units, packs into logical pages.
+ */
+export function paginateDocumentBody(
+  body: DocumentBody,
+  opts: PaginateOptions = {},
+): DocumentBody {
+  if (body.page.autoPaginate === false) {
+    return body;
+  }
+
+  const capacity = pageContentCapacity(body.page);
+  const defaultMasterId =
+    body.pages[0]?.masterId ?? body.masters[0]?.id ?? null;
+
+  const allTop: BlockNode[] = [];
+  for (const page of body.pages) {
+    allTop.push(...page.blocks);
+  }
+
+  const units = expandTopLevelToUnits(allTop, opts);
+  const packed = packUnits(units, capacity);
+
+  const pages: DocumentPage[] = packed.map((blocks, index) => ({
+    id: body.pages[index]?.id ?? newId('pg'),
+    masterId: body.pages[index]?.masterId ?? defaultMasterId,
+    blocks,
+  }));
+
+  return {
+    ...body,
+    pages: pages.length > 0 ? pages : body.pages,
+  };
+}
