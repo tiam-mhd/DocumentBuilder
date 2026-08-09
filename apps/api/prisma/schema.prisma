@@ -46,8 +46,28 @@ model User {
   createdAt     DateTime             @default(now()) @map("created_at")
   updatedAt     DateTime             @updatedAt @map("updated_at")
   memberships   BusinessMembership[]
+  auditEvents   AuditEvent[]
 
   @@map("users")
+}
+
+/** Append-only audit log — see `.cursor/rules/15-audit-events.mdc`. */
+model AuditEvent {
+  id         String    @id @default(cuid())
+  businessId String?   @map("business_id")
+  userId     String?   @map("user_id")
+  action     String
+  entityType String    @map("entity_type")
+  entityId   String?   @map("entity_id")
+  meta       Json      @default("{}")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  business   Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, createdAt])
+  @@index([entityType, entityId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_events")
 }
 
 model Business {
@@ -66,6 +86,9 @@ model Business {
   templates    DocumentTemplate[]
   documents    Document[]
   exportJobs   ExportJob[]
+  importJobs   ImportJob[]
+  documentVersions DocumentVersion[]
+  documentComments DocumentComment[]
   projectCategories ProjectCategory[]
   projects     Project[]
   teamMembers  TeamMember[]
@@ -77,6 +100,9 @@ model Business {
   galleryItems GalleryItem[]
   locations    Location[]
   timelineEvents TimelineEvent[]
+  auditEvents  AuditEvent[]
+  workspaceBackupJobs WorkspaceBackupJob[]
+  workspaceRestoreJobs WorkspaceRestoreJob[]
 
   @@map("businesses")
 }
@@ -331,6 +357,8 @@ model DocumentTemplate {
 
 enum DocumentStatus {
   draft
+  review
+  approved
   published
 }
 
@@ -343,6 +371,8 @@ model Document {
   businessId String           @map("business_id")
   templateId String?          @map("template_id")
   title      String
+  /** Content locale for preview/PDF (ADR 015). Columns default fa. */
+  locale     String           @default("fa")
   status     DocumentStatus   @default(draft)
   createdAt  DateTime         @default(now()) @map("created_at")
   updatedAt  DateTime         @updatedAt @map("updated_at")
@@ -350,10 +380,62 @@ model Document {
   business   Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
   template   DocumentTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
   exportJobs ExportJob[]
+  versions   DocumentVersion[]
+  comments   DocumentComment[]
 
   @@index([businessId, deletedAt, createdAt])
   @@index([businessId, status, deletedAt])
   @@map("documents")
+}
+
+/** Review comments on a document — ADR 022. Mentions out of MVP. */
+model DocumentComment {
+  id               String    @id @default(cuid())
+  businessId       String    @map("business_id")
+  documentId       String    @map("document_id")
+  authorUserId     String    @map("author_user_id")
+  body             String
+  /** Optional DocumentBody page id. */
+  pageId           String?   @map("page_id")
+  /** Optional BlockNode id (element anchor). */
+  blockId          String?   @map("block_id")
+  resolvedAt       DateTime? @map("resolved_at")
+  resolvedByUserId String?   @map("resolved_by_user_id")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  deletedAt        DateTime? @map("deleted_at")
+  business         Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  document         Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, documentId, deletedAt, createdAt])
+  @@index([businessId, documentId, resolvedAt])
+  @@map("document_comments")
+}
+
+enum DocumentVersionSource {
+  publish
+  manual
+}
+
+/** Immutable document version metadata — body snapshot in Mongo `document_version_bodies`. */
+model DocumentVersion {
+  id              String                @id @default(cuid())
+  businessId      String                @map("business_id")
+  documentId      String                @map("document_id")
+  versionNumber   Int                   @map("version_number")
+  source          DocumentVersionSource
+  note            String?
+  title           String
+  locale          String                @default("fa")
+  status          DocumentStatus
+  createdByUserId String?               @map("created_by_user_id")
+  createdAt       DateTime              @default(now()) @map("created_at")
+  business        Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  document        Document              @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, versionNumber])
+  @@index([businessId, documentId, createdAt])
+  @@map("document_versions")
 }
 
 enum ExportJobStatus {
@@ -386,20 +468,134 @@ model ExportJob {
   @@map("export_jobs")
 }
 
+enum ImportJobStatus {
+  uploaded
+  mapped
+  queued
+  processing
+  completed
+  failed
+}
+
+enum ImportEntityType {
+  projects
+}
+
+enum ImportFileFormat {
+  csv
+  xlsx
+}
+
+/** Bulk content import jobs — file in ObjectStorage; queue on Redis/BullMQ when large. */
+model ImportJob {
+  id               String           @id @default(cuid())
+  businessId       String           @map("business_id")
+  createdByUserId  String           @map("created_by_user_id")
+  entityType       ImportEntityType @map("entity_type")
+  status           ImportJobStatus  @default(uploaded)
+  format           ImportFileFormat
+  originalFilename String           @map("original_filename")
+  mimeType         String           @map("mime_type")
+  byteSize         Int              @map("byte_size")
+  storageKey       String           @map("storage_key")
+  /** Column header → field key (title, description, …). */
+  mapping          Json?
+  /** headers, totalRows, sampleRows, errorCounts / sample errors. */
+  preview          Json?
+  /** created, skipped, errors[]. */
+  result           Json?
+  errorCode        String?          @map("error_code")
+  errorMessage     String?          @map("error_message")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+  startedAt        DateTime?        @map("started_at")
+  finishedAt       DateTime?        @map("finished_at")
+  business         Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, createdAt])
+  @@index([businessId, status, createdAt])
+  @@map("import_jobs")
+}
+
+enum WorkspaceBackupStatus {
+  queued
+  processing
+  completed
+  failed
+}
+
+enum WorkspaceRestoreStatus {
+  uploaded
+  queued
+  processing
+  completed
+  failed
+}
+
+/** Business workspace ZIP backup — ADR 024 / `.cursor/rules/16-backup-restore.mdc`. */
+model WorkspaceBackupJob {
+  id              String                @id @default(cuid())
+  businessId      String                @map("business_id")
+  createdByUserId String                @map("created_by_user_id")
+  status          WorkspaceBackupStatus @default(queued)
+  storageKey      String?               @map("storage_key")
+  byteSize        Int?                  @map("byte_size")
+  mimeType        String                @default("application/zip") @map("mime_type")
+  manifest        Json?
+  errorCode       String?               @map("error_code")
+  errorMessage    String?               @map("error_message")
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+  startedAt       DateTime?             @map("started_at")
+  finishedAt      DateTime?             @map("finished_at")
+  business        Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, createdAt])
+  @@index([businessId, status, createdAt])
+  @@map("workspace_backup_jobs")
+}
+
+/** Business workspace ZIP restore — upload → preview → commit. */
+model WorkspaceRestoreJob {
+  id              String                 @id @default(cuid())
+  businessId      String                 @map("business_id")
+  createdByUserId String                 @map("created_by_user_id")
+  status          WorkspaceRestoreStatus @default(uploaded)
+  storageKey      String                 @map("storage_key")
+  byteSize        Int                    @map("byte_size")
+  mimeType        String                 @default("application/zip") @map("mime_type")
+  originalFilename String                @map("original_filename")
+  preview         Json?
+  result          Json?
+  confirmReplace  Boolean                @default(false) @map("confirm_replace")
+  errorCode       String?                @map("error_code")
+  errorMessage    String?                @map("error_message")
+  createdAt       DateTime               @default(now()) @map("created_at")
+  updatedAt       DateTime               @updatedAt @map("updated_at")
+  startedAt       DateTime?              @map("started_at")
+  finishedAt      DateTime?              @map("finished_at")
+  business        Business               @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, createdAt])
+  @@index([businessId, status, createdAt])
+  @@map("workspace_restore_jobs")
+}
+
 /**
  * Portfolio categories (ContentModule). Gated by module.projects —
  * see `.cursor/rules/14-content-entities.mdc`.
  */
 model ProjectCategory {
-  id         String    @id @default(cuid())
-  businessId String    @map("business_id")
-  name       String
-  sortOrder  Int       @default(0) @map("sort_order")
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
-  deletedAt  DateTime? @map("deleted_at")
-  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  projects   Project[]
+  id           String    @id @default(cuid())
+  businessId   String    @map("business_id")
+  name         String
+  translations Json      @default("{}")
+  sortOrder    Int       @default(0) @map("sort_order")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+  business     Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  projects     Project[]
 
   @@index([businessId, deletedAt, sortOrder])
   @@map("project_categories")
@@ -421,6 +617,7 @@ model Project {
   categoryId   String?          @map("category_id")
   title        String
   description  String           @default("")
+  translations Json             @default("{}")
   status       ProjectStatus    @default(draft)
   coverMediaId String?          @map("cover_media_id")
   mediaIds     Json             @default("[]") @map("media_ids")
@@ -452,6 +649,7 @@ model TeamMember {
   name           String
   roleTitle      String      @default("") @map("role_title")
   department     String      @default("")
+  translations   Json        @default("{}")
   photoMediaId   String?     @map("photo_media_id")
   sortOrder      Int         @default(0) @map("sort_order")
   fields         Json        @default("{}")
@@ -473,25 +671,26 @@ model TeamMember {
  * Company branches / offices. Optional FK to shared `locations`.
  */
 model Branch {
-  id          String       @id @default(cuid())
-  businessId  String       @map("business_id")
-  name        String
-  addressLine1 String      @default("") @map("address_line1")
-  addressLine2 String      @default("") @map("address_line2")
-  city        String       @default("")
-  province    String       @default("")
-  postalCode  String       @default("") @map("postal_code")
-  country     String       @default("")
-  phone       String       @default("")
-  locationId  String?      @map("location_id")
-  sortOrder   Int          @default(0) @map("sort_order")
-  fields      Json         @default("{}")
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
-  deletedAt   DateTime?    @map("deleted_at")
-  business    Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  location    Location?    @relation(fields: [locationId], references: [id], onDelete: SetNull)
-  teamMembers TeamMember[]
+  id           String       @id @default(cuid())
+  businessId   String       @map("business_id")
+  name         String
+  addressLine1 String       @default("") @map("address_line1")
+  addressLine2 String       @default("") @map("address_line2")
+  city         String       @default("")
+  province     String       @default("")
+  postalCode   String       @default("") @map("postal_code")
+  country      String       @default("")
+  phone        String       @default("")
+  translations Json         @default("{}")
+  locationId   String?      @map("location_id")
+  sortOrder    Int          @default(0) @map("sort_order")
+  fields       Json         @default("{}")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  deletedAt    DateTime?    @map("deleted_at")
+  business     Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  location     Location?    @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  teamMembers  TeamMember[]
 
   @@index([businessId, deletedAt, sortOrder])
   @@index([businessId, locationId])
@@ -502,17 +701,18 @@ model Branch {
  * Company services / offerings (foundational Content — no sellable module).
  */
 model BusinessService {
-  id          String    @id @default(cuid())
-  businessId  String    @map("business_id")
-  name        String
-  description String    @default("")
-  iconMediaId String?   @map("icon_media_id")
-  sortOrder   Int       @default(0) @map("sort_order")
-  fields      Json      @default("{}")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  deletedAt   DateTime? @map("deleted_at")
-  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  id           String    @id @default(cuid())
+  businessId   String    @map("business_id")
+  name         String
+  description  String    @default("")
+  translations Json      @default("{}")
+  iconMediaId  String?   @map("icon_media_id")
+  sortOrder    Int       @default(0) @map("sort_order")
+  fields       Json      @default("{}")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+  business     Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId, deletedAt, sortOrder])
   @@map("business_services")
@@ -522,17 +722,18 @@ model BusinessService {
  * Clients / partners (logo wall). Foundational Content.
  */
 model Client {
-  id          String    @id @default(cuid())
-  businessId  String    @map("business_id")
-  name        String
-  website     String    @default("")
-  logoMediaId String?   @map("logo_media_id")
-  sortOrder   Int       @default(0) @map("sort_order")
-  fields      Json      @default("{}")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  deletedAt   DateTime? @map("deleted_at")
-  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  id           String    @id @default(cuid())
+  businessId   String    @map("business_id")
+  name         String
+  website      String    @default("")
+  translations Json      @default("{}")
+  logoMediaId  String?   @map("logo_media_id")
+  sortOrder    Int       @default(0) @map("sort_order")
+  fields       Json      @default("{}")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+  business     Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId, deletedAt, sortOrder])
   @@map("clients")
@@ -546,6 +747,7 @@ model Certificate {
   businessId      String    @map("business_id")
   name            String
   issuer          String    @default("")
+  translations    Json      @default("{}")
   issuedAt        DateTime? @map("issued_at")
   expiresAt       DateTime? @map("expires_at")
   documentMediaId String?   @map("document_media_id")
@@ -629,18 +831,19 @@ model Location {
  * see `.cursor/rules/14-content-entities.mdc`.
  */
 model TimelineEvent {
-  id         String    @id @default(cuid())
-  businessId String    @map("business_id")
-  occurredAt DateTime  @map("occurred_at")
-  title      String
-  body       String    @default("")
-  mediaId    String?   @map("media_id")
-  sortOrder  Int       @default(0) @map("sort_order")
-  fields     Json      @default("{}")
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
-  deletedAt  DateTime? @map("deleted_at")
-  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  id           String    @id @default(cuid())
+  businessId   String    @map("business_id")
+  occurredAt   DateTime  @map("occurred_at")
+  title        String
+  body         String    @default("")
+  translations Json      @default("{}")
+  mediaId      String?   @map("media_id")
+  sortOrder    Int       @default(0) @map("sort_order")
+  fields       Json      @default("{}")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+  business     Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId, deletedAt, occurredAt])
   @@index([businessId, deletedAt, sortOrder])
