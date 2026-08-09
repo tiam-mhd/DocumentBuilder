@@ -86,6 +86,48 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               >
                 {t('documentsLink')}
               </Link>
+              <Link
+                className={styles.loginLink}
+                href={`/${locale}/app/projects`}
+              >
+                {t('projectsLink')}
+              </Link>
+              <Link className={styles.loginLink} href={`/${locale}/app/team`}>
+                {t('teamLink')}
+              </Link>
+              <Link
+                className={styles.loginLink}
+                href={`/${locale}/app/profile-content`}
+              >
+                {t('profileContentLink')}
+              </Link>
+              <Link
+                className={styles.loginLink}
+                href={`/${locale}/app/galleries`}
+              >
+                {t('galleryLink')}
+              </Link>
+              <Link
+                className={styles.loginLink}
+                href={`/${locale}/app/locations`}
+              >
+                {t('locationsLink')}
+              </Link>
+              <Link className={styles.loginLink} href={`/${locale}/app/map`}>
+                {t('mapLink')}
+              </Link>
+              <Link
+                className={styles.loginLink}
+                href={`/${locale}/app/org-chart`}
+              >
+                {t('orgChartLink')}
+              </Link>
+              <Link
+                className={styles.loginLink}
+                href={`/${locale}/app/timeline`}
+              >
+                {t('timelineLink')}
+              </Link>
               {showLicense ? (
                 <Link
                   className={styles.loginLink}
