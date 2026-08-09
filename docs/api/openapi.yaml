@@ -1,0 +1,2486 @@
+openapi: 3.0.3
+info:
+  title: Visual Document Builder API
+  version: 0.2.0
+  description: |
+    Canonical file — keep in sync with Nest routes.
+    JWT issuance after OTP verify lands in P01-T02.
+servers:
+  - url: http://localhost:3001/api
+    description: Local development
+tags:
+  - name: system
+    description: Health and public edition config
+  - name: auth
+    description: Mobile OTP identity
+  - name: businesses
+    description: Multi-business tenancy
+  - name: billing
+    description: Subscription status and payments
+  - name: content
+    description: Business content (gate probes until Phase 02 entities)
+  - name: assets
+    description: Media library and fonts
+  - name: design
+    description: Document brand themes (not app chrome dark/light)
+  - name: documents
+    description: Document instances (PG metadata + Mongo body)
+  - name: export
+    description: PDF export jobs (BullMQ + ObjectStorage)
+paths:
+  /health:
+    get:
+      tags: [system]
+      summary: Liveness + soft dependency checks
+      operationId: getHealth
+      responses:
+        '200':
+          description: Health report
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/HealthReport'
+  /system/config:
+    get:
+      tags: [system]
+      summary: Public edition flags (no secrets)
+      operationId: getSystemConfig
+      responses:
+        '200':
+          description: Public system config
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicSystemConfig'
+  /system/license:
+    get:
+      tags: [system]
+      summary: Installation license status (no secrets)
+      operationId: getInstallationLicense
+      responses:
+        '200':
+          description: License status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicInstallationLicense'
+  /system/license/activate:
+    post:
+      tags: [system]
+      summary: Activate SELF_HOSTED installation license
+      operationId: activateInstallationLicense
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActivateLicenseBody'
+      responses:
+        '200':
+          description: Activated status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicInstallationLicense'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/media:
+    get:
+      tags: [assets]
+      summary: List media assets
+      operationId: listMedia
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 24
+        - name: q
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicMediaList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /businesses/{businessId}/media/upload:
+    post:
+      tags: [assets]
+      summary: Upload image (writable + EntitlementGuard)
+      operationId: uploadMedia
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Created asset
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicMediaAsset'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/media/{assetId}:
+    get:
+      tags: [assets]
+      summary: Get media metadata
+      operationId: getMedia
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: assetId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Asset
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicMediaAsset'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    delete:
+      tags: [assets]
+      summary: Soft-delete media
+      operationId: deleteMedia
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: assetId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/media/{assetId}/file:
+    get:
+      tags: [assets]
+      summary: Stream media variant
+      operationId: getMediaFile
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: assetId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: variant
+          in: query
+          schema:
+            type: string
+            enum: [original, thumb, web, print]
+            default: original
+      responses:
+        '200':
+          description: Binary image
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/fonts:
+    get:
+      tags: [assets]
+      summary: List font faces for a business
+      description: |
+        Paginated list of uploaded font faces (family/weight/style).
+        Use for theme/template pickers. Soft-deleted faces are omitted.
+      operationId: listFonts
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: q
+          in: query
+          description: Search family or original filename
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Font list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicFontList'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/fonts/upload:
+    post:
+      tags: [assets]
+      summary: Upload a font face
+      description: |
+        Multipart upload. Allowed extensions: `.woff2`, `.ttf`, `.otf` only.
+        Storage key: `{businessId}/fonts/{fontId}/original.{ext}`.
+        Requires writable subscription (EntitlementGuard). Max size `FONT_MAX_BYTES`.
+      operationId: uploadFont
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, family, weight]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                family:
+                  type: string
+                  minLength: 1
+                  maxLength: 120
+                weight:
+                  type: integer
+                  enum: [100, 200, 300, 400, 500, 600, 700, 800, 900]
+                style:
+                  type: string
+                  enum: [normal, italic]
+                  default: normal
+      responses:
+        '201':
+          description: Font face created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicFontFace'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '404':
+          $ref: '#/components/responses/ApiError'
+        '409':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/fonts/{fontId}:
+    get:
+      tags: [assets]
+      summary: Get one font face
+      operationId: getFont
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: fontId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Font face
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicFontFace'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    delete:
+      tags: [assets]
+      summary: Soft-delete a font face
+      operationId: deleteFont
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: fontId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/fonts/{fontId}/file:
+    get:
+      tags: [assets]
+      summary: Stream font binary (for preview / PDF worker)
+      description: |
+        Returns the original font bytes from ObjectStorage.
+        PDF export workers must use the same ObjectStorage adapter — never embed from browser URLs alone.
+      operationId: getFontFile
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: fontId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Font binary
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+            font/woff2:
+              schema:
+                type: string
+                format: binary
+            font/ttf:
+              schema:
+                type: string
+                format: binary
+            font/otf:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/themes:
+    get:
+      tags: [design]
+      summary: List document brand themes
+      description: |
+        Ensures a default theme exists. Tokens are document/PDF brand tokens —
+        not app chrome dark/light (`vdb-theme` cookie).
+      operationId: listThemes
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        '200':
+          description: Theme list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDesignThemeList'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    post:
+      tags: [design]
+      summary: Create a document brand theme
+      operationId: createTheme
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDesignThemeBody'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDesignTheme'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/themes/default:
+    get:
+      tags: [design]
+      summary: Get or seed default brand theme
+      operationId: getDefaultTheme
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      responses:
+        '200':
+          description: Default theme
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDesignTheme'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/themes/{themeId}:
+    get:
+      tags: [design]
+      summary: Get one theme
+      operationId: getTheme
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: themeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Theme
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDesignTheme'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    patch:
+      tags: [design]
+      summary: Update theme name and/or tokens
+      operationId: updateTheme
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: themeId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDesignThemeBody'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDesignTheme'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    delete:
+      tags: [design]
+      summary: Soft-delete a non-default theme
+      operationId: deleteTheme
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: themeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/themes/{themeId}/default:
+    post:
+      tags: [design]
+      summary: Set theme as Business default
+      operationId: setDefaultTheme
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: themeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Now default
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDesignTheme'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/blocks:
+    get:
+      tags: [design]
+      summary: Core block registry
+      description: |
+        Phase-01 block types from `@vdb/document-schema` (text, image, section,
+        divider, headerSlot, footerSlot). Module blocks register later.
+      operationId: getBlockRegistry
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      responses:
+        '200':
+          description: Registry
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicBlockRegistry'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/templates:
+    get:
+      tags: [design]
+      summary: List templates (PostgreSQL metadata)
+      operationId: listTemplates
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: q
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Template list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentTemplateList'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    post:
+      tags: [design]
+      summary: Create template (PG + Mongo body)
+      description: |
+        Metadata in PostgreSQL; body in Mongo `template_bodies` validated by
+        TemplateBody schema v2. Default starter blocks if body omitted.
+      operationId: createTemplate
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDocumentTemplateBody'
+      responses:
+        '201':
+          description: Created with body
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentTemplateDetail'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/templates/{templateId}:
+    get:
+      tags: [design]
+      summary: Get template metadata + Mongo body
+      operationId: getTemplate
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: templateId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Detail
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentTemplateDetail'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    patch:
+      tags: [design]
+      summary: Update template metadata and/or body
+      operationId: updateTemplate
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: templateId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDocumentTemplateBody'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentTemplateDetail'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    delete:
+      tags: [design]
+      summary: Soft-delete template and remove Mongo body
+      operationId: deleteTemplate
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: templateId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/documents:
+    get:
+      tags: [documents]
+      summary: List documents (metadata)
+      operationId: listDocuments
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, published]
+      responses:
+        '200':
+          description: Document list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentList'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    post:
+      tags: [documents]
+      summary: Create document from template
+      description: |
+        Copies template page/blocks into Mongo `document_bodies` (new block ids).
+        `dataRefs` starts empty — Business data is not stored in the template.
+      operationId: createDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDocumentBody'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentDetail'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/documents/{documentId}:
+    get:
+      tags: [documents]
+      summary: Get document metadata + Mongo body
+      operationId: getDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Detail
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentDetail'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    patch:
+      tags: [documents]
+      summary: Update title, status, and/or body
+      description: |
+        Used by the flow editor autosave (debounced ~800ms). Does not trigger PDF.
+      operationId: updateDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDocumentBody'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentDetail'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    delete:
+      tags: [documents]
+      summary: Soft-delete document and remove Mongo body
+      operationId: deleteDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/documents/{documentId}/export/pdf:
+    post:
+      tags: [export]
+      summary: Enqueue PDF export
+      description: |
+        Creates `export_jobs` row (queued) and enqueues BullMQ `export.pdf`.
+        Worker renders canonical HTML (masters + theme + embedded fonts) → PDF.
+        Never runs on editor keystrokes. Requires entitlement `export.pdf`.
+      operationId: createPdfExport
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Export job created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicExportJob'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '404':
+          $ref: '#/components/responses/ApiError'
+        '503':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/documents/{documentId}/exports:
+    get:
+      tags: [export]
+      summary: List export jobs for a document
+      operationId: listDocumentExports
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated export jobs
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicExportJobList'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/exports/{jobId}:
+    get:
+      tags: [export]
+      summary: Get export job status
+      operationId: getExportJob
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Export job
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicExportJob'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/exports/{jobId}/file:
+    get:
+      tags: [export]
+      summary: Download completed PDF
+      description: |
+        Binary PDF from ObjectStorage key `{businessId}/exports/{jobId}/document.pdf`.
+        Requires membership; job must be `completed`.
+      operationId: downloadExportPdf
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: PDF bytes
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/ApiError'
+        '409':
+          $ref: '#/components/responses/ApiError'
+  /auth/otp/request:
+    post:
+      tags: [auth]
+      summary: Request mobile OTP
+      operationId: requestOtp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestOtpBody'
+      responses:
+        '200':
+          description: Challenge created (raw OTP never logged; optional devCode only in fake+development)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/RequestOtpResult'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '429':
+          $ref: '#/components/responses/ApiError'
+        '503':
+          $ref: '#/components/responses/ApiError'
+  /auth/otp/verify:
+    post:
+      tags: [auth]
+      summary: Verify OTP, upsert user, issue access JWT
+      description: |
+        Creates User on first success and returns a Bearer access token.
+        No refresh token in MVP — client re-runs OTP when access expires.
+        Logout blacklists token `jti` in Redis until expiry.
+      operationId: verifyOtp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyOtpBody'
+      responses:
+        '200':
+          description: User verified with access token
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/VerifyOtpResult'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '401':
+          $ref: '#/components/responses/ApiError'
+  /auth/me:
+    get:
+      tags: [auth]
+      summary: Current user
+      operationId: getMe
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Public user profile
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: Revoke current access token
+      operationId: logout
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Token jti blacklisted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [ok]
+                    properties:
+                      ok:
+                        type: boolean
+                        enum: [true]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /businesses:
+    get:
+      tags: [businesses]
+      summary: List businesses for current user
+      operationId: listBusinesses
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Business list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PublicBusiness'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [businesses]
+      summary: Create business (caller becomes OWNER)
+      description: |
+        Creates Business + OWNER membership in one transaction.
+        TrialFirstBusinessHook (same TX): first account trial (7d) or pending_payment.
+      operationId: createBusiness
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 120
+      responses:
+        '200':
+          description: Created business
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicBusiness'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /businesses/{businessId}:
+    parameters:
+      - $ref: '#/components/parameters/businessId'
+    get:
+      tags: [businesses]
+      summary: Get business if member (IDOR-safe)
+      operationId: getBusiness
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Business
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicBusiness'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    patch:
+      tags: [businesses]
+      summary: Update business (OWNER only)
+      operationId: updateBusiness
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 120
+      responses:
+        '200':
+          description: Updated business
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicBusiness'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    delete:
+      tags: [businesses]
+      summary: Soft-delete business (OWNER only)
+      operationId: deleteBusiness
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Soft-deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [ok]
+                    properties:
+                      ok:
+                        type: boolean
+                        enum: [true]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/subscription:
+    parameters:
+      - $ref: '#/components/parameters/businessId'
+    get:
+      tags: [billing]
+      summary: Get subscription status for a business
+      description: |
+        Membership required. `effectiveStatus` applies endsAt clock
+        (trial/active/grace past endsAt → expired) without mutating DB.
+        `writable` is true for trial|active|grace effective statuses (EntitlementGuard prep).
+      operationId: getBusinessSubscription
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Subscription
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicSubscription'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/entitlements:
+    get:
+      tags: [billing]
+      summary: Resolved entitlements for a business
+      operationId: getBusinessEntitlements
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      responses:
+        '200':
+          description: Entitlement snapshot
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicBusinessEntitlements'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/gates/writable:
+    post:
+      tags: [content]
+      summary: Probe mutate route (writable subscription)
+      operationId: gateProbeWritable
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      responses:
+        '200':
+          description: Allowed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/gates/export-pdf:
+    post:
+      tags: [content]
+      summary: Probe mutate route (export.pdf)
+      operationId: gateProbeExportPdf
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      responses:
+        '200':
+          description: Allowed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '403':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/gates/module-map:
+    post:
+      tags: [content]
+      summary: Probe mutate route (module.map)
+      operationId: gateProbeModuleMap
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      responses:
+        '200':
+          description: Allowed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '403':
+          $ref: '#/components/responses/EntitlementDenied'
+  /billing/catalog:
+    get:
+      tags: [billing]
+      summary: List plans and sellable modules
+      operationId: getBillingCatalog
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Catalog
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/BillingCatalog'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /businesses/{businessId}/billing/checkout:
+    post:
+      tags: [billing]
+      summary: Start SAAS checkout (plan + modules)
+      operationId: startBillingCheckout
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckoutBody'
+      responses:
+        '200':
+          description: Checkout session
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/CheckoutSession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /billing/payments/callback:
+    get:
+      tags: [billing]
+      summary: Gateway return URL (verifies + redirects to web)
+      operationId: paymentGatewayCallback
+      parameters:
+        - name: paymentId
+          in: query
+          schema:
+            type: string
+        - name: Authority
+          in: query
+          schema:
+            type: string
+        - name: Status
+          in: query
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to web billing return page
+  /billing/webhooks/payment:
+    post:
+      tags: [billing]
+      summary: Idempotent payment webhook
+      operationId: paymentWebhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                Authority:
+                  type: string
+                gatewayRef:
+                  type: string
+                paymentId:
+                  type: string
+                Status:
+                  type: string
+      responses:
+        '200':
+          description: Payment + subscription after activation
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      payment:
+                        $ref: '#/components/schemas/PublicPayment'
+                      subscription:
+                        $ref: '#/components/schemas/PublicSubscription'
+  /billing/payments/confirm:
+    post:
+      tags: [billing]
+      summary: Confirm payment after return (membership required)
+      operationId: confirmPayment
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmPaymentBody'
+      responses:
+        '200':
+          description: Payment + subscription
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      payment:
+                        $ref: '#/components/schemas/PublicPayment'
+                      subscription:
+                        $ref: '#/components/schemas/PublicSubscription'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/ApiError'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Phase 01-T02 — mobile OTP JWT access token
+  parameters:
+    businessId:
+      name: businessId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Tenant business id (membership required)
+  schemas:
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          example: AUTH_REQUIRED
+          description: |
+            Identity codes include MOBILE_INVALID, OTP_COOLDOWN, OTP_RATE_LIMITED,
+            OTP_INVALID, OTP_EXPIRED, REDIS_UNAVAILABLE, AUTH_REQUIRED, AUTH_INVALID
+        message:
+          type: string
+          description: Fallback message; clients prefer i18n via code
+    RequestOtpBody:
+      type: object
+      required: [mobile]
+      properties:
+        mobile:
+          type: string
+          example: '09121234567'
+    VerifyOtpBody:
+      type: object
+      required: [mobile, code]
+      properties:
+        mobile:
+          type: string
+          example: '09121234567'
+        code:
+          type: string
+          pattern: '^\d{6}$'
+          example: '123456'
+    RequestOtpResult:
+      type: object
+      required: [mobile, expiresInSeconds, cooldownSeconds]
+      properties:
+        mobile:
+          type: string
+          example: '+989121234567'
+        expiresInSeconds:
+          type: integer
+        cooldownSeconds:
+          type: integer
+        devCode:
+          type: string
+          description: Present only when SMS_PROVIDER=fake and NODE_ENV=development
+    PublicUser:
+      type: object
+      required: [id, mobile, trialConsumed, createdAt]
+      properties:
+        id:
+          type: string
+        mobile:
+          type: string
+        trialConsumed:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+    PublicBusiness:
+      type: object
+      required: [id, name, role, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [OWNER, ADMIN, MEMBER]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PublicSubscription:
+      type: object
+      required:
+        [
+          id,
+          businessId,
+          planId,
+          planCode,
+          status,
+          effectiveStatus,
+          writable,
+          startsAt,
+          endsAt,
+        ]
+      properties:
+        id:
+          type: string
+        businessId:
+          type: string
+        planId:
+          type: string
+          nullable: true
+        planCode:
+          type: string
+          nullable: true
+          example: plan.core
+        status:
+          type: string
+          enum: [trial, active, grace, expired, pending_payment]
+        effectiveStatus:
+          type: string
+          enum: [trial, active, grace, expired, pending_payment]
+        writable:
+          type: boolean
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+          nullable: true
+    BillingCatalog:
+      type: object
+      required: [plans, modules]
+      properties:
+        plans:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicPlan'
+        modules:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicCatalogModule'
+    PublicPlan:
+      type: object
+      required:
+        [
+          id,
+          code,
+          nameKey,
+          descriptionKey,
+          priceMonthly,
+          currency,
+          baseEntitlements,
+          moduleCodes,
+        ]
+      properties:
+        id:
+          type: string
+        code:
+          type: string
+          example: plan.core
+        nameKey:
+          type: string
+        descriptionKey:
+          type: string
+        priceMonthly:
+          type: integer
+        currency:
+          type: string
+        baseEntitlements:
+          type: array
+          items:
+            type: string
+        moduleCodes:
+          type: array
+          items:
+            type: string
+    PublicCatalogModule:
+      type: object
+      required:
+        [id, code, nameKey, descriptionKey, priceMonthly, currency]
+      properties:
+        id:
+          type: string
+        code:
+          type: string
+          example: module.map
+        nameKey:
+          type: string
+        descriptionKey:
+          type: string
+        priceMonthly:
+          type: integer
+        currency:
+          type: string
+    VerifyOtpResult:
+      type: object
+      required: [user, isNewUser, accessToken, tokenType, expiresInSeconds]
+      properties:
+        user:
+          $ref: '#/components/schemas/PublicUser'
+        isNewUser:
+          type: boolean
+        accessToken:
+          type: string
+        tokenType:
+          type: string
+          enum: [Bearer]
+        expiresInSeconds:
+          type: integer
+    HealthReport:
+      type: object
+      required: [status, edition, checks]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+        edition:
+          type: string
+          enum: [SELF_HOSTED, SAAS]
+        checks:
+          type: object
+          required: [postgres, redis, mongo]
+          properties:
+            postgres:
+              type: string
+              enum: [up, down]
+            redis:
+              type: string
+              enum: [up, down]
+            mongo:
+              type: string
+              enum: [up, down]
+    PublicSystemConfig:
+      type: object
+      required:
+        [
+          edition,
+          publicSignup,
+          showPoweredBy,
+          trialEnabledByDefault,
+          platformCheckout,
+          licenseActivation,
+          licenseActive,
+        ]
+      properties:
+        edition:
+          type: string
+          enum: [SELF_HOSTED, SAAS]
+        publicSignup:
+          type: boolean
+        showPoweredBy:
+          type: boolean
+        trialEnabledByDefault:
+          type: boolean
+        platformCheckout:
+          type: boolean
+          description: True only when APP_EDITION=SAAS
+        licenseActivation:
+          type: boolean
+          description: True when APP_EDITION=SELF_HOSTED
+        licenseActive:
+          type: boolean
+          description: SAAS always true; SELF_HOSTED from installation_licenses
+    PublicInstallationLicense:
+      type: object
+      required:
+        [required, active, organizationName, keyHint, activatedAt, expiresAt]
+      properties:
+        required:
+          type: boolean
+        active:
+          type: boolean
+        organizationName:
+          type: string
+          nullable: true
+        keyHint:
+          type: string
+          nullable: true
+        activatedAt:
+          type: string
+          format: date-time
+          nullable: true
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+    ActivateLicenseBody:
+      type: object
+      required: [licenseKey]
+      properties:
+        licenseKey:
+          type: string
+        organizationName:
+          type: string
+    PublicMediaAsset:
+      type: object
+      required:
+        [
+          id,
+          businessId,
+          originalName,
+          mimeType,
+          byteSize,
+          width,
+          height,
+          status,
+          createdAt,
+          urls,
+        ]
+      properties:
+        id:
+          type: string
+        businessId:
+          type: string
+        originalName:
+          type: string
+        mimeType:
+          type: string
+        byteSize:
+          type: integer
+        width:
+          type: integer
+          nullable: true
+        height:
+          type: integer
+          nullable: true
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        urls:
+          type: object
+          required: [original, thumb, web, print]
+          properties:
+            original:
+              type: string
+            thumb:
+              type: string
+              nullable: true
+            web:
+              type: string
+              nullable: true
+            print:
+              type: string
+              nullable: true
+    PublicMediaList:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicMediaAsset'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    PublicFontFace:
+      type: object
+      required:
+        [
+          id,
+          businessId,
+          family,
+          weight,
+          style,
+          originalName,
+          mimeType,
+          extension,
+          byteSize,
+          storageKey,
+          fileUrl,
+          createdAt,
+        ]
+      properties:
+        id:
+          type: string
+        businessId:
+          type: string
+        family:
+          type: string
+        weight:
+          type: integer
+          enum: [100, 200, 300, 400, 500, 600, 700, 800, 900]
+        style:
+          type: string
+          enum: [normal, italic]
+        originalName:
+          type: string
+        mimeType:
+          type: string
+        extension:
+          type: string
+          enum: [woff2, ttf, otf]
+        byteSize:
+          type: integer
+        storageKey:
+          type: string
+          description: ObjectStorage key — `{businessId}/fonts/{fontId}/original.{ext}`
+        fileUrl:
+          type: string
+          description: API path to stream binary (auth required)
+        createdAt:
+          type: string
+          format: date-time
+    PublicFontList:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicFontFace'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    DesignThemeTokens:
+      type: object
+      required: [colors, typography, fonts]
+      properties:
+        colors:
+          type: object
+          required: [primary, secondary, text, background]
+          properties:
+            primary:
+              type: string
+              example: '#1B4D3E'
+            secondary:
+              type: string
+            text:
+              type: string
+            background:
+              type: string
+        typography:
+          type: object
+          required:
+            [
+              headingFamily,
+              bodyFamily,
+              headingWeight,
+              bodyWeight,
+              baseSizePx,
+            ]
+          properties:
+            headingFamily:
+              type: string
+            bodyFamily:
+              type: string
+            headingWeight:
+              type: integer
+            bodyWeight:
+              type: integer
+            baseSizePx:
+              type: integer
+              minimum: 10
+              maximum: 32
+        fonts:
+          type: object
+          required: [headingFontFaceId, bodyFontFaceId]
+          properties:
+            headingFontFaceId:
+              type: string
+              nullable: true
+            bodyFontFaceId:
+              type: string
+              nullable: true
+    PublicDesignTheme:
+      type: object
+      required:
+        [id, businessId, name, isDefault, tokens, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        businessId:
+          type: string
+        name:
+          type: string
+        isDefault:
+          type: boolean
+        tokens:
+          $ref: '#/components/schemas/DesignThemeTokens'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PublicDesignThemeList:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicDesignTheme'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    CreateDesignThemeBody:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        tokens:
+          $ref: '#/components/schemas/DesignThemeTokens'
+        makeDefault:
+          type: boolean
+    UpdateDesignThemeBody:
+      type: object
+      properties:
+        name:
+          type: string
+        tokens:
+          $ref: '#/components/schemas/DesignThemeTokens'
+    PublicBlockRegistryEntry:
+      type: object
+      required: [type, labelKey, allowsChildren, moduleCode]
+      properties:
+        type:
+          type: string
+          enum: [text, image, section, divider, headerSlot, footerSlot]
+        labelKey:
+          type: string
+        allowsChildren:
+          type: boolean
+        moduleCode:
+          type: string
+          nullable: true
+    PublicBlockRegistry:
+      type: object
+      required: [schemaVersion, items]
+      properties:
+        schemaVersion:
+          type: integer
+          example: 3
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicBlockRegistryEntry'
+    PublicDocumentTemplate:
+      type: object
+      required:
+        [id, businessId, themeId, name, description, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        businessId:
+          type: string
+        themeId:
+          type: string
+          nullable: true
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PublicDocumentTemplateDetail:
+      allOf:
+        - $ref: '#/components/schemas/PublicDocumentTemplate'
+        - type: object
+          required: [body]
+          properties:
+            body:
+              type: object
+              description: TemplateBody from @vdb/document-schema v3
+    PublicDocumentTemplateList:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicDocumentTemplate'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    CreateDocumentTemplateBody:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        themeId:
+          type: string
+          nullable: true
+        body:
+          type: object
+    UpdateDocumentTemplateBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        themeId:
+          type: string
+          nullable: true
+        body:
+          type: object
+    PublicDocument:
+      type: object
+      required:
+        [id, businessId, templateId, title, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        businessId:
+          type: string
+        templateId:
+          type: string
+          nullable: true
+        title:
+          type: string
+        status:
+          type: string
+          enum: [draft, published]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PublicDocumentDetail:
+      allOf:
+        - $ref: '#/components/schemas/PublicDocument'
+        - type: object
+          required: [body]
+          properties:
+            body:
+              type: object
+              description: DocumentBody from @vdb/document-schema v3 (masters + pages)
+    PublicDocumentList:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicDocument'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    CreateDocumentBody:
+      type: object
+      required: [title, templateId]
+      properties:
+        title:
+          type: string
+        templateId:
+          type: string
+    PublicExportJob:
+      type: object
+      required:
+        - id
+        - businessId
+        - documentId
+        - status
+        - mimeType
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        businessId:
+          type: string
+        documentId:
+          type: string
+        status:
+          type: string
+          enum: [queued, processing, completed, failed]
+        errorCode:
+          type: string
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+        byteSize:
+          type: integer
+          nullable: true
+        mimeType:
+          type: string
+          example: application/pdf
+        downloadUrl:
+          type: string
+          nullable: true
+          description: Relative API path when completed
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+    PublicExportJobList:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicExportJob'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    UpdateDocumentBody:
+      type: object
+      properties:
+        title:
+          type: string
+        status:
+          type: string
+          enum: [draft, published]
+        body:
+          type: object
+    PublicBusinessEntitlements:
+      type: object
+      required:
+        [businessId, writable, effectiveStatus, planCode, codes, modules]
+      properties:
+        businessId:
+          type: string
+        writable:
+          type: boolean
+        effectiveStatus:
+          type: string
+          enum: [trial, active, grace, expired, pending_payment]
+        planCode:
+          type: string
+          nullable: true
+        codes:
+          type: array
+          items:
+            type: string
+          description: Plan baseEntitlements ∪ subscription modules
+        modules:
+          type: array
+          items:
+            type: string
+    CheckoutBody:
+      type: object
+      required: [planCode]
+      properties:
+        planCode:
+          type: string
+          example: plan.core
+        moduleCodes:
+          type: array
+          items:
+            type: string
+    ConfirmPaymentBody:
+      type: object
+      required: [paymentId]
+      properties:
+        paymentId:
+          type: string
+        gatewayRef:
+          type: string
+    CheckoutSession:
+      type: object
+      required:
+        [paymentId, invoiceId, amount, currency, provider, redirectUrl, gatewayRef]
+      properties:
+        paymentId:
+          type: string
+        invoiceId:
+          type: string
+        amount:
+          type: integer
+        currency:
+          type: string
+        provider:
+          type: string
+          enum: [fake, zarinpal]
+        redirectUrl:
+          type: string
+        gatewayRef:
+          type: string
+          nullable: true
+    PublicPayment:
+      type: object
+      required:
+        [id, businessId, invoiceId, status, amount, currency, provider, paidAt]
+      properties:
+        id:
+          type: string
+        businessId:
+          type: string
+        invoiceId:
+          type: string
+        status:
+          type: string
+          enum: [pending, paid, failed, canceled]
+        amount:
+          type: integer
+        currency:
+          type: string
+        provider:
+          type: string
+          enum: [fake, zarinpal]
+        paidAt:
+          type: string
+          format: date-time
+          nullable: true
+  responses:
+    ApiError:
+      description: Error envelope
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              errors:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApiError'
+    Unauthorized:
+      description: Missing or invalid JWT
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              errors:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApiError'
+    EntitlementDenied:
+      description: Subscription or module entitlement failed
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              errors:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApiError'
