@@ -1,0 +1,82 @@
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.4rem;
+  align-items: stretch;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 6px);
+  background: var(--bg-elevated);
+}
+
+.rowSelected {
+  border-color: var(--accent);
+}
+
+.handle {
+  border: none;
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: grab;
+  padding: 0.5rem 0.4rem;
+  font-size: 0.85rem;
+}
+
+.handle:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.rowMain {
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  text-align: start;
+  padding: 0.55rem 0.35rem;
+  cursor: pointer;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.type {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.summary {
+  font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.remove {
+  border: none;
+  background: transparent;
+  color: var(--danger);
+  padding: 0.5rem 0.65rem;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.remove:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.empty {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 0.92rem;
+}

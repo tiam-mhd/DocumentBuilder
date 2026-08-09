@@ -1,0 +1,33 @@
+.section {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+}
+
+.hint {
+  margin: 0;
+  color: var(--fg-muted);
+}
+
+.meta {
+  margin: 0;
+  color: var(--fg-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9rem;
+}
+
+.link {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+  width: fit-content;
+}
+
+.link:hover {
+  text-decoration: underline;
+}

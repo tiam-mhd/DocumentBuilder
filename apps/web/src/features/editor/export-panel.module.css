@@ -1,0 +1,47 @@
+.wrap {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.title {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.hint,
+.status {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 0.85rem;
+}
+
+.warn {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+
+.primary,
+.secondary {
+  justify-self: start;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 6px);
+  background: var(--bg-elevated);
+  color: var(--fg);
+  padding: 0.45rem 0.8rem;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: transparent;
+}
+
+.primary:disabled,
+.secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

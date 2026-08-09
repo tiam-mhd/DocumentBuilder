@@ -1,0 +1,113 @@
+.preview {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  min-height: 16rem;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--doc-secondary, var(--fg-muted));
+}
+
+.docTitle {
+  margin: 0;
+  font-family: var(--doc-heading-family, var(--font-display));
+  font-weight: var(--doc-heading-weight, 700);
+  color: var(--doc-primary, var(--fg));
+  font-size: 1.6em;
+  line-height: 1.25;
+}
+
+.flow {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.text {
+  margin: 0;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.imagePh {
+  padding: 1.5rem;
+  border: 1px dashed color-mix(in srgb, var(--doc-secondary, var(--border)) 70%, transparent);
+  text-align: center;
+  opacity: 0.85;
+  font-size: 0.9em;
+}
+
+.sectionBlock {
+  display: grid;
+  gap: 0.5rem;
+  padding-inline-start: 0.5rem;
+  border-inline-start: 3px solid var(--doc-secondary, var(--border));
+}
+
+.sectionTitle {
+  margin: 0;
+  font-family: var(--doc-heading-family, var(--font-display));
+  font-weight: var(--doc-heading-weight, 700);
+  color: var(--doc-primary, var(--fg));
+  font-size: 1.15em;
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  margin: 0.35rem 0;
+}
+
+.slot {
+  margin: 0;
+  padding: 0.5rem 0.65rem;
+  border: 1px dashed color-mix(in srgb, currentColor 30%, transparent);
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+.headerBand,
+.footerBand {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  font-size: 0.9em;
+  opacity: 0.92;
+}
+
+.footerBand {
+  border-bottom: none;
+  border-top: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  margin-top: 0.5rem;
+}
+
+.pageNum {
+  margin: 0;
+  font-size: 0.8em;
+  color: var(--doc-secondary, var(--fg-muted));
+}
+
+.pageNumStart {
+  text-align: start;
+}
+
+.pageNumCenter {
+  text-align: center;
+}
+
+.pageNumEnd {
+  text-align: end;
+}
+
+.unknown {
+  margin: 0;
+  opacity: 0.6;
+  font-style: italic;
+}

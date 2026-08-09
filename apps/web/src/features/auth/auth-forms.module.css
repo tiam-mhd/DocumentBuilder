@@ -1,0 +1,77 @@
+.form {
+  display: grid;
+  gap: var(--space-3);
+  max-width: 28rem;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  letter-spacing: -0.02em;
+}
+
+.hint {
+  margin: 0;
+  color: var(--fg-muted);
+}
+
+.field {
+  display: grid;
+  gap: var(--space-2);
+  color: var(--fg-muted);
+  font-size: 0.9rem;
+}
+
+.input {
+  background: var(--bg-elevated);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 4px);
+  padding: 0.7rem 0.85rem;
+}
+
+.submit {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border: none;
+  border-radius: calc(var(--radius) - 4px);
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.linkButton {
+  background: transparent;
+  border: none;
+  color: var(--fg-muted);
+  cursor: pointer;
+  text-align: start;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+}
+
+.success {
+  margin: 0;
+  color: var(--accent);
+}
+
+.devHint {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--border);
+  border-radius: calc(var(--radius) - 4px);
+  background: var(--bg-elevated);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9rem;
+}

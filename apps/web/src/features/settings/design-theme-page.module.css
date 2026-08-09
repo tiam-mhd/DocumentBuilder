@@ -1,0 +1,128 @@
+.section {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 3vw, 2.2rem);
+}
+
+.hint,
+.meta {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 0.92rem;
+}
+
+.warn,
+.error {
+  margin: 0;
+  color: var(--danger);
+}
+
+.ok {
+  margin: 0;
+  color: var(--accent);
+}
+
+.preview {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  display: grid;
+  gap: var(--space-2);
+  min-height: 10rem;
+}
+
+.previewEyebrow {
+  margin: 0;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.previewHeading {
+  margin: 0;
+  font-size: 1.75em;
+  line-height: 1.2;
+}
+
+.previewBody {
+  margin: 0;
+  max-width: 40rem;
+  line-height: 1.55;
+  opacity: 0.92;
+}
+
+.swatches {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: var(--space-2);
+}
+
+.swatch {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--fg) 25%, transparent);
+}
+
+.form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.fieldset {
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.fieldset legend {
+  padding: 0 0.35rem;
+  font-weight: 600;
+}
+
+.field {
+  display: grid;
+  gap: var(--space-2);
+  font-size: 0.9rem;
+}
+
+.colorRow {
+  display: grid;
+  grid-template-columns: 7rem 2.5rem 1fr;
+  gap: var(--space-2);
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.input {
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 6px);
+  background: var(--bg);
+  color: var(--fg);
+  padding: 0.55rem 0.75rem;
+}
+
+.primary {
+  justify-self: start;
+  border: none;
+  border-radius: calc(var(--radius) - 6px);
+  background: var(--accent);
+  color: var(--accent-fg);
+  padding: 0.6rem 1.1rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
