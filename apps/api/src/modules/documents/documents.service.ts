@@ -9,17 +9,20 @@ import {
   createEmptyDocumentBody,
   createEmptyTemplateBody,
   parseDocumentBody,
+  documentCollectRequiredModuleCodes,
   DOCUMENT_SCHEMA_VERSION,
 } from '@vdb/document-schema';
 import {
   DocumentErrorCodes,
   DocumentStatus,
+  type EntitlementCode,
   type PublicDocument,
   type PublicDocumentDetail,
   type PublicDocumentList,
 } from '@vdb/shared-types';
 import { DomainException } from '../../common/errors/domain.exception';
 import { PrismaService } from '../../config/prisma/prisma.service';
+import { EntitlementsService } from '../billing/entitlements.service';
 import { TemplateBodyRepository } from '../design/template-body.repository';
 import { DocumentBodyRepository } from './document-body.repository';
 
@@ -28,6 +31,7 @@ export class DocumentsService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly bodies: DocumentBodyRepository,
+    private readonly entitlements: EntitlementsService,
     private readonly templateBodies: TemplateBodyRepository,
   ) {}
 
@@ -213,6 +217,12 @@ export class DocumentsService implements OnModuleInit {
         });
       } catch (err) {
         this.rethrowBodyError(err);
+      }
+      for (const code of documentCollectRequiredModuleCodes(body)) {
+        await this.entitlements.assertModule(
+          input.businessId,
+          code as EntitlementCode,
+        );
       }
       try {
         await this.bodies.upsert(body);

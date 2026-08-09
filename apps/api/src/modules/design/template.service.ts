@@ -4,12 +4,14 @@ import type { DocumentTemplate } from '@prisma/client';
 import {
   createEmptyTemplateBody,
   parseTemplateBody,
-  CORE_BLOCK_REGISTRY,
+  BLOCK_REGISTRY,
+  documentCollectRequiredModuleCodes,
   TEMPLATE_SCHEMA_VERSION,
   type TemplateBody,
 } from '@vdb/document-schema';
 import {
   TemplateErrorCodes,
+  type EntitlementCode,
   type PublicBlockRegistry,
   type PublicDocumentTemplate,
   type PublicDocumentTemplateDetail,
@@ -17,6 +19,7 @@ import {
 } from '@vdb/shared-types';
 import { DomainException } from '../../common/errors/domain.exception';
 import { PrismaService } from '../../config/prisma/prisma.service';
+import { EntitlementsService } from '../billing/entitlements.service';
 import { TemplateBodyRepository } from './template-body.repository';
 
 @Injectable()
@@ -24,6 +27,7 @@ export class TemplateService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly bodies: TemplateBodyRepository,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -37,7 +41,7 @@ export class TemplateService implements OnModuleInit {
   getRegistry(): PublicBlockRegistry {
     return {
       schemaVersion: TEMPLATE_SCHEMA_VERSION,
-      items: CORE_BLOCK_REGISTRY.map((e) => ({
+      items: BLOCK_REGISTRY.map((e) => ({
         type: e.type,
         labelKey: e.labelKey,
         allowsChildren: e.allowsChildren,
@@ -134,8 +138,20 @@ export class TemplateService implements OnModuleInit {
     }
 
     try {
+      if (input.body !== undefined) {
+        for (const code of documentCollectRequiredModuleCodes(body!)) {
+          await this.entitlements.assertModule(
+            input.businessId,
+            code as EntitlementCode,
+          );
+        }
+      }
       await this.bodies.upsert(body!);
-    } catch {
+    } catch (err) {
+      if (err instanceof DomainException) {
+        await this.prisma.documentTemplate.delete({ where: { id: row.id } });
+        throw err;
+      }
       await this.prisma.documentTemplate.delete({ where: { id: row.id } });
       throw new DomainException(
         TemplateErrorCodes.StorageError,
@@ -197,6 +213,12 @@ export class TemplateService implements OnModuleInit {
         });
       } catch (err) {
         this.rethrowBodyError(err);
+      }
+      for (const code of documentCollectRequiredModuleCodes(body)) {
+        await this.entitlements.assertModule(
+          input.businessId,
+          code as EntitlementCode,
+        );
       }
       try {
         await this.bodies.upsert(body);

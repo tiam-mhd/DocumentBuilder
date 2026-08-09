@@ -4,6 +4,7 @@ import { BillingModule } from '../billing/billing.module';
 import { IdentityModule } from '../identity/identity.module';
 import { TenancyModule } from '../tenancy/tenancy.module';
 import { AssetsModule } from '../assets/assets.module';
+import { ContentModule } from '../content/content.module';
 import { DocumentsModule } from '../documents/documents.module';
 import { DocumentHtmlRenderer } from './document-html.renderer';
 import { ExportController } from './export.controller';
@@ -21,6 +22,7 @@ import { PlaywrightPdfRenderer } from './pdf/playwright-pdf.renderer';
     forwardRef(() => BillingModule),
     AssetsModule,
     forwardRef(() => DocumentsModule),
+    forwardRef(() => ContentModule),
   ],
   controllers: [ExportController],
   providers: [
