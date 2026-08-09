@@ -18,7 +18,7 @@ tags:
   - name: billing
     description: Subscription status and payments
   - name: content
-    description: Business content (gate probes until Phase 02 entities)
+    description: Business content entities (Projects portfolio, …) — module-gated
   - name: assets
     description: Media library and fonts
   - name: design
@@ -821,6 +821,1626 @@ paths:
           $ref: '#/components/responses/EntitlementDenied'
         '404':
           $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/project-categories:
+    get:
+      tags: [content]
+      summary: List project categories
+      description: Requires entitlement `module.projects` (sellable; not in plan.core base).
+      operationId: listProjectCategories
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Category list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicProjectCategoryList'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '403':
+          $ref: '#/components/responses/ApiError'
+    post:
+      tags: [content]
+      summary: Create project category
+      operationId: createProjectCategory
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProjectCategoryBody'
+      responses:
+        '200':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicProjectCategory'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/project-categories/{categoryId}:
+    patch:
+      tags: [content]
+      summary: Update project category
+      operationId: updateProjectCategory
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProjectCategoryBody'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicProjectCategory'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    delete:
+      tags: [content]
+      summary: Soft-delete project category
+      operationId: deleteProjectCategory
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '409':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/projects:
+    get:
+      tags: [content]
+      summary: List projects / portfolio items
+      description: |
+        Filters `q`, `status` (draft|published|archived), `categoryId`.
+        Gated by `module.projects`. Optional `locationId` FK to `locations`.
+      operationId: listProjects
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, published, archived]
+        - name: categoryId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Project list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicProjectList'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+    post:
+      tags: [content]
+      summary: Create project
+      operationId: createProject
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProjectBody'
+      responses:
+        '200':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicProject'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/projects/{projectId}:
+    get:
+      tags: [content]
+      summary: Get one project
+      operationId: getProject
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Project
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicProject'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    patch:
+      tags: [content]
+      summary: Update project
+      operationId: updateProject
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProjectBody'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicProject'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    delete:
+      tags: [content]
+      summary: Soft-delete project
+      operationId: deleteProject
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/team-members:
+    get:
+      tags: [content]
+      summary: List team members
+      description: Membership required. Mutate routes require writable subscription.
+      operationId: listTeamMembers
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: branchId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Team member list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicTeamMemberList'
+    post:
+      tags: [content]
+      summary: Create team member
+      operationId: createTeamMember
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTeamMemberBody'
+      responses:
+        '200':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicTeamMember'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/team-members/{memberId}:
+    get:
+      tags: [content]
+      summary: Get team member
+      operationId: getTeamMember
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Member
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicTeamMember'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    patch:
+      tags: [content]
+      summary: Update team member
+      operationId: updateTeamMember
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTeamMemberBody'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicTeamMember'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+    delete:
+      tags: [content]
+      summary: Soft-delete team member
+      operationId: deleteTeamMember
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/branches:
+    get:
+      tags: [content]
+      summary: List branches
+      description: Offices for Map/Org Chart. Optional `locationId` FK to `locations`.
+      operationId: listBranches
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: q
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Branch list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicBranchList'
+    post:
+      tags: [content]
+      summary: Create branch
+      operationId: createBranch
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBranchBody'
+      responses:
+        '200':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicBranch'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/branches/{branchId}:
+    get:
+      tags: [content]
+      summary: Get branch
+      operationId: getBranch
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: branchId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Branch
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicBranch'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    patch:
+      tags: [content]
+      summary: Update branch
+      operationId: updateBranch
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: branchId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBranchBody'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicBranch'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+    delete:
+      tags: [content]
+      summary: Soft-delete branch
+      operationId: deleteBranch
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: branchId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '409':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/services:
+    get:
+      tags: [content]
+      summary: List business services
+      description: Membership required. Foundational Content — no sellable module. Mutate requires writable.
+      operationId: listBusinessServices
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: q
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Service list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicBusinessServiceList'
+    post:
+      tags: [content]
+      summary: Create service
+      operationId: createBusinessService
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBusinessServiceBody'
+      responses:
+        '200':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicBusinessService'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/services/{serviceId}:
+    get:
+      tags: [content]
+      summary: Get service
+      operationId: getBusinessService
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: serviceId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Service
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicBusinessService'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    patch:
+      tags: [content]
+      summary: Update service
+      operationId: updateBusinessService
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: serviceId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBusinessServiceBody'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicBusinessService'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+    delete:
+      tags: [content]
+      summary: Soft-delete service
+      operationId: deleteBusinessService
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: serviceId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Deleted
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/clients:
+    get:
+      tags: [content]
+      summary: List clients / partners
+      description: Membership required. Foundational Content — no sellable module.
+      operationId: listClients
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: q
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Client list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicClientList'
+    post:
+      tags: [content]
+      summary: Create client
+      operationId: createClient
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateClientBody'
+      responses:
+        '200':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicClient'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/clients/{clientId}:
+    get:
+      tags: [content]
+      summary: Get client
+      operationId: getClient
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: clientId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Client
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicClient'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    patch:
+      tags: [content]
+      summary: Update client
+      operationId: updateClient
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: clientId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateClientBody'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicClient'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+    delete:
+      tags: [content]
+      summary: Soft-delete client
+      operationId: deleteClient
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: clientId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Deleted
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/certificates:
+    get:
+      tags: [content]
+      summary: List certificates
+      description: Membership required. Foundational Content — no sellable module.
+      operationId: listCertificates
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: q
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Certificate list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicCertificateList'
+    post:
+      tags: [content]
+      summary: Create certificate
+      operationId: createCertificate
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCertificateBody'
+      responses:
+        '200':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicCertificate'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/certificates/{certificateId}:
+    get:
+      tags: [content]
+      summary: Get certificate
+      operationId: getCertificate
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: certificateId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Certificate
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicCertificate'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    patch:
+      tags: [content]
+      summary: Update certificate
+      operationId: updateCertificate
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: certificateId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCertificateBody'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicCertificate'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+    delete:
+      tags: [content]
+      summary: Soft-delete certificate
+      operationId: deleteCertificate
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: certificateId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Deleted
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/galleries:
+    get:
+      tags: [content]
+      summary: List galleries
+      description: Requires module.gallery (implies writable subscription).
+      operationId: listGalleries
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: q
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Gallery list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicGalleryList'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+    post:
+      tags: [content]
+      summary: Create gallery
+      operationId: createGallery
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGalleryBody'
+      responses:
+        '200':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicGallery'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/galleries/{galleryId}:
+    get:
+      tags: [content]
+      summary: Get gallery with items
+      operationId: getGallery
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: galleryId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Gallery
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicGallery'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    patch:
+      tags: [content]
+      summary: Update gallery
+      operationId: updateGallery
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: galleryId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateGalleryBody'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicGallery'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+    delete:
+      tags: [content]
+      summary: Soft-delete gallery and items
+      operationId: deleteGallery
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: galleryId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Deleted
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/galleries/{galleryId}/items:
+    post:
+      tags: [content]
+      summary: Add gallery item (media + caption)
+      operationId: addGalleryItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: galleryId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGalleryItemBody'
+      responses:
+        '200':
+          description: Created item
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicGalleryItem'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/galleries/{galleryId}/items/reorder:
+    put:
+      tags: [content]
+      summary: Reorder gallery items
+      operationId: reorderGalleryItems
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: galleryId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReorderGalleryItemsBody'
+      responses:
+        '200':
+          description: Gallery with new order
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicGallery'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/galleries/{galleryId}/items/{itemId}:
+    patch:
+      tags: [content]
+      summary: Update gallery item
+      operationId: updateGalleryItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: galleryId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: itemId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateGalleryItemBody'
+      responses:
+        '200':
+          description: Updated item
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicGalleryItem'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+    delete:
+      tags: [content]
+      summary: Soft-delete gallery item
+      operationId: deleteGalleryItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: galleryId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: itemId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Deleted
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/locations:
+    get:
+      tags: [content]
+      summary: List locations
+      description: Membership required. Foundational geography for Projects, Branches, and Map (T06).
+      operationId: listLocations
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: q
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Location list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicLocationList'
+    post:
+      tags: [content]
+      summary: Create location
+      operationId: createLocation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLocationBody'
+      responses:
+        '200':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicLocation'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/locations/{locationId}:
+    get:
+      tags: [content]
+      summary: Get location
+      operationId: getLocation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: locationId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Location
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicLocation'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    patch:
+      tags: [content]
+      summary: Update location
+      operationId: updateLocation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: locationId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLocationBody'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicLocation'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+    delete:
+      tags: [content]
+      summary: Soft-delete location
+      description: Fails with LOCATION_IN_USE if projects or branches still reference it.
+      operationId: deleteLocation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: locationId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Deleted
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '409':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/map/markers:
+    get:
+      tags: [content]
+      summary: List map markers
+      description: Requires module.map. Markers resolve from locations (or branches/projects with location FK).
+      operationId: listMapMarkers
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: source
+          in: query
+          schema:
+            type: string
+            enum: [locations, branches, projects, none]
+            default: locations
+        - name: country
+          in: query
+          description: Optional country filter (e.g. IR)
+          schema: { type: string }
+      responses:
+        '200':
+          description: Marker list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicMapMarkerList'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/org-chart/tree:
+    get:
+      tags: [content]
+      summary: Get organization chart tree
+      description: Requires module.org_chart. Built from team_members.parent_member_id.
+      operationId: getOrgChartTree
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: rootMemberId
+          in: query
+          description: Optional subtree root (team member id)
+          schema: { type: string }
+      responses:
+        '200':
+          description: Org chart tree
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicOrgChartTree'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/timeline-events:
+    get:
+      tags: [content]
+      summary: List timeline events
+      description: Requires module.timeline.
+      operationId: listTimelineEvents
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: q
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Event list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicTimelineEventList'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+    post:
+      tags: [content]
+      summary: Create timeline event
+      operationId: createTimelineEvent
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTimelineEventBody'
+      responses:
+        '200':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicTimelineEvent'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/timeline-events/{eventId}:
+    get:
+      tags: [content]
+      summary: Get timeline event
+      operationId: getTimelineEvent
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: eventId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Event
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicTimelineEvent'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    patch:
+      tags: [content]
+      summary: Update timeline event
+      operationId: updateTimelineEvent
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: eventId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTimelineEventBody'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicTimelineEvent'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+    delete:
+      tags: [content]
+      summary: Soft-delete timeline event
+      operationId: deleteTimelineEvent
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: eventId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Deleted
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/qr/encode:
+    post:
+      tags: [content]
+      summary: Encode QR PNG data URL
+      description: Core QR block helper. Membership required. Dynamic redirect short-links are out of scope (ADR 011).
+      operationId: encodeQr
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EncodeQrBody'
+      responses:
+        '200':
+          description: Encoded QR
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicQrEncode'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /businesses/{businessId}/collections/{source}:
+    get:
+      tags: [content]
+      summary: List collection items for repeater binding
+      description: |
+        Flat `values` maps for `{{item.*}}` placeholders (ADR 013).
+        Sources `projects` and `timelineEvents` require `module.projects` / `module.timeline`.
+      operationId: listCollection
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: source
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              [
+                projects,
+                teamMembers,
+                branches,
+                services,
+                clients,
+                certificates,
+                timelineEvents,
+              ]
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: Collection items
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicCollectionList'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
   /businesses/{businessId}/documents:
     get:
       tags: [documents]
@@ -1449,6 +3069,42 @@ paths:
       tags: [content]
       summary: Probe mutate route (module.map)
       operationId: gateProbeModuleMap
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      responses:
+        '200':
+          description: Allowed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '403':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/gates/module-org-chart:
+    post:
+      tags: [content]
+      summary: Probe mutate route (module.org_chart)
+      operationId: gateProbeModuleOrgChart
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      responses:
+        '200':
+          description: Allowed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '403':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/gates/module-timeline:
+    post:
+      tags: [content]
+      summary: Probe mutate route (module.timeline)
+      operationId: gateProbeModuleTimeline
       security:
         - bearerAuth: []
       parameters:
@@ -2351,6 +4007,667 @@ components:
           type: integer
         total:
           type: integer
+    PublicProjectCategory:
+      type: object
+      required: [id, businessId, name, sortOrder, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        businessId:
+          type: string
+        name:
+          type: string
+        sortOrder:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PublicProjectCategoryList:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicProjectCategory'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    CreateProjectCategoryBody:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        sortOrder:
+          type: integer
+    UpdateProjectCategoryBody:
+      type: object
+      properties:
+        name:
+          type: string
+        sortOrder:
+          type: integer
+    PublicProject:
+      type: object
+      required:
+        - id
+        - businessId
+        - title
+        - description
+        - status
+        - mediaIds
+        - fields
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        businessId:
+          type: string
+        categoryId:
+          type: string
+          nullable: true
+        categoryName:
+          type: string
+          nullable: true
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [draft, published, archived]
+        coverMediaId:
+          type: string
+          nullable: true
+        mediaIds:
+          type: array
+          items:
+            type: string
+        locationId:
+          type: string
+          nullable: true
+          description: Optional FK to locations
+        locationName:
+          type: string
+          nullable: true
+        fields:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PublicProjectList:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicProject'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    CreateProjectBody:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        categoryId:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [draft, published, archived]
+        coverMediaId:
+          type: string
+          nullable: true
+        mediaIds:
+          type: array
+          items:
+            type: string
+        locationId:
+          type: string
+          nullable: true
+        fields:
+          type: object
+    UpdateProjectBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        categoryId:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [draft, published, archived]
+        coverMediaId:
+          type: string
+          nullable: true
+        mediaIds:
+          type: array
+          items:
+            type: string
+        locationId:
+          type: string
+          nullable: true
+        fields:
+          type: object
+    PublicTeamMember:
+      type: object
+      required:
+        [id, businessId, name, roleTitle, department, sortOrder, fields, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        businessId: { type: string }
+        branchId: { type: string, nullable: true }
+        branchName: { type: string, nullable: true }
+        parentMemberId: { type: string, nullable: true }
+        name: { type: string }
+        roleTitle: { type: string }
+        department: { type: string }
+        photoMediaId: { type: string, nullable: true }
+        sortOrder: { type: integer }
+        fields: { type: object }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    PublicTeamMemberList:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicTeamMember'
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+    CreateTeamMemberBody:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        roleTitle: { type: string }
+        department: { type: string }
+        photoMediaId: { type: string, nullable: true }
+        branchId: { type: string, nullable: true }
+        parentMemberId: { type: string, nullable: true }
+        sortOrder: { type: integer }
+        fields: { type: object }
+    UpdateTeamMemberBody:
+      type: object
+      properties:
+        name: { type: string }
+        roleTitle: { type: string }
+        department: { type: string }
+        photoMediaId: { type: string, nullable: true }
+        branchId: { type: string, nullable: true }
+        parentMemberId: { type: string, nullable: true }
+        sortOrder: { type: integer }
+        fields: { type: object }
+    PublicBranch:
+      type: object
+      required:
+        [id, businessId, name, addressLine1, addressLine2, city, province, postalCode, country, phone, sortOrder, fields, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        businessId: { type: string }
+        name: { type: string }
+        addressLine1: { type: string }
+        addressLine2: { type: string }
+        city: { type: string }
+        province: { type: string }
+        postalCode: { type: string }
+        country: { type: string }
+        phone: { type: string }
+        locationId: { type: string, nullable: true }
+        locationName: { type: string, nullable: true }
+        sortOrder: { type: integer }
+        fields: { type: object }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    PublicBranchList:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicBranch'
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+    CreateBranchBody:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        addressLine1: { type: string }
+        addressLine2: { type: string }
+        city: { type: string }
+        province: { type: string }
+        postalCode: { type: string }
+        country: { type: string }
+        phone: { type: string }
+        locationId: { type: string, nullable: true }
+        sortOrder: { type: integer }
+        fields: { type: object }
+    UpdateBranchBody:
+      type: object
+      properties:
+        name: { type: string }
+        addressLine1: { type: string }
+        addressLine2: { type: string }
+        city: { type: string }
+        province: { type: string }
+        postalCode: { type: string }
+        country: { type: string }
+        phone: { type: string }
+        locationId: { type: string, nullable: true }
+        sortOrder: { type: integer }
+        fields: { type: object }
+    PublicBusinessService:
+      type: object
+      required: [id, businessId, name, description, sortOrder, fields, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        businessId: { type: string }
+        name: { type: string }
+        description: { type: string }
+        iconMediaId: { type: string, nullable: true }
+        sortOrder: { type: integer }
+        fields: { type: object }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    PublicBusinessServiceList:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicBusinessService'
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+    CreateBusinessServiceBody:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        description: { type: string }
+        iconMediaId: { type: string, nullable: true }
+        sortOrder: { type: integer }
+        fields: { type: object }
+    UpdateBusinessServiceBody:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string }
+        iconMediaId: { type: string, nullable: true }
+        sortOrder: { type: integer }
+        fields: { type: object }
+    PublicClient:
+      type: object
+      required: [id, businessId, name, website, sortOrder, fields, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        businessId: { type: string }
+        name: { type: string }
+        website: { type: string }
+        logoMediaId: { type: string, nullable: true }
+        sortOrder: { type: integer }
+        fields: { type: object }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    PublicClientList:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicClient'
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+    CreateClientBody:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        website: { type: string }
+        logoMediaId: { type: string, nullable: true }
+        sortOrder: { type: integer }
+        fields: { type: object }
+    UpdateClientBody:
+      type: object
+      properties:
+        name: { type: string }
+        website: { type: string }
+        logoMediaId: { type: string, nullable: true }
+        sortOrder: { type: integer }
+        fields: { type: object }
+    PublicCertificate:
+      type: object
+      required: [id, businessId, name, issuer, sortOrder, fields, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        businessId: { type: string }
+        name: { type: string }
+        issuer: { type: string }
+        issuedAt: { type: string, format: date-time, nullable: true }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        documentMediaId: { type: string, nullable: true }
+        sortOrder: { type: integer }
+        fields: { type: object }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    PublicCertificateList:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicCertificate'
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+    CreateCertificateBody:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        issuer: { type: string }
+        issuedAt: { type: string, format: date-time, nullable: true }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        documentMediaId: { type: string, nullable: true }
+        sortOrder: { type: integer }
+        fields: { type: object }
+    UpdateCertificateBody:
+      type: object
+      properties:
+        name: { type: string }
+        issuer: { type: string }
+        issuedAt: { type: string, format: date-time, nullable: true }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        documentMediaId: { type: string, nullable: true }
+        sortOrder: { type: integer }
+        fields: { type: object }
+    PublicGalleryItem:
+      type: object
+      required: [id, businessId, galleryId, mediaId, caption, sortOrder, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        businessId: { type: string }
+        galleryId: { type: string }
+        mediaId: { type: string }
+        caption: { type: string }
+        sortOrder: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    PublicGallery:
+      type: object
+      required: [id, businessId, name, description, sortOrder, itemCount, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        businessId: { type: string }
+        name: { type: string }
+        description: { type: string }
+        sortOrder: { type: integer }
+        itemCount: { type: integer }
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicGalleryItem'
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    PublicGalleryList:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicGallery'
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+    CreateGalleryBody:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        description: { type: string }
+        sortOrder: { type: integer }
+    UpdateGalleryBody:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string }
+        sortOrder: { type: integer }
+    CreateGalleryItemBody:
+      type: object
+      required: [mediaId]
+      properties:
+        mediaId: { type: string }
+        caption: { type: string }
+        sortOrder: { type: integer }
+    UpdateGalleryItemBody:
+      type: object
+      properties:
+        mediaId: { type: string }
+        caption: { type: string }
+        sortOrder: { type: integer }
+    ReorderGalleryItemsBody:
+      type: object
+      required: [itemIds]
+      properties:
+        itemIds:
+          type: array
+          items: { type: string }
+    PublicLocation:
+      type: object
+      required: [id, businessId, name, country, province, city, address, lat, lng, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        businessId: { type: string }
+        name: { type: string }
+        country: { type: string }
+        province: { type: string }
+        city: { type: string }
+        address: { type: string }
+        lat: { type: number, minimum: -90, maximum: 90 }
+        lng: { type: number, minimum: -180, maximum: 180 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    PublicLocationList:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicLocation'
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+    CreateLocationBody:
+      type: object
+      required: [name, lat, lng]
+      properties:
+        name: { type: string }
+        country: { type: string }
+        province: { type: string }
+        city: { type: string }
+        address: { type: string }
+        lat: { type: number, minimum: -90, maximum: 90 }
+        lng: { type: number, minimum: -180, maximum: 180 }
+    UpdateLocationBody:
+      type: object
+      properties:
+        name: { type: string }
+        country: { type: string }
+        province: { type: string }
+        city: { type: string }
+        address: { type: string }
+        lat: { type: number, minimum: -90, maximum: 90 }
+        lng: { type: number, minimum: -180, maximum: 180 }
+    PublicMapMarker:
+      type: object
+      required: [id, name, lat, lng, country, source]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        lat: { type: number }
+        lng: { type: number }
+        country: { type: string }
+        source: { type: string }
+    PublicMapMarkerList:
+      type: object
+      required: [items, source, countryRestriction]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicMapMarker'
+        source: { type: string }
+        countryRestriction: { type: string, nullable: true }
+    PublicOrgChartNode:
+      type: object
+      required: [id, name, roleTitle, department, sortOrder, children]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        roleTitle: { type: string }
+        department: { type: string }
+        photoMediaId: { type: string, nullable: true }
+        parentMemberId: { type: string, nullable: true }
+        sortOrder: { type: integer }
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicOrgChartNode'
+    PublicOrgChartTree:
+      type: object
+      required: [roots, rootMemberId, memberCount]
+      properties:
+        roots:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicOrgChartNode'
+        rootMemberId: { type: string, nullable: true }
+        memberCount: { type: integer }
+    PublicTimelineEvent:
+      type: object
+      required:
+        [
+          id,
+          businessId,
+          occurredAt,
+          title,
+          body,
+          sortOrder,
+          fields,
+          createdAt,
+          updatedAt,
+        ]
+      properties:
+        id: { type: string }
+        businessId: { type: string }
+        occurredAt: { type: string, format: date-time }
+        title: { type: string }
+        body: { type: string }
+        mediaId: { type: string, nullable: true }
+        sortOrder: { type: integer }
+        fields: { type: object }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    PublicTimelineEventList:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicTimelineEvent'
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+    CreateTimelineEventBody:
+      type: object
+      required: [occurredAt, title]
+      properties:
+        occurredAt: { type: string }
+        title: { type: string }
+        body: { type: string }
+        mediaId: { type: string, nullable: true }
+        sortOrder: { type: integer }
+        fields: { type: object }
+    UpdateTimelineEventBody:
+      type: object
+      properties:
+        occurredAt: { type: string }
+        title: { type: string }
+        body: { type: string }
+        mediaId: { type: string, nullable: true }
+        sortOrder: { type: integer }
+        fields: { type: object }
+    PublicQrEncode:
+      type: object
+      required: [payload, dataUrl, sizePx]
+      properties:
+        payload: { type: string }
+        dataUrl: { type: string }
+        sizePx: { type: integer }
+    EncodeQrBody:
+      type: object
+      required: [targetType, value]
+      properties:
+        targetType:
+          type: string
+          enum: [url, phone, email, map, custom]
+        value: { type: string }
+        sizePx: { type: integer, minimum: 64, maximum: 512 }
+        caption: { type: string }
+    PublicCollectionItem:
+      type: object
+      required: [id, values]
+      properties:
+        id: { type: string }
+        values:
+          type: object
+          additionalProperties: { type: string }
+    PublicCollectionList:
+      type: object
+      required: [source, items, total]
+      properties:
+        source: { type: string }
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicCollectionItem'
+        total: { type: integer, minimum: 0 }
     UpdateDocumentBody:
       type: object
       properties:

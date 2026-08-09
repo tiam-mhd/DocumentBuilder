@@ -32,7 +32,8 @@ You are working in **Visual Document Builder** (VDB).
 | `11-fonts.mdc` | Font formats, storage keys, PDF embed contract |
 | `12-design-themes.mdc` | Document brand tokens vs app chrome dark/light |
 | `13-templates-blocks.mdc` | Template PG+Mongo split + core block registry |
+| `14-content-entities.mdc` | Corporate content (Projects…) + `module.*` gates |
 
-Phase exit QA: `docs/qa/` + `scripts/e2e/` (see delivery workflow).
+Phase exit QA: `docs/qa/` + `scripts/e2e/` (phase-01 edition funnels + `phase-02-corporate-acceptance` / `npm run test:e2e:corporate`).
 
 If a user request conflicts with these rules, refuse the conflicting part and propose a compliant design.

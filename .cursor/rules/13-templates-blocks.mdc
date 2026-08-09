@@ -30,10 +30,57 @@ Canonical types in `@vdb/document-schema` (`CORE_BLOCK_TYPES`):
 | `divider` | Visual rule |
 | `headerSlot` | Master header placeholder (filled in master-page phase) |
 | `footerSlot` | Master footer placeholder |
+| `qr` | QR code (`props` targetType/value/sizePx) — **core**; encode server-side for PDF — see ADR 011 |
+| `toc` | Auto table of contents from section/text headings — **core**; logical page # — ADR 012 |
+| `repeater` | Loop Business collection (`props.source` + card `children`) — **core**; ADR 013 |
+| `gallery` | Album ref (`props.galleryId`) — **`module.gallery`** (Phase 02) |
+| `map` | Leaflet/OSM map (`props` center/zoom/markersSource/…) — **`module.map`** (Phase 02) |
+| `orgChart` | Org tree from Team (`props` layout/rootMemberId/…) — **`module.org_chart`** (Phase 02) |
+| `timeline` | Company events (`props` layout vertical/alternating) — **`module.timeline`** (Phase 02) |
 
 Unknown block types must **fail safely** at validate/render (reject or skip with audit) — never crash the worker.
 
-Sellable modules (Map, OrgChart, …) register **additional** types later with `moduleCode`; Core types have `moduleCode: null`.
+## QR block (core)
+
+| Concern | Rule |
+| --- | --- |
+| Entitlement | None beyond document writable / membership for encode preview |
+| Props | `targetType` (`url`\|`phone`\|`email`\|`map`\|`custom`), `value`, `sizePx`, optional `caption` |
+| Payload | `buildQrPayload` in `@vdb/document-schema` |
+| Encode | Server `qrcode` → PNG data URL — PDF + `POST .../qr/encode` (ADR 011) |
+| Non-goal | Dynamic redirect / tracked short URLs |
+
+## TOC block (core)
+
+| Concern | Rule |
+| --- | --- |
+| Entitlement | None beyond document writable |
+| Sources | `section.title` + `text` with `headingLevel` 1–3 — see ADR 012 |
+| Page numbers | **Logical** `pages[]` 1-based index (not print-sheet reflow) |
+| Compute | `buildTableOfContents` in `@vdb/document-schema` — shared preview + PDF |
+| Props | `maxLevel`, `showPageNumbers`, optional `title` |
+
+## Repeater block (core)
+
+| Concern | Rule |
+| --- | --- |
+| Entitlement | Source-dependent: `projects` → `module.projects`; `timelineEvents` → `module.timeline`; else foundational |
+| Props | `source`, `limit`, `emptyMessage`; **children** = card template |
+| Binding | `{{item.<key>}}` only (ADR 013) — no formulas |
+| API | `GET .../collections/:source` for preview; export resolves same data |
+| Nested | Nested `repeater` unsupported in MVP |
+
+## Conditional visibility (Phase 02 — all blocks)
+
+| Concern | Rule |
+| --- | --- |
+| Field | Optional `when` on `BlockNode` (ADR 014) |
+| Ops | `exists` \| `empty` \| `eq` only |
+| Paths | `collection.<RepeaterSource>` → item count |
+| Evaluate | Preview + PDF render; TOC skips hidden |
+| Non-goal | AND/OR trees, formulas, entitlement conditions |
+
+Sellable modules (Map, OrgChart, Gallery, …) register **additional** types with `moduleCode`; Core types have `moduleCode: null`. Full registry: `BLOCK_REGISTRY` in `@vdb/document-schema`.
 
 ## API
 

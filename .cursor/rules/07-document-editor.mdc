@@ -9,7 +9,8 @@ alwaysApply: true
 
 - **Data** (Business entities) ≠ **Template** (layout, tokens, blocks, bindings) ≠ **Document** (instance: data refs + template + page config).
 - Bindings use explicit placeholders (e.g. `{{business.name}}`, repeaters for collections).
-- Conditional visibility evaluated at render time from data + entitlements.
+- Collection repeater (`repeater` block): loops PG Business data with `{{item.*}}` — see ADR 013 (no advanced formulas in Phase 02).
+- Conditional visibility: optional `when` on blocks (`exists` | `empty` | `eq` on `collection.<source>`) evaluated at preview + PDF — see ADR 014 (no rule-engine trees in Phase 02).
 
 ## Editor UX rules
 
@@ -29,6 +30,7 @@ alwaysApply: true
 - `headerSlot` / `footerSlot` in flow are markers only; repeating chrome comes from the assigned master.
 - Smart breaks: avoid orphan titles; support keep-with-next where modeled.
 - Print presets (A4/A3/…, DPI tiers) live in export config, not hardcoded in Next.js UI components.
+- Auto TOC (`toc` block): entries from section/text headings; page numbers = logical `pages[]` index — see ADR 012 (not Chromium print-sheet pages).
 
 ## Assets
 

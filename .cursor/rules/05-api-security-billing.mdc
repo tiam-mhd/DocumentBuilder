@@ -27,6 +27,13 @@ Central Nest service + Guard; used on every mutating/export route:
 
 UI mirrors the same codes from `/businesses/:businessId/entitlements`.
 
+Editor + Corporate modules wire-up:
+
+- Palette lists only allowed module blocks; locked modules shown with upgrade CTA
+- Document / template body save and PDF enqueue assert modules via `documentCollectRequiredModuleCodes` (map, orgChart, timeline, gallery, gated repeater/`when` sources) → **403** `ENTITLEMENT_MODULE_REQUIRED`
+- Module content pages (projects/map/org/timeline/gallery) show billing upgrade CTA when locked
+- Catalog seed includes all `MODULE_ENTITLEMENT_CODES` as paid add-ons (not in `plan.core` base)
+
 ## Billing integrity
 
 - Trial grant is transactional with first Business create; set `trial_consumed` atomically.

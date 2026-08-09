@@ -1,0 +1,124 @@
+# Content Business Entities (Permanent)
+
+## Law
+
+Sellable **corporate content** entities (Projects, Team, Gallery, …) live in Nest `ContentModule`, are **PostgreSQL** tenant tables (`business_id` + soft-delete), and are gated server-side — never UI-only.
+
+## Projects / Portfolio (`module.projects`)
+
+| Concern | Rule |
+| --- | --- |
+| Entitlement | **`module.projects`** — sellable catalog module, **not** in `plan.core` `baseEntitlements` |
+| Tables | `project_categories`, `projects` |
+| Scope | Always filter `businessId`; soft-delete via `deleted_at` |
+| Media | Optional `cover_media_id` + `media_ids` (JSON string[]) — ids must resolve to active `media_assets` same Business |
+| Location | Optional FK `location_id` → `locations` (same `businessId`); null allowed |
+| Flexible data | `fields` JSONB for per-vertical extras (strict allow unknown keys; size-capped in service) |
+| Status | `draft` \| `published` \| `archived` |
+| API | `/api/businesses/:businessId/projects` (+ `/project-categories`) |
+| Mutate + list | `EntitlementGuard` + `@RequireModule('module.projects')` |
+
+## Team members + Branches (foundational Business Data)
+
+| Concern | Rule |
+| --- | --- |
+| Entitlement | **No separate sellable module** — mutate with `@RequireWritable`; list/get with membership (expired = read-only) |
+| Consumers | Org Chart (`module.org_chart`) and Map (`module.map`) read these rows later — do not fork duplicate people/branch stores |
+| Tables | `team_members`, `branches` |
+| Team fields | `name`, `role_title`, `photo_media_id?`, `department?`, `sort_order`, optional `branch_id?`, optional `parent_member_id?` (reporting line for Org Chart), `fields` JSONB |
+| Branch fields | `name`, address lines / city / province / postal / country, `phone?`, optional FK `location_id` → `locations`, `sort_order`, `fields` JSONB |
+| Media | `photo_media_id` must resolve to active `media_assets` same Business |
+| API | `/api/businesses/:businessId/team-members`, `/api/businesses/:businessId/branches` |
+
+## Locations (foundational shared geography)
+
+| Concern | Rule |
+| --- | --- |
+| Entitlement | **No separate sellable module** — list/get = membership; mutate = `@RequireWritable` |
+| Consumers | Projects, Branches, and later Map (`module.map`) — **one** `locations` table; never duplicate lat/lng stores |
+| Table | `locations` |
+| Fields | `name`, `country`, `province`, `city`, `address`, required `lat`/`lng` (WGS84), soft-delete |
+| Coordinates | `lat` ∈ [-90, 90], `lng` ∈ [-180, 180]; both required on create/update when set |
+| FK consumers | `projects.location_id`, `branches.location_id` → `locations.id` (`ON DELETE SET NULL`) |
+| Soft-delete | Soft-deleted locations cannot be newly linked; existing FKs may be cleared or left until consumer updates |
+| Map | Map Engine (`module.map`, P02-T06) reads these rows for markers — never fork lat/lng |
+| API | `/api/businesses/:businessId/locations` |
+
+## Map Engine (`module.map`)
+
+| Concern | Rule |
+| --- | --- |
+| Entitlement | **`module.map`** — sellable catalog module (already seeded); not in `plan.core` base |
+| Config store | Map settings live in **document/template Mongo block props** (`type: map`) — not a parallel PG geography table |
+| Markers | Resolve from `locations` (and optionally locations linked via branches/projects) filtered by `businessId` + optional country |
+| Block | `map` in `BLOCK_REGISTRY` with `moduleCode: module.map`; props: center, zoom, markersSource, countryRestriction, showMarkers, heightPx |
+| API | `GET /api/businesses/:businessId/map/markers` — `@RequireModule(module.map)` |
+| Editor | Leaflet + OSM tiles for interactive preview only |
+| PDF | Static map image (OSM static endpoint) embedded in export HTML — see `docs/adr/008-map-pdf-static.md` |
+| Gates | Saving a document body that contains `map` blocks requires `module.map`; PDF export of such docs also asserts `module.map` |
+
+## Services / Clients / Certificates (foundational Business Data)
+
+| Concern | Rule |
+| --- | --- |
+| Entitlement | **No separate sellable module** — list/get = membership; mutate = `@RequireWritable` |
+| Rationale | Standard company-profile data for documents/templates (not a premium vertical like Projects) |
+| Tables | `business_services`, `clients`, `certificates` |
+| Service fields | `name`, `description`, optional `icon_media_id`, `sort_order`, `fields` JSONB |
+| Client fields | `name`, optional `website`, optional `logo_media_id`, `sort_order`, `fields` JSONB |
+| Certificate fields | `name`, `issuer`, optional `issued_at` / `expires_at`, optional `document_media_id` (scan/PDF), `sort_order`, `fields` JSONB |
+| Media | Optional media ids must resolve to active `media_assets` same Business |
+| API | `/api/businesses/:businessId/services`, `/clients`, `/certificates` |
+
+## Organization Chart (`module.org_chart`)
+
+| Concern | Rule |
+| --- | --- |
+| Entitlement | **`module.org_chart`** — sellable catalog module (seeded); not in `plan.core` base |
+| People store | **Reuse** `team_members` — never fork a second people table |
+| Reporting edge | `team_members.parent_member_id` → same-business `team_members.id` (`ON DELETE SET NULL`); cycle rejected in service |
+| Tree API | `GET /api/businesses/:businessId/org-chart/tree` — `@RequireModule(module.org_chart)` |
+| Parent edit | PATCH team member `parentMemberId` with `@RequireWritable` (foundational team mutate); org-chart UI may also expose parent form when module entitled |
+| Block | `orgChart` in `BLOCK_REGISTRY` with `moduleCode: module.org_chart`; props: `layout` (`tree-vertical` \| `tree-horizontal`), optional `rootMemberId`, `showPhotos`, `heightPx` |
+| Editor / PDF | HTML/CSS tree (vertical or horizontal flex); same markup for preview + Chromium PDF — no Leaflet-style separate raster |
+| Gates | Saving / exporting documents that contain `orgChart` blocks asserts `module.org_chart` |
+
+## Timeline (`module.timeline`)
+
+| Concern | Rule |
+| --- | --- |
+| Entitlement | **`module.timeline`** — sellable catalog module (seeded); not in `plan.core` base |
+| Table | `timeline_events` (`business_id`, soft-delete) |
+| Fields | `occurred_at`, `title`, `body`, optional `media_id` → `media_assets`, `sort_order`, `fields` JSONB |
+| Scope | Always filter `businessId`; list ordered by `occurred_at` desc then `sort_order` |
+| Block | `timeline` in `BLOCK_REGISTRY` with `moduleCode: module.timeline`; props: `layout` (`vertical` \| `alternating`), `limit`, `heightPx` |
+| API | `/api/businesses/:businessId/timeline-events` — `@RequireModule(module.timeline)` |
+| Editor / PDF | HTML/CSS timeline (same markup) — see `docs/adr/010-timeline-html-pdf.md` |
+| Gates | Saving / exporting documents that contain `timeline` blocks asserts `module.timeline` |
+
+## Gallery (`module.gallery`)
+
+| Concern | Rule |
+| --- | --- |
+| Entitlement | **`module.gallery`** — sellable catalog module, **not** in `plan.core` `baseEntitlements` |
+| Tables | `galleries`, `gallery_items` |
+| Gallery fields | `name`, `description`, `sort_order`, soft-delete |
+| Item fields | `gallery_id`, `media_id` (active `media_assets` same Business), `caption`, `sort_order` |
+| Scope | Always filter `businessId` on gallery **and** items; soft-delete both |
+| Reorder | Mutating sort via explicit item id order (service rewrites `sort_order`) |
+| Block | Document/template block type `gallery` with `moduleCode: module.gallery`; props `{ galleryId }` |
+| API | `/api/businesses/:businessId/galleries` (+ `.../items`, reorder) |
+| Mutate + list | `EntitlementGuard` + `@RequireModule('module.gallery')` |
+
+## Forbidden
+
+- Putting content rows on User without `businessId`
+- Shipping Projects without `module.projects` gate
+- Shipping Gallery without `module.gallery` gate
+- Duplicating lat/lng or address geography outside `locations` for Map/Projects/Branches
+- Duplicating team/branch tables inside Org Chart / Map modules
+- Inventing sellable `module.services` / `module.clients` / `module.locations` without a product decision — Location default is foundational
+- Storing gallery image binaries outside Media Library (items reference `media_id` only)
+- Shipping Map markers without resolving through `locations` (T06)
+- Shipping Org Chart people outside `team_members` / without `parent_member_id` reporting edges
+- Shipping Timeline events without `module.timeline` gate or outside `timeline_events`

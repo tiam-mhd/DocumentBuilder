@@ -109,6 +109,8 @@ Clients map `code` → i18n (`fa` / `en`).
 | `POST` | `/api/businesses/:businessId/gates/writable` | Bearer + EntitlementGuard (writable) |
 | `POST` | `/api/businesses/:businessId/gates/export-pdf` | Bearer + `export.pdf` |
 | `POST` | `/api/businesses/:businessId/gates/module-map` | Bearer + `module.map` |
+| `POST` | `/api/businesses/:businessId/gates/module-org-chart` | Bearer + `module.org_chart` |
+| `POST` | `/api/businesses/:businessId/gates/module-timeline` | Bearer + `module.timeline` |
 | `GET` | `/api/billing/catalog` | Bearer |
 | `POST` | `/api/businesses/:businessId/billing/checkout` | Bearer + membership (SAAS only) |
 | `GET` | `/api/billing/payments/callback` | Gateway return (no JWT) |
@@ -144,7 +146,64 @@ Clients map `code` → i18n (`fa` / `en`).
 | `GET` | `/api/businesses/:businessId/documents/:documentId` | Bearer + membership |
 | `PATCH` | `/api/businesses/:businessId/documents/:documentId` | Bearer + EntitlementGuard writable |
 | `DELETE` | `/api/businesses/:businessId/documents/:documentId` | Bearer + EntitlementGuard writable |
-| `POST` | `/api/businesses/:businessId/documents/:documentId/export/pdf` | Bearer + `@RequireEntitlement(export.pdf)` |
+| `GET` | `/api/businesses/:businessId/project-categories` | Bearer + `@RequireModule(module.projects)` |
+| `POST` | `/api/businesses/:businessId/project-categories` | Bearer + `@RequireModule(module.projects)` |
+| `PATCH` | `/api/businesses/:businessId/project-categories/:categoryId` | Bearer + module.projects |
+| `DELETE` | `/api/businesses/:businessId/project-categories/:categoryId` | Bearer + module.projects |
+| `GET` | `/api/businesses/:businessId/projects` | Bearer + `@RequireModule(module.projects)` |
+| `POST` | `/api/businesses/:businessId/projects` | Bearer + module.projects |
+| `GET` | `/api/businesses/:businessId/projects/:projectId` | Bearer + module.projects |
+| `PATCH` | `/api/businesses/:businessId/projects/:projectId` | Bearer + module.projects |
+| `DELETE` | `/api/businesses/:businessId/projects/:projectId` | Bearer + module.projects |
+| `GET` | `/api/businesses/:businessId/team-members` | Bearer + membership |
+| `POST` | `/api/businesses/:businessId/team-members` | Bearer + `@RequireWritable` |
+| `GET` | `/api/businesses/:businessId/team-members/:memberId` | Bearer + membership |
+| `PATCH` | `/api/businesses/:businessId/team-members/:memberId` | Bearer + `@RequireWritable` |
+| `DELETE` | `/api/businesses/:businessId/team-members/:memberId` | Bearer + `@RequireWritable` |
+| `GET` | `/api/businesses/:businessId/branches` | Bearer + membership |
+| `POST` | `/api/businesses/:businessId/branches` | Bearer + `@RequireWritable` |
+| `GET` | `/api/businesses/:businessId/branches/:branchId` | Bearer + membership |
+| `PATCH` | `/api/businesses/:businessId/branches/:branchId` | Bearer + `@RequireWritable` |
+| `DELETE` | `/api/businesses/:businessId/branches/:branchId` | Bearer + `@RequireWritable` |
+| `GET` | `/api/businesses/:businessId/services` | Bearer + membership |
+| `POST` | `/api/businesses/:businessId/services` | Bearer + `@RequireWritable` |
+| `GET` | `/api/businesses/:businessId/services/:serviceId` | Bearer + membership |
+| `PATCH` | `/api/businesses/:businessId/services/:serviceId` | Bearer + `@RequireWritable` |
+| `DELETE` | `/api/businesses/:businessId/services/:serviceId` | Bearer + `@RequireWritable` |
+| `GET` | `/api/businesses/:businessId/clients` | Bearer + membership |
+| `POST` | `/api/businesses/:businessId/clients` | Bearer + `@RequireWritable` |
+| `GET` | `/api/businesses/:businessId/clients/:clientId` | Bearer + membership |
+| `PATCH` | `/api/businesses/:businessId/clients/:clientId` | Bearer + `@RequireWritable` |
+| `DELETE` | `/api/businesses/:businessId/clients/:clientId` | Bearer + `@RequireWritable` |
+| `GET` | `/api/businesses/:businessId/certificates` | Bearer + membership |
+| `POST` | `/api/businesses/:businessId/certificates` | Bearer + `@RequireWritable` |
+| `GET` | `/api/businesses/:businessId/certificates/:certificateId` | Bearer + membership |
+| `PATCH` | `/api/businesses/:businessId/certificates/:certificateId` | Bearer + `@RequireWritable` |
+| `DELETE` | `/api/businesses/:businessId/certificates/:certificateId` | Bearer + `@RequireWritable` |
+| `GET` | `/api/businesses/:businessId/galleries` | Bearer + `@RequireModule(module.gallery)` |
+| `POST` | `/api/businesses/:businessId/galleries` | Bearer + module.gallery |
+| `GET` | `/api/businesses/:businessId/galleries/:galleryId` | Bearer + module.gallery |
+| `PATCH` | `/api/businesses/:businessId/galleries/:galleryId` | Bearer + module.gallery |
+| `DELETE` | `/api/businesses/:businessId/galleries/:galleryId` | Bearer + module.gallery |
+| `POST` | `/api/businesses/:businessId/galleries/:galleryId/items` | Bearer + module.gallery |
+| `PATCH` | `/api/businesses/:businessId/galleries/:galleryId/items/:itemId` | Bearer + module.gallery |
+| `DELETE` | `/api/businesses/:businessId/galleries/:galleryId/items/:itemId` | Bearer + module.gallery |
+| `PUT` | `/api/businesses/:businessId/galleries/:galleryId/items/reorder` | Bearer + module.gallery |
+| `GET` | `/api/businesses/:businessId/locations` | Bearer + membership |
+| `POST` | `/api/businesses/:businessId/locations` | Bearer + `@RequireWritable` |
+| `GET` | `/api/businesses/:businessId/locations/:locationId` | Bearer + membership |
+| `PATCH` | `/api/businesses/:businessId/locations/:locationId` | Bearer + `@RequireWritable` |
+| `DELETE` | `/api/businesses/:businessId/locations/:locationId` | Bearer + `@RequireWritable` |
+| `GET` | `/api/businesses/:businessId/map/markers` | Bearer + `@RequireModule(module.map)` |
+| `GET` | `/api/businesses/:businessId/org-chart/tree` | Bearer + `@RequireModule(module.org_chart)` |
+| `GET` | `/api/businesses/:businessId/timeline-events` | Bearer + `@RequireModule(module.timeline)` |
+| `POST` | `/api/businesses/:businessId/timeline-events` | Bearer + `@RequireModule(module.timeline)` |
+| `GET` | `/api/businesses/:businessId/timeline-events/:eventId` | Bearer + `@RequireModule(module.timeline)` |
+| `PATCH` | `/api/businesses/:businessId/timeline-events/:eventId` | Bearer + `@RequireModule(module.timeline)` |
+| `DELETE` | `/api/businesses/:businessId/timeline-events/:eventId` | Bearer + `@RequireModule(module.timeline)` |
+| `POST` | `/api/businesses/:businessId/qr/encode` | Bearer + membership (core QR PNG data URL) |
+| `GET` | `/api/businesses/:businessId/collections/:source` | Bearer + membership (+ module gate for `projects` / `timelineEvents`) |
+| `POST` | `/api/businesses/:businessId/documents/:documentId/export/pdf` | Bearer + `@RequireEntitlement(export.pdf)` (+ module gates if body has gated blocks) |
 | `GET` | `/api/businesses/:businessId/documents/:documentId/exports` | Bearer + membership |
 | `GET` | `/api/businesses/:businessId/exports/:jobId` | Bearer + membership |
 | `GET` | `/api/businesses/:businessId/exports/:jobId/file` | Bearer + membership (PDF bytes) |
@@ -192,7 +251,7 @@ Clients map `code` → i18n (`fa` / `en`).
 ### Templates & core blocks
 
 - PG `document_templates` + Mongo `template_bodies` (`businessId` + `templateId`) — see `docs/adr/003-template-mongo-body.md`
-- Schema v3: masters + `pages[].masterId`; core blocks `text` | `image` | `section` | `divider` | `headerSlot` | `footerSlot`
+- Schema v3: masters + `pages[].masterId`; core blocks include `text` | `image` | `section` | `divider` | `headerSlot` | `footerSlot` | `qr` | `toc` (+ module blocks)
 - Registry: `GET /api/businesses/:businessId/blocks`
 - Layout only — no Business data in templates
 - Mutate routes use `EntitlementGuard` + `@RequireWritable`
@@ -207,6 +266,119 @@ Clients map `code` → i18n (`fa` / `en`).
 - Mutate routes use `EntitlementGuard` + `@RequireWritable`
 - **Editor (web):** flow shell at `/app/documents/:documentId` — Zustand undo/redo, dnd-kit vertical reorder, HTML preview with master header/footer/page numbers, autosave debounce **800ms** via PATCH (never PDF on keystroke). See `docs/adr/005-editor-shell-autosave.md` + `docs/adr/006-master-pages.md`
 
+### Projects / Portfolio (Phase 02)
+
+- PG `project_categories` + `projects` (`business_id`, soft-delete)
+- Sellable entitlement **`module.projects`** (not in `plan.core` base) — see `.cursor/rules/14-content-entities.mdc`
+- Fields: title, description, status (`draft|published|archived`), category, `coverMediaId` / `mediaIds`, flexible `fields` JSON, optional FK `locationId` → `locations`
+- UI: `/app/projects` (fa/en); locked when module missing
+- Mutate + list require `@RequireModule(module.projects)`
+
+### Team & branches (Phase 02)
+
+- PG `team_members` + `branches` — foundational Business Data (no separate sellable module)
+- List/get: membership; mutate: `@RequireWritable`
+- Member: name, roleTitle, department, photoMediaId, branchId?, **parentMemberId?** (reporting line), sortOrder, fields
+- Branch: name, address fields, phone, optional FK `locationId` → `locations`, sortOrder, fields
+- UI: `/app/team` — parent picker on create; feeds Org Chart / Map
+
+### Organization Chart (Phase 02)
+
+- Sellable entitlement **`module.org_chart`** (catalog seeded)
+- Reporting edges on `team_members.parent_member_id` (same Business; cycle rejected)
+- Tree API: `GET /api/businesses/:businessId/org-chart/tree?rootMemberId=` (`@RequireModule(module.org_chart)`)
+- Block type `orgChart` — props: layout (`tree-vertical`|`tree-horizontal`), rootMemberId?, showPhotos, heightPx
+- Editor + PDF: HTML/CSS tree (ADR 009)
+- Saving / exporting documents with `orgChart` blocks asserts `module.org_chart`
+- UI: `/app/org-chart` (structure parent form + preview)
+
+### Timeline (Phase 02)
+
+- Sellable entitlement **`module.timeline`** (catalog seeded)
+- PG `timeline_events` (`occurred_at`, `title`, `body`, optional `media_id`, `sort_order`, `fields`)
+- CRUD: `/api/businesses/:businessId/timeline-events` (`@RequireModule(module.timeline)`)
+- Block type `timeline` — props: layout (`vertical`|`alternating`), limit, heightPx
+- Editor + PDF: HTML/CSS timeline (ADR 010)
+- Saving / exporting documents with `timeline` blocks asserts `module.timeline`
+- UI: `/app/timeline`
+
+### QR block (Phase 02 — core)
+
+- Core block type `qr` (no sellable module) — props: `targetType` (`url|phone|email|map|custom`), `value`, `sizePx`, `caption`
+- Payload encoding: `buildQrPayload` in `@vdb/document-schema`
+- Server encode (PNG data URL): `POST /api/businesses/:businessId/qr/encode` (membership) + PDF HTML embed (ADR 011)
+- **Non-goal:** dynamic redirect / tracked short-link QR destinations
+- Editor palette shows QR for all businesses; preview calls encode API
+
+### Auto TOC (Phase 02 — core)
+
+- Core block type `toc` — props: `maxLevel` (1–3), `showPageNumbers`, optional `title`
+- Entries from `section.title` (+ `headingLevel`) and `text` with `headingLevel` 1–3
+- Page numbers = **logical** `pages[]` 1-based index (ADR 012) — not Chromium print-sheet pages
+- Shared `buildTableOfContents` in `@vdb/document-schema` for editor preview + PDF HTML
+
+### Collection repeater (Phase 02 — core)
+
+- Core block type `repeater` — props: `source`, `limit`, `emptyMessage`; children = card template
+- Sources: `projects` | `teamMembers` | `branches` | `services` | `clients` | `certificates` | `timelineEvents`
+- Binding: `{{item.<key>}}` only (ADR 013) — no formulas
+- Data: `GET /api/businesses/:businessId/collections/:source` (+ export resolve); response includes `total` count
+- Gates: `projects` → `module.projects`; `timelineEvents` → `module.timeline` (on collections GET, document save, PDF enqueue)
+- Nested repeater unsupported in MVP
+
+### Conditional visibility (Phase 02 — basic)
+
+- Optional `when` on any block: `{ op: exists|empty|eq, path, value? }` (ADR 014)
+- MVP paths: `collection.<source>` → item count
+- Evaluated in editor HTML preview + PDF HTML; TOC skips hidden blocks
+- UI: inspector condition builder (fa/en)
+
+### Module entitlements wire-up (Phase 02)
+
+- Catalog seed: `plan.core` + modules `module.map|org_chart|timeline|projects|gallery` (add-ons)
+- `documentCollectRequiredModuleCodes` drives save/export/template deny (**403**)
+- Editor palette: allowed blocks only; locked list + upgrade CTA → `/app/billing`
+- Entitlements panel lists all module codes + CTA
+- Content pages show upgrade CTA when module missing
+
+### Services / Clients / Certificates (Phase 02)
+
+- PG `business_services`, `clients`, `certificates` — **foundational** Business Data (no sellable `module.*`)
+- List/get: membership; mutate: `@RequireWritable`
+- Service: name, description, iconMediaId?, sortOrder, fields
+- Client: name, website, logoMediaId?, sortOrder, fields
+- Certificate: name, issuer, issuedAt/expiresAt?, documentMediaId?, sortOrder, fields
+- Media refs must belong to the same Business
+- UI: `/app/profile-content` (fa/en)
+
+### Gallery (Phase 02)
+
+- PG `galleries` + `gallery_items` (`business_id`, soft-delete)
+- Sellable entitlement **`module.gallery`** (not in `plan.core` base)
+- Items: `mediaId` (Media Library), `caption`, `sortOrder`; reorder via `PUT .../items/reorder`
+- Document block type `gallery` (`moduleCode: module.gallery`, props `{ galleryId }`)
+- UI: `/app/galleries`; editor palette shows gallery when module enabled
+- All routes require `@RequireModule(module.gallery)` (implies writable)
+
+### Locations (Phase 02)
+
+- PG `locations` — foundational shared geography (no sellable module)
+- Fields: name, country, province, city, address, required `lat`/`lng` (WGS84 validated)
+- FK: `projects.location_id`, `branches.location_id` → `locations` (`ON DELETE SET NULL`)
+- List/get: membership; mutate: `@RequireWritable`
+- Soft-delete blocked while linked (`LOCATION_IN_USE`)
+- UI: `/app/locations`; pickers on Projects + Team/Branches
+- Markers consumed by Map Engine (`module.map`) — no duplicate lat/lng store
+
+### Map Engine (Phase 02)
+
+- Sellable entitlement **`module.map`** (catalog seeded)
+- Block type `map` in Mongo document/template body — props: centerLat/Lng, zoom, markersSource (`locations|branches|projects|none`), countryRestriction, showMarkers, heightPx
+- Markers API: `GET /api/businesses/:businessId/map/markers?source=&country=` (`@RequireModule(module.map)`)
+- Editor: Leaflet + OSM interactive preview; PDF: static image or placeholder (`MAP_STATIC_URL_TEMPLATE`, ADR 008)
+- Saving / exporting documents that contain `map` blocks asserts `module.map`
+- UI: `/app/map` + editor palette when entitled
+
 ### PDF export
 
 - PG `export_jobs` (`queued` → `processing` → `completed`|`failed`) + Redis/BullMQ queue `export.pdf`
@@ -218,7 +390,7 @@ Clients map `code` → i18n (`fa` / `en`).
 
 ### Catalog
 
-- Seed: `plan.core` (base entitlement `export.pdf`) + modules `module.map|org_chart|timeline|projects`
+- Seed: `plan.core` (base entitlement `export.pdf`) + modules `module.map|org_chart|timeline|projects|gallery`
 - Run: `npm run db:seed` after migrate
 
 ### Payments (SAAS)
