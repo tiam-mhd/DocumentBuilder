@@ -13,8 +13,11 @@ import {
   DOCUMENT_SCHEMA_VERSION,
 } from '@vdb/document-schema';
 import {
+  AuditActions,
   DocumentErrorCodes,
   DocumentStatus,
+  DOCUMENT_BODY_LOCKED_STATUSES,
+  parseContentLocale,
   type EntitlementCode,
   type PublicDocument,
   type PublicDocumentDetail,
@@ -22,9 +25,11 @@ import {
 } from '@vdb/shared-types';
 import { DomainException } from '../../common/errors/domain.exception';
 import { PrismaService } from '../../config/prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 import { EntitlementsService } from '../billing/entitlements.service';
 import { TemplateBodyRepository } from '../design/template-body.repository';
 import { DocumentBodyRepository } from './document-body.repository';
+import { DocumentVersionsService } from './document-versions.service';
 
 @Injectable()
 export class DocumentsService implements OnModuleInit {
@@ -33,6 +38,8 @@ export class DocumentsService implements OnModuleInit {
     private readonly bodies: DocumentBodyRepository,
     private readonly entitlements: EntitlementsService,
     private readonly templateBodies: TemplateBodyRepository,
+    private readonly versions: DocumentVersionsService,
+    private readonly audit: AuditService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -71,8 +78,25 @@ export class DocumentsService implements OnModuleInit {
       }),
       this.prisma.document.count({ where }),
     ]);
+    const ids = rows.map((r) => r.id);
+    const latestMap = new Map<string, number>();
+    if (ids.length > 0) {
+      const grouped = await this.prisma.documentVersion.groupBy({
+        by: ['documentId'],
+        where: { businessId: input.businessId, documentId: { in: ids } },
+        _max: { versionNumber: true },
+      });
+      for (const g of grouped) {
+        if (g._max.versionNumber != null) {
+          latestMap.set(g.documentId, g._max.versionNumber);
+        }
+      }
+    }
+    const items = await Promise.all(
+      rows.map((r) => this.toPublicMeta(r, latestMap.get(r.id) ?? null)),
+    );
     return {
-      items: rows.map((r) => this.toPublicMeta(r)),
+      items,
       page,
       pageSize,
       total,
@@ -92,15 +116,17 @@ export class DocumentsService implements OnModuleInit {
       });
       await this.bodies.upsert(body);
     }
-    return { ...this.toPublicMeta(row), body };
+    return { ...(await this.toPublicMeta(row)), body };
   }
 
   async create(input: {
     businessId: string;
     title: string;
     templateId: string;
+    locale?: string;
   }): Promise<PublicDocumentDetail> {
     const title = this.validateTitle(input.title);
+    const locale = parseContentLocale(input.locale);
     const templateId = input.templateId?.trim();
     if (!templateId) {
       throw new DomainException(
@@ -139,17 +165,21 @@ export class DocumentsService implements OnModuleInit {
         businessId: input.businessId,
         templateId,
         title,
+        locale,
         status: PrismaDocumentStatus.draft,
       },
     });
 
-    const body = createDocumentBodyFromTemplate({
-      businessId: input.businessId,
-      documentId: row.id,
-      templateId,
-      title,
-      templateBody,
-    });
+    const body = {
+      ...createDocumentBodyFromTemplate({
+        businessId: input.businessId,
+        documentId: row.id,
+        templateId,
+        title,
+        templateBody,
+      }),
+      locale,
+    };
 
     try {
       await this.bodies.upsert(body);
@@ -162,42 +192,48 @@ export class DocumentsService implements OnModuleInit {
       );
     }
 
-    return { ...this.toPublicMeta(row), body };
+    return { ...(await this.toPublicMeta(row)), body };
   }
 
   async update(input: {
     businessId: string;
     documentId: string;
+    userId?: string;
     title?: string;
-    status?: string;
+    locale?: string;
     body?: unknown;
   }): Promise<PublicDocumentDetail> {
+    void input.userId;
     const row = await this.requireMeta(input.businessId, input.documentId);
     const data: {
       title?: string;
-      status?: PrismaDocumentStatus;
+      locale?: string;
     } = {};
 
     if (input.title !== undefined) {
       data.title = this.validateTitle(input.title);
     }
-    if (input.status !== undefined) {
-      data.status = this.requireStatus(input.status);
+    if (input.locale !== undefined) {
+      data.locale = parseContentLocale(input.locale);
     }
 
-    const updated =
-      Object.keys(data).length > 0
-        ? await this.prisma.document.update({
-            where: { id: row.id },
-            data,
-          })
-        : row;
+    const bodyLocked = DOCUMENT_BODY_LOCKED_STATUSES.includes(
+      row.status as (typeof DOCUMENT_BODY_LOCKED_STATUSES)[number],
+    );
+
+    if (input.body !== undefined && bodyLocked) {
+      throw new DomainException(
+        DocumentErrorCodes.PublishedLocked,
+        'Document body is locked until returned to draft',
+        HttpStatus.CONFLICT,
+      );
+    }
 
     let body =
       (await this.bodies.find(input.businessId, input.documentId)) ??
       createEmptyDocumentBody(input.businessId, input.documentId, {
-        title: updated.title,
-        templateId: updated.templateId,
+        title: row.title,
+        templateId: row.templateId,
       });
 
     if (input.body !== undefined) {
@@ -209,14 +245,21 @@ export class DocumentsService implements OnModuleInit {
           schemaVersion: DOCUMENT_SCHEMA_VERSION,
           templateId:
             (input.body as { templateId?: string | null }).templateId ??
-            updated.templateId,
+            row.templateId,
           title:
             data.title ??
             (input.body as { title?: string }).title ??
-            updated.title,
+            row.title,
+          locale:
+            data.locale ??
+            (input.body as { locale?: string }).locale ??
+            row.locale,
         });
       } catch (err) {
         this.rethrowBodyError(err);
+      }
+      if (data.locale === undefined) {
+        data.locale = body.locale;
       }
       for (const code of documentCollectRequiredModuleCodes(body)) {
         await this.entitlements.assertModule(
@@ -224,8 +267,32 @@ export class DocumentsService implements OnModuleInit {
           code as EntitlementCode,
         );
       }
+    } else if (data.locale !== undefined && body.locale !== data.locale) {
+      body = { ...body, locale: parseContentLocale(data.locale) };
+    } else if (data.title && body.title !== data.title) {
+      body = { ...body, title: data.title };
+    }
+
+    const updated =
+      Object.keys(data).length > 0
+        ? await this.prisma.document.update({
+            where: { id: row.id },
+            data,
+          })
+        : row;
+
+    if (input.body !== undefined || data.locale !== undefined || data.title) {
       try {
-        await this.bodies.upsert(body);
+        await this.bodies.upsert({
+          ...body,
+          title: updated.title,
+          locale: parseContentLocale(updated.locale),
+        });
+        body = {
+          ...body,
+          title: updated.title,
+          locale: parseContentLocale(updated.locale),
+        };
       } catch {
         throw new DomainException(
           DocumentErrorCodes.StorageError,
@@ -233,16 +300,17 @@ export class DocumentsService implements OnModuleInit {
           HttpStatus.SERVICE_UNAVAILABLE,
         );
       }
-    } else if (data.title && body.title !== data.title) {
-      body = { ...body, title: data.title };
-      await this.bodies.upsert(body);
     }
 
-    return { ...this.toPublicMeta(updated), body };
+    return { ...(await this.toPublicMeta(updated)), body };
   }
 
-  async softDelete(businessId: string, documentId: string): Promise<void> {
-    await this.requireMeta(businessId, documentId);
+  async softDelete(
+    businessId: string,
+    documentId: string,
+    userId?: string | null,
+  ): Promise<void> {
+    const meta = await this.requireMeta(businessId, documentId);
     await this.prisma.document.update({
       where: { id: documentId },
       data: { deletedAt: new Date() },
@@ -252,6 +320,19 @@ export class DocumentsService implements OnModuleInit {
     } catch {
       // PG soft-delete is list source of truth.
     }
+    try {
+      await this.versions.deleteBodiesForDocument(businessId, documentId);
+    } catch {
+      // best-effort
+    }
+    await this.audit.log({
+      action: AuditActions.DocumentDelete,
+      entityType: 'document',
+      entityId: documentId,
+      businessId,
+      userId: userId ?? null,
+      meta: { title: meta.title },
+    });
   }
 
   private async requireMeta(businessId: string, documentId: string) {
@@ -281,15 +362,15 @@ export class DocumentsService implements OnModuleInit {
   }
 
   private requireStatus(status: string): PrismaDocumentStatus {
-    if (status === DocumentStatus.Draft) return PrismaDocumentStatus.draft;
-    if (status === DocumentStatus.Published) {
-      return PrismaDocumentStatus.published;
+    const allowed = Object.values(DocumentStatus) as string[];
+    if (!allowed.includes(status)) {
+      throw new DomainException(
+        DocumentErrorCodes.InvalidStatus,
+        'Document status is invalid',
+        HttpStatus.BAD_REQUEST,
+      );
     }
-    throw new DomainException(
-      DocumentErrorCodes.InvalidStatus,
-      'Document status is invalid',
-      HttpStatus.BAD_REQUEST,
-    );
+    return status as PrismaDocumentStatus;
   }
 
   private optionalStatus(status?: string): PrismaDocumentStatus | undefined {
@@ -313,13 +394,22 @@ export class DocumentsService implements OnModuleInit {
     );
   }
 
-  private toPublicMeta(row: PrismaDocument): PublicDocument {
+  private async toPublicMeta(
+    row: PrismaDocument,
+    latestVersionNumber?: number | null,
+  ): Promise<PublicDocument> {
+    const latest =
+      latestVersionNumber !== undefined
+        ? latestVersionNumber
+        : await this.versions.latestVersionNumber(row.businessId, row.id);
     return {
       id: row.id,
       businessId: row.businessId,
       templateId: row.templateId,
       title: row.title,
+      locale: parseContentLocale(row.locale),
       status: row.status,
+      latestVersionNumber: latest,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
