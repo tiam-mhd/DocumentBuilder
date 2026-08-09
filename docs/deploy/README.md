@@ -154,3 +154,14 @@ Same artifacts for both editions; difference is env + domain + backup ownership:
 - Object storage (S3/MinIO) for media/fonts (Phase 01)
 - Queue worker for BullMQ PDF jobs (in-process with API in Phase 01; optional dedicated worker later)
 - Set `PDF_RENDERER=playwright` and bake Chromium into the API/worker image for real PDFs
+
+### Business workspace backup (tenant ZIP)
+
+Owners can export/restore one Business via in-app `/app/backup` (ADR 024). This is **not** a substitute for platform backups:
+
+| Layer | Who | What |
+| --- | --- | --- |
+| Tenant ZIP | Business OWNER | PG content + Mongo bodies + media/font binaries for one `businessId` |
+| Platform | Operator | PostgreSQL dumps, Mongo dumps, Redis (ephemeral), object-storage bucket replication |
+
+Package: ZIP `kind=vdb.business-backup`, `formatVersion=1`. Storage keys: `{businessId}/backups/{jobId}/package.zip` and `{businessId}/restores/{jobId}/package.zip`. Env: `BACKUP_MAX_BYTES` (default 100MB). Queues: `backup.workspace`, `restore.workspace`.

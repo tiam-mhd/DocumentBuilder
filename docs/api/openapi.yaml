@@ -27,6 +27,10 @@ tags:
     description: Document instances (PG metadata + Mongo body)
   - name: export
     description: PDF export jobs (BullMQ + ObjectStorage)
+  - name: audit
+    description: Append-only audit_events list (OWNER/ADMIN)
+  - name: backup
+    description: Business workspace ZIP backup / restore (OWNER)
 paths:
   /health:
     get:
@@ -106,6 +110,270 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/audit-events:
+    get:
+      tags: [audit]
+      summary: List audit events (OWNER/ADMIN; tenant-scoped)
+      operationId: listAuditEvents
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: action
+          in: query
+          schema:
+            type: string
+            maxLength: 120
+          description: Exact action code (e.g. export.pdf.enqueued)
+        - name: entityType
+          in: query
+          schema:
+            type: string
+            maxLength: 80
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Inclusive lower bound on createdAt
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Inclusive upper bound on createdAt
+      responses:
+        '200':
+          description: Paginated audit events for this business (plus member login / install license)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicAuditEventList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/backups:
+    post:
+      tags: [backup]
+      summary: Enqueue workspace ZIP backup (OWNER + writable)
+      operationId: createWorkspaceBackup
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      responses:
+        '200':
+          description: Backup job queued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicWorkspaceBackupJob'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ApiError'
+    get:
+      tags: [backup]
+      summary: List workspace backup jobs (OWNER)
+      operationId: listWorkspaceBackups
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: Paginated backup jobs
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [items, total, page, pageSize]
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/PublicWorkspaceBackupJob'
+                      total: { type: integer }
+                      page: { type: integer }
+                      pageSize: { type: integer }
+  /businesses/{businessId}/backups/{jobId}:
+    get:
+      tags: [backup]
+      summary: Get backup job (OWNER)
+      operationId: getWorkspaceBackup
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: jobId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Backup job
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicWorkspaceBackupJob'
+  /businesses/{businessId}/backups/{jobId}/file:
+    get:
+      tags: [backup]
+      summary: Download completed backup ZIP (OWNER)
+      operationId: downloadWorkspaceBackup
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: jobId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: application/zip
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '409':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/restores/upload:
+    post:
+      tags: [backup]
+      summary: Upload ZIP for restore preview (OWNER)
+      operationId: uploadWorkspaceRestore
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Restore job in uploaded/preview state
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicWorkspaceRestoreJob'
+        '400':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/restores/{jobId}:
+    get:
+      tags: [backup]
+      summary: Get restore job / preview (OWNER)
+      operationId: getWorkspaceRestore
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: jobId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Restore job
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicWorkspaceRestoreJob'
+  /businesses/{businessId}/restores/{jobId}/commit:
+    post:
+      tags: [backup]
+      summary: Commit restore after preview (OWNER)
+      operationId: commitWorkspaceRestore
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: jobId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                confirmReplace:
+                  type: boolean
+                  description: Required when target workspace is not empty
+      responses:
+        '200':
+          description: Restore queued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicWorkspaceRestoreJob'
+        '409':
+          description: Target not empty without confirmReplace
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorBody'
   /businesses/{businessId}/media:
     get:
       tags: [assets]
@@ -1097,6 +1365,154 @@ paths:
         '402':
           $ref: '#/components/responses/EntitlementDenied'
         '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/imports/projects/upload:
+    post:
+      tags: [content]
+      summary: Upload CSV/XLSX for Projects import
+      description: |
+        Multipart field `file` (`.csv` or `.xlsx`). Temp file stored under
+        `{businessId}/imports/{importId}/original.{csv|xlsx}`.
+        Requires `module.projects` + writable subscription. Limits: `IMPORT_MAX_BYTES`, `IMPORT_MAX_ROWS`.
+        See ADR 019.
+      operationId: uploadProjectsImport
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Import job (status uploaded)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicImportJob'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/imports/{importId}:
+    get:
+      tags: [content]
+      summary: Get import job (preview / result / status)
+      operationId: getImportJob
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: importId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Import job
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicImportJob'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/imports/{importId}/mapping:
+    patch:
+      tags: [content]
+      summary: Set column mapping and refresh preview
+      description: |
+        Mapping keys: title (required), description, status, category, location,
+        titleEn, descriptionEn, year. Values are source column header names.
+      operationId: setImportMapping
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: importId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mapping]
+              properties:
+                mapping:
+                  type: object
+                  additionalProperties:
+                    type: string
+      responses:
+        '200':
+          description: Import job (status mapped)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicImportJob'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '409':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/imports/{importId}/commit:
+    post:
+      tags: [content]
+      summary: Commit Projects import
+      description: |
+        Creates valid project rows in one PG transaction; invalid rows skipped.
+        If `totalRows` > `IMPORT_SYNC_MAX_ROWS`, status becomes `queued` and BullMQ
+        queue `import.content` processes the commit asynchronously.
+      operationId: commitImport
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: importId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Import job (completed | queued | failed)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicImportJob'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '409':
           $ref: '#/components/responses/ApiError'
   /businesses/{businessId}/team-members:
     get:
@@ -2185,6 +2601,10 @@ paths:
           in: query
           description: Optional country filter (e.g. IR)
           schema: { type: string }
+        - name: locale
+          in: query
+          description: Content locale for marker labels (fa|en; default fa)
+          schema: { type: string, enum: [fa, en] }
       responses:
         '200':
           description: Marker list
@@ -2212,6 +2632,10 @@ paths:
           in: query
           description: Optional subtree root (team member id)
           schema: { type: string }
+        - name: locale
+          in: query
+          description: Content locale for member name/role/department (fa|en; default fa)
+          schema: { type: string, enum: [fa, en] }
       responses:
         '200':
           description: Org chart tree
@@ -2400,6 +2824,7 @@ paths:
       description: |
         Flat `values` maps for `{{item.*}}` placeholders (ADR 013).
         Sources `projects` and `timelineEvents` require `module.projects` / `module.timeline`.
+        Optional `locale=fa|en` resolves entity `translations` (ADR 015; default fa).
       operationId: listCollection
       security:
         - bearerAuth: []
@@ -2424,6 +2849,11 @@ paths:
           in: query
           required: false
           schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: locale
+          in: query
+          required: false
+          schema: { type: string, enum: [fa, en], default: fa }
+          description: Content locale for localized string fields (ADR 015)
       responses:
         '200':
           description: Collection items
@@ -2471,7 +2901,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [draft, published]
+            enum: [draft, review, approved, published]
       responses:
         '200':
           description: Document list
@@ -2549,6 +2979,9 @@ paths:
       summary: Update title, status, and/or body
       description: |
         Used by the flow editor autosave (debounced ~800ms). Does not trigger PDF.
+        When status becomes `published`, an immutable version snapshot is created (ADR 020).
+        PATCH with `body` while already `published` returns `DOCUMENT_PUBLISHED_LOCKED`
+        unless the same request sets `status` to `draft`.
       operationId: updateDocument
       security:
         - bearerAuth: []
@@ -2602,6 +3035,637 @@ paths:
           $ref: '#/components/responses/EntitlementDenied'
         '404':
           $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/documents/{documentId}/versions:
+    get:
+      tags: [documents]
+      summary: List document versions
+      description: Immutable version metadata (ADR 020). Bodies in Mongo `document_version_bodies`.
+      operationId: listDocumentVersions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Version list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentVersionList'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    post:
+      tags: [documents]
+      summary: Create manual version snapshot
+      operationId: createDocumentVersion
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note:
+                  type: string
+                  maxLength: 500
+      responses:
+        '200':
+          description: Version created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentVersionDetail'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/documents/{documentId}/workflow/submit:
+    post:
+      tags: [documents]
+      summary: Submit draft for review
+      description: draft → review (any writable member). ADR 021.
+      operationId: workflowSubmitDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Updated document
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentDetail'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '409':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/documents/{documentId}/workflow/approve:
+    post:
+      tags: [documents]
+      summary: Approve review (OWNER/ADMIN)
+      description: review → approved
+      operationId: workflowApproveDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Updated document
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentDetail'
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '409':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/documents/{documentId}/workflow/reject:
+    post:
+      tags: [documents]
+      summary: Reject review (OWNER/ADMIN)
+      description: review → draft
+      operationId: workflowRejectDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note:
+                  type: string
+      responses:
+        '200':
+          description: Updated document
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentDetail'
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '409':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/documents/{documentId}/workflow/publish:
+    post:
+      tags: [documents]
+      summary: Publish approved document (OWNER/ADMIN)
+      description: approved → published + immutable version snapshot
+      operationId: workflowPublishDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Updated document
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentDetail'
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '409':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/documents/{documentId}/workflow/unpublish:
+    post:
+      tags: [documents]
+      summary: Unpublish (OWNER/ADMIN)
+      description: published → draft
+      operationId: workflowUnpublishDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Updated document
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentDetail'
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '409':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/documents/{documentId}/workflow/reopen:
+    post:
+      tags: [documents]
+      summary: Reopen approved to draft (OWNER/ADMIN)
+      description: approved → draft
+      operationId: workflowReopenDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Updated document
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentDetail'
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '409':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/documents/{documentId}/comments:
+    get:
+      tags: [documents]
+      summary: List document comments
+      description: |
+        PG `document_comments` (ADR 022). Query `resolved=open|resolved|all`.
+        Mentions are out of MVP.
+      operationId: listDocumentComments
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: resolved
+          in: query
+          schema:
+            type: string
+            enum: [all, open, resolved]
+            default: all
+      responses:
+        '200':
+          description: Comment list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentCommentList'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    post:
+      tags: [documents]
+      summary: Create document comment
+      operationId: createDocumentComment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body:
+                  type: string
+                  maxLength: 4000
+                pageId:
+                  type: string
+                  nullable: true
+                blockId:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentComment'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/documents/{documentId}/comments/{commentId}:
+    patch:
+      tags: [documents]
+      summary: Update comment body
+      operationId: updateDocumentComment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body:
+                  type: string
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentComment'
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+    delete:
+      tags: [documents]
+      summary: Soft-delete comment
+      operationId: deleteDocumentComment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/documents/{documentId}/comments/{commentId}/resolve:
+    post:
+      tags: [documents]
+      summary: Resolve comment
+      operationId: resolveDocumentComment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Resolved
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentComment'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/documents/{documentId}/comments/{commentId}/unresolve:
+    post:
+      tags: [documents]
+      summary: Unresolve comment
+      operationId: unresolveDocumentComment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Reopened
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentComment'
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/documents/{documentId}/versions/compare:
+    get:
+      tags: [documents]
+      summary: Compare two versions (metadata/stats)
+      operationId: compareDocumentVersions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: left
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: right
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Compare result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentVersionCompare'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/documents/{documentId}/versions/{versionId}:
+    get:
+      tags: [documents]
+      summary: Get version + immutable body
+      operationId: getDocumentVersion
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Version detail
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentVersionDetail'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/documents/{documentId}/versions/{versionId}/restore:
+    post:
+      tags: [documents]
+      summary: Restore version into current document (draft)
+      operationId: restoreDocumentVersion
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Restored
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [documentId]
+                    properties:
+                      documentId:
+                        type: string
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/documents/{documentId}/versions/{versionId}/clone:
+    post:
+      tags: [documents]
+      summary: Clone version into a new draft document
+      operationId: cloneDocumentVersion
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+      responses:
+        '200':
+          description: New document id
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [documentId]
+                    properties:
+                      documentId:
+                        type: string
+        '402':
+          $ref: '#/components/responses/EntitlementDenied'
+        '404':
+          $ref: '#/components/responses/ApiError'
   /businesses/{businessId}/documents/{documentId}/export/pdf:
     post:
       tags: [export]
@@ -2610,6 +3674,8 @@ paths:
         Creates `export_jobs` row (queued) and enqueues BullMQ `export.pdf`.
         Worker renders canonical HTML (masters + theme + embedded fonts) → PDF.
         Never runs on editor keystrokes. Requires entitlement `export.pdf`.
+        Document status must be `approved` or `published` (ADR 021); otherwise
+        `DOCUMENT_NOT_APPROVED_FOR_EXPORT`.
       operationId: createPdfExport
       security:
         - bearerAuth: []
@@ -3892,7 +4958,7 @@ components:
     PublicDocument:
       type: object
       required:
-        [id, businessId, templateId, title, status, createdAt, updatedAt]
+        [id, businessId, templateId, title, locale, status, latestVersionNumber, createdAt, updatedAt]
       properties:
         id:
           type: string
@@ -3903,15 +4969,157 @@ components:
           nullable: true
         title:
           type: string
+        locale:
+          type: string
+          enum: [fa, en]
+          description: Document content locale (ADR 015) — PDF dir/lang + collections
         status:
           type: string
-          enum: [draft, published]
+          enum: [draft, review, approved, published]
+        latestVersionNumber:
+          type: integer
+          nullable: true
+          description: Highest version_number if any snapshots exist (ADR 020)
         createdAt:
           type: string
           format: date-time
         updatedAt:
           type: string
           format: date-time
+    PublicDocumentVersion:
+      type: object
+      required:
+        - id
+        - businessId
+        - documentId
+        - versionNumber
+        - source
+        - title
+        - locale
+        - status
+        - createdAt
+        - stats
+      properties:
+        id:
+          type: string
+        businessId:
+          type: string
+        documentId:
+          type: string
+        versionNumber:
+          type: integer
+        source:
+          type: string
+          enum: [publish, manual]
+        note:
+          type: string
+          nullable: true
+        title:
+          type: string
+        locale:
+          type: string
+        status:
+          type: string
+        createdByUserId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        stats:
+          type: object
+          properties:
+            schemaVersion:
+              type: integer
+              nullable: true
+            pageCount:
+              type: integer
+            blockCount:
+              type: integer
+            masterCount:
+              type: integer
+    PublicDocumentVersionDetail:
+      allOf:
+        - $ref: '#/components/schemas/PublicDocumentVersion'
+        - type: object
+          required: [body]
+          properties:
+            body:
+              type: object
+    PublicDocumentVersionList:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicDocumentVersion'
+        total:
+          type: integer
+    PublicDocumentVersionCompare:
+      type: object
+      required: [left, right, diff]
+      properties:
+        left:
+          $ref: '#/components/schemas/PublicDocumentVersion'
+        right:
+          $ref: '#/components/schemas/PublicDocumentVersion'
+        diff:
+          type: object
+          additionalProperties:
+            type: boolean
+    PublicDocumentComment:
+      type: object
+      required:
+        - id
+        - businessId
+        - documentId
+        - authorUserId
+        - body
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        businessId:
+          type: string
+        documentId:
+          type: string
+        authorUserId:
+          type: string
+        body:
+          type: string
+        pageId:
+          type: string
+          nullable: true
+        blockId:
+          type: string
+          nullable: true
+        resolvedAt:
+          type: string
+          format: date-time
+          nullable: true
+        resolvedByUserId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PublicDocumentCommentList:
+      type: object
+      required: [items, total, unresolvedCount]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicDocumentComment'
+        total:
+          type: integer
+        unresolvedCount:
+          type: integer
     PublicDocumentDetail:
       allOf:
         - $ref: '#/components/schemas/PublicDocument'
@@ -3920,7 +5128,7 @@ components:
           properties:
             body:
               type: object
-              description: DocumentBody from @vdb/document-schema v3 (masters + pages)
+              description: DocumentBody from @vdb/document-schema v3 (masters + pages; includes locale)
     PublicDocumentList:
       type: object
       required: [items, page, pageSize, total]
@@ -3943,6 +5151,10 @@ components:
           type: string
         templateId:
           type: string
+        locale:
+          type: string
+          enum: [fa, en]
+          description: Document content locale (default fa)
     PublicExportJob:
       type: object
       required:
@@ -4007,9 +5219,141 @@ components:
           type: integer
         total:
           type: integer
+    PublicAuditEvent:
+      type: object
+      required:
+        - id
+        - action
+        - entityType
+        - meta
+        - createdAt
+      properties:
+        id:
+          type: string
+        businessId:
+          type: string
+          nullable: true
+        userId:
+          type: string
+          nullable: true
+        action:
+          type: string
+        entityType:
+          type: string
+        entityId:
+          type: string
+          nullable: true
+        meta:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+    PublicAuditEventList:
+      type: object
+      required: [items, total, page, pageSize]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAuditEvent'
+        total:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+    PublicWorkspaceBackupJob:
+      type: object
+      required:
+        - id
+        - businessId
+        - status
+        - mimeType
+        - createdAt
+        - updatedAt
+      properties:
+        id: { type: string }
+        businessId: { type: string }
+        status:
+          type: string
+          enum: [queued, processing, completed, failed]
+        byteSize: { type: integer, nullable: true }
+        mimeType: { type: string }
+        manifest:
+          $ref: '#/components/schemas/BusinessBackupManifest'
+        errorCode: { type: string, nullable: true }
+        errorMessage: { type: string, nullable: true }
+        downloadUrl: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        startedAt: { type: string, format: date-time, nullable: true }
+        finishedAt: { type: string, format: date-time, nullable: true }
+    PublicWorkspaceRestoreJob:
+      type: object
+      required:
+        - id
+        - businessId
+        - status
+        - originalFilename
+        - byteSize
+        - mimeType
+        - confirmReplace
+        - createdAt
+        - updatedAt
+      properties:
+        id: { type: string }
+        businessId: { type: string }
+        status:
+          type: string
+          enum: [uploaded, queued, processing, completed, failed]
+        originalFilename: { type: string }
+        byteSize: { type: integer }
+        mimeType: { type: string }
+        preview:
+          $ref: '#/components/schemas/BusinessBackupManifest'
+        result:
+          type: object
+          nullable: true
+          properties:
+            remappedEntities: { type: integer }
+        confirmReplace: { type: boolean }
+        targetEmpty: { type: boolean, nullable: true }
+        errorCode: { type: string, nullable: true }
+        errorMessage: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        startedAt: { type: string, format: date-time, nullable: true }
+        finishedAt: { type: string, format: date-time, nullable: true }
+    BusinessBackupManifest:
+      type: object
+      required: [kind, formatVersion, createdAt, source, counts]
+      properties:
+        kind:
+          type: string
+          enum: [vdb.business-backup]
+        formatVersion: { type: integer }
+        createdAt: { type: string, format: date-time }
+        source:
+          type: object
+          required: [businessId, name]
+          properties:
+            businessId: { type: string }
+            name: { type: string }
+        counts:
+          type: object
+          additionalProperties: { type: integer }
+    EntityTranslations:
+      type: object
+      description: Non-default locale bags (ADR 015). Canonical FA columns stay on the entity; MVP write key is en.
+      additionalProperties: false
+      properties:
+        en:
+          type: object
+          additionalProperties: { type: string }
     PublicProjectCategory:
       type: object
-      required: [id, businessId, name, sortOrder, createdAt, updatedAt]
+      required: [id, businessId, name, sortOrder, translations, createdAt, updatedAt]
       properties:
         id:
           type: string
@@ -4019,6 +5363,8 @@ components:
           type: string
         sortOrder:
           type: integer
+        translations:
+          $ref: '#/components/schemas/EntityTranslations'
         createdAt:
           type: string
           format: date-time
@@ -4041,12 +5387,14 @@ components:
           type: integer
     CreateProjectCategoryBody:
       type: object
-      required: [name]
+      required: [name, translations]
       properties:
         name:
           type: string
         sortOrder:
           type: integer
+        translations:
+          $ref: '#/components/schemas/EntityTranslations'
     UpdateProjectCategoryBody:
       type: object
       properties:
@@ -4054,6 +5402,8 @@ components:
           type: string
         sortOrder:
           type: integer
+        translations:
+          $ref: '#/components/schemas/EntityTranslations'
     PublicProject:
       type: object
       required:
@@ -4064,6 +5414,7 @@ components:
         - status
         - mediaIds
         - fields
+        - translations
         - createdAt
         - updatedAt
       properties:
@@ -4101,6 +5452,8 @@ components:
         fields:
           type: object
           additionalProperties: true
+        translations:
+          $ref: '#/components/schemas/EntityTranslations'
         createdAt:
           type: string
           format: date-time
@@ -4121,9 +5474,114 @@ components:
           type: integer
         total:
           type: integer
+    PublicImportJob:
+      type: object
+      required:
+        - id
+        - businessId
+        - entityType
+        - status
+        - format
+        - originalFilename
+        - mimeType
+        - byteSize
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        businessId:
+          type: string
+        entityType:
+          type: string
+          enum: [projects]
+        status:
+          type: string
+          enum: [uploaded, mapped, queued, processing, completed, failed]
+        format:
+          type: string
+          enum: [csv, xlsx]
+        originalFilename:
+          type: string
+        mimeType:
+          type: string
+        byteSize:
+          type: integer
+        mapping:
+          type: object
+          nullable: true
+          additionalProperties:
+            type: string
+        preview:
+          type: object
+          nullable: true
+          properties:
+            headers:
+              type: array
+              items:
+                type: string
+            totalRows:
+              type: integer
+            sampleRows:
+              type: array
+              items:
+                type: object
+                additionalProperties:
+                  type: string
+            mappedSample:
+              type: array
+              items:
+                type: object
+                additionalProperties:
+                  type: string
+            errorCount:
+              type: integer
+            sampleErrors:
+              type: array
+              items:
+                type: object
+                properties:
+                  row:
+                    type: integer
+                  code:
+                    type: string
+                  message:
+                    type: string
+        result:
+          type: object
+          nullable: true
+          properties:
+            created:
+              type: integer
+            skipped:
+              type: integer
+            errors:
+              type: array
+              items:
+                type: object
+        errorCode:
+          type: string
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
     CreateProjectBody:
       type: object
-      required: [title]
+      required: [title, translations]
       properties:
         title:
           type: string
@@ -4147,6 +5605,8 @@ components:
           nullable: true
         fields:
           type: object
+        translations:
+          $ref: '#/components/schemas/EntityTranslations'
     UpdateProjectBody:
       type: object
       properties:
@@ -4172,6 +5632,8 @@ components:
           nullable: true
         fields:
           type: object
+        translations:
+          $ref: '#/components/schemas/EntityTranslations'
     PublicTeamMember:
       type: object
       required:
@@ -4188,6 +5650,8 @@ components:
         photoMediaId: { type: string, nullable: true }
         sortOrder: { type: integer }
         fields: { type: object }
+        translations:
+          $ref: '#/components/schemas/EntityTranslations'
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     PublicTeamMemberList:
@@ -4203,7 +5667,7 @@ components:
         total: { type: integer }
     CreateTeamMemberBody:
       type: object
-      required: [name]
+      required: [name, translations]
       properties:
         name: { type: string }
         roleTitle: { type: string }
@@ -4213,6 +5677,8 @@ components:
         parentMemberId: { type: string, nullable: true }
         sortOrder: { type: integer }
         fields: { type: object }
+        translations:
+          $ref: '#/components/schemas/EntityTranslations'
     UpdateTeamMemberBody:
       type: object
       properties:
@@ -4224,6 +5690,8 @@ components:
         parentMemberId: { type: string, nullable: true }
         sortOrder: { type: integer }
         fields: { type: object }
+        translations:
+          $ref: '#/components/schemas/EntityTranslations'
     PublicBranch:
       type: object
       required:
@@ -4243,6 +5711,8 @@ components:
         locationName: { type: string, nullable: true }
         sortOrder: { type: integer }
         fields: { type: object }
+        translations:
+          $ref: '#/components/schemas/EntityTranslations'
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     PublicBranchList:
@@ -4258,7 +5728,7 @@ components:
         total: { type: integer }
     CreateBranchBody:
       type: object
-      required: [name]
+      required: [name, translations]
       properties:
         name: { type: string }
         addressLine1: { type: string }
@@ -4271,6 +5741,8 @@ components:
         locationId: { type: string, nullable: true }
         sortOrder: { type: integer }
         fields: { type: object }
+        translations:
+          $ref: '#/components/schemas/EntityTranslations'
     UpdateBranchBody:
       type: object
       properties:
@@ -4285,9 +5757,11 @@ components:
         locationId: { type: string, nullable: true }
         sortOrder: { type: integer }
         fields: { type: object }
+        translations:
+          $ref: '#/components/schemas/EntityTranslations'
     PublicBusinessService:
       type: object
-      required: [id, businessId, name, description, sortOrder, fields, createdAt, updatedAt]
+      required: [id, businessId, name, description, sortOrder, fields, translations, createdAt, updatedAt]
       properties:
         id: { type: string }
         businessId: { type: string }
@@ -4296,6 +5770,8 @@ components:
         iconMediaId: { type: string, nullable: true }
         sortOrder: { type: integer }
         fields: { type: object }
+        translations:
+          $ref: '#/components/schemas/EntityTranslations'
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     PublicBusinessServiceList:
@@ -4311,13 +5787,15 @@ components:
         total: { type: integer }
     CreateBusinessServiceBody:
       type: object
-      required: [name]
+      required: [name, translations]
       properties:
         name: { type: string }
         description: { type: string }
         iconMediaId: { type: string, nullable: true }
         sortOrder: { type: integer }
         fields: { type: object }
+        translations:
+          $ref: '#/components/schemas/EntityTranslations'
     UpdateBusinessServiceBody:
       type: object
       properties:
@@ -4326,9 +5804,11 @@ components:
         iconMediaId: { type: string, nullable: true }
         sortOrder: { type: integer }
         fields: { type: object }
+        translations:
+          $ref: '#/components/schemas/EntityTranslations'
     PublicClient:
       type: object
-      required: [id, businessId, name, website, sortOrder, fields, createdAt, updatedAt]
+      required: [id, businessId, name, website, sortOrder, fields, translations, createdAt, updatedAt]
       properties:
         id: { type: string }
         businessId: { type: string }
@@ -4337,6 +5817,8 @@ components:
         logoMediaId: { type: string, nullable: true }
         sortOrder: { type: integer }
         fields: { type: object }
+        translations:
+          $ref: '#/components/schemas/EntityTranslations'
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     PublicClientList:
@@ -4352,13 +5834,15 @@ components:
         total: { type: integer }
     CreateClientBody:
       type: object
-      required: [name]
+      required: [name, translations]
       properties:
         name: { type: string }
         website: { type: string }
         logoMediaId: { type: string, nullable: true }
         sortOrder: { type: integer }
         fields: { type: object }
+        translations:
+          $ref: '#/components/schemas/EntityTranslations'
     UpdateClientBody:
       type: object
       properties:
@@ -4367,9 +5851,11 @@ components:
         logoMediaId: { type: string, nullable: true }
         sortOrder: { type: integer }
         fields: { type: object }
+        translations:
+          $ref: '#/components/schemas/EntityTranslations'
     PublicCertificate:
       type: object
-      required: [id, businessId, name, issuer, sortOrder, fields, createdAt, updatedAt]
+      required: [id, businessId, name, issuer, sortOrder, fields, translations, createdAt, updatedAt]
       properties:
         id: { type: string }
         businessId: { type: string }
@@ -4380,6 +5866,8 @@ components:
         documentMediaId: { type: string, nullable: true }
         sortOrder: { type: integer }
         fields: { type: object }
+        translations:
+          $ref: '#/components/schemas/EntityTranslations'
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     PublicCertificateList:
@@ -4395,7 +5883,7 @@ components:
         total: { type: integer }
     CreateCertificateBody:
       type: object
-      required: [name]
+      required: [name, translations]
       properties:
         name: { type: string }
         issuer: { type: string }
@@ -4404,6 +5892,8 @@ components:
         documentMediaId: { type: string, nullable: true }
         sortOrder: { type: integer }
         fields: { type: object }
+        translations:
+          $ref: '#/components/schemas/EntityTranslations'
     UpdateCertificateBody:
       type: object
       properties:
@@ -4414,6 +5904,8 @@ components:
         documentMediaId: { type: string, nullable: true }
         sortOrder: { type: integer }
         fields: { type: object }
+        translations:
+          $ref: '#/components/schemas/EntityTranslations'
     PublicGalleryItem:
       type: object
       required: [id, businessId, galleryId, mediaId, caption, sortOrder, createdAt, updatedAt]
@@ -4601,6 +6093,8 @@ components:
         mediaId: { type: string, nullable: true }
         sortOrder: { type: integer }
         fields: { type: object }
+        translations:
+          $ref: '#/components/schemas/EntityTranslations'
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     PublicTimelineEventList:
@@ -4616,7 +6110,7 @@ components:
         total: { type: integer }
     CreateTimelineEventBody:
       type: object
-      required: [occurredAt, title]
+      required: [occurredAt, title, translations]
       properties:
         occurredAt: { type: string }
         title: { type: string }
@@ -4624,6 +6118,8 @@ components:
         mediaId: { type: string, nullable: true }
         sortOrder: { type: integer }
         fields: { type: object }
+        translations:
+          $ref: '#/components/schemas/EntityTranslations'
     UpdateTimelineEventBody:
       type: object
       properties:
@@ -4633,6 +6129,8 @@ components:
         mediaId: { type: string, nullable: true }
         sortOrder: { type: integer }
         fields: { type: object }
+        translations:
+          $ref: '#/components/schemas/EntityTranslations'
     PublicQrEncode:
       type: object
       required: [payload, dataUrl, sizePx]
@@ -4670,14 +6168,18 @@ components:
         total: { type: integer, minimum: 0 }
     UpdateDocumentBody:
       type: object
+      description: |
+        Status changes go through workflow endpoints (ADR 021), not this PATCH.
       properties:
         title:
           type: string
-        status:
+        locale:
           type: string
-          enum: [draft, published]
+          enum: [fa, en]
+          description: Document content locale (ADR 015)
         body:
           type: object
+          description: DocumentBody; body.locale synced to PG documents.locale
     PublicBusinessEntitlements:
       type: object
       required:

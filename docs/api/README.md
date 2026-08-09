@@ -146,6 +146,32 @@ Clients map `code` → i18n (`fa` / `en`).
 | `GET` | `/api/businesses/:businessId/documents/:documentId` | Bearer + membership |
 | `PATCH` | `/api/businesses/:businessId/documents/:documentId` | Bearer + EntitlementGuard writable |
 | `DELETE` | `/api/businesses/:businessId/documents/:documentId` | Bearer + EntitlementGuard writable |
+| `POST` | `/api/businesses/:businessId/documents/:documentId/workflow/submit` | Bearer + writable (draft→review) |
+| `POST` | `/api/businesses/:businessId/documents/:documentId/workflow/approve` | Bearer + writable + OWNER/ADMIN |
+| `POST` | `/api/businesses/:businessId/documents/:documentId/workflow/reject` | Bearer + writable + OWNER/ADMIN |
+| `POST` | `/api/businesses/:businessId/documents/:documentId/workflow/publish` | Bearer + writable + OWNER/ADMIN (+ version) |
+| `POST` | `/api/businesses/:businessId/documents/:documentId/workflow/unpublish` | Bearer + writable + OWNER/ADMIN |
+| `POST` | `/api/businesses/:businessId/documents/:documentId/workflow/reopen` | Bearer + writable + OWNER/ADMIN |
+| `GET` | `/api/businesses/:businessId/documents/:documentId/comments` | Bearer + membership (`resolved=open\|resolved\|all`) |
+| `POST` | `/api/businesses/:businessId/documents/:documentId/comments` | Bearer + writable |
+| `PATCH` | `/api/businesses/:businessId/documents/:documentId/comments/:commentId` | Bearer + writable (author/OWNER/ADMIN) |
+| `POST` | `/api/businesses/:businessId/documents/:documentId/comments/:commentId/resolve` | Bearer + writable |
+| `POST` | `/api/businesses/:businessId/documents/:documentId/comments/:commentId/unresolve` | Bearer + writable (author/OWNER/ADMIN) |
+| `DELETE` | `/api/businesses/:businessId/documents/:documentId/comments/:commentId` | Bearer + writable (author/OWNER/ADMIN) |
+| `GET` | `/api/businesses/:businessId/audit-events` | Bearer + OWNER/ADMIN (tenant-scoped + safe login/license) |
+| `POST` | `/api/businesses/:businessId/backups` | Bearer + writable + OWNER (enqueue ZIP) |
+| `GET` | `/api/businesses/:businessId/backups` | Bearer + writable + OWNER |
+| `GET` | `/api/businesses/:businessId/backups/:jobId` | Bearer + writable + OWNER |
+| `GET` | `/api/businesses/:businessId/backups/:jobId/file` | Bearer + writable + OWNER (download ZIP) |
+| `POST` | `/api/businesses/:businessId/restores/upload` | Bearer + writable + OWNER (multipart ZIP → preview) |
+| `GET` | `/api/businesses/:businessId/restores/:jobId` | Bearer + writable + OWNER |
+| `POST` | `/api/businesses/:businessId/restores/:jobId/commit` | Bearer + writable + OWNER (`confirmReplace` if not empty) |
+| `GET` | `/api/businesses/:businessId/documents/:documentId/versions` | Bearer + membership |
+| `POST` | `/api/businesses/:businessId/documents/:documentId/versions` | Bearer + writable (manual snapshot) |
+| `GET` | `/api/businesses/:businessId/documents/:documentId/versions/compare` | Bearer + membership (`left`,`right`) |
+| `GET` | `/api/businesses/:businessId/documents/:documentId/versions/:versionId` | Bearer + membership |
+| `POST` | `/api/businesses/:businessId/documents/:documentId/versions/:versionId/restore` | Bearer + writable |
+| `POST` | `/api/businesses/:businessId/documents/:documentId/versions/:versionId/clone` | Bearer + writable |
 | `GET` | `/api/businesses/:businessId/project-categories` | Bearer + `@RequireModule(module.projects)` |
 | `POST` | `/api/businesses/:businessId/project-categories` | Bearer + `@RequireModule(module.projects)` |
 | `PATCH` | `/api/businesses/:businessId/project-categories/:categoryId` | Bearer + module.projects |
@@ -155,6 +181,10 @@ Clients map `code` → i18n (`fa` / `en`).
 | `GET` | `/api/businesses/:businessId/projects/:projectId` | Bearer + module.projects |
 | `PATCH` | `/api/businesses/:businessId/projects/:projectId` | Bearer + module.projects |
 | `DELETE` | `/api/businesses/:businessId/projects/:projectId` | Bearer + module.projects |
+| `POST` | `/api/businesses/:businessId/imports/projects/upload` | Bearer + module.projects + writable (multipart) |
+| `GET` | `/api/businesses/:businessId/imports/:importId` | Bearer + module.projects |
+| `PATCH` | `/api/businesses/:businessId/imports/:importId/mapping` | Bearer + module.projects + writable |
+| `POST` | `/api/businesses/:businessId/imports/:importId/commit` | Bearer + module.projects + writable |
 | `GET` | `/api/businesses/:businessId/team-members` | Bearer + membership |
 | `POST` | `/api/businesses/:businessId/team-members` | Bearer + `@RequireWritable` |
 | `GET` | `/api/businesses/:businessId/team-members/:memberId` | Bearer + membership |
@@ -202,7 +232,7 @@ Clients map `code` → i18n (`fa` / `en`).
 | `PATCH` | `/api/businesses/:businessId/timeline-events/:eventId` | Bearer + `@RequireModule(module.timeline)` |
 | `DELETE` | `/api/businesses/:businessId/timeline-events/:eventId` | Bearer + `@RequireModule(module.timeline)` |
 | `POST` | `/api/businesses/:businessId/qr/encode` | Bearer + membership (core QR PNG data URL) |
-| `GET` | `/api/businesses/:businessId/collections/:source` | Bearer + membership (+ module gate for `projects` / `timelineEvents`) |
+| `GET` | `/api/businesses/:businessId/collections/:source` | Bearer + membership (+ module gate for `projects` / `timelineEvents`); query `locale=fa\|en` |
 | `POST` | `/api/businesses/:businessId/documents/:documentId/export/pdf` | Bearer + `@RequireEntitlement(export.pdf)` (+ module gates if body has gated blocks) |
 | `GET` | `/api/businesses/:businessId/documents/:documentId/exports` | Bearer + membership |
 | `GET` | `/api/businesses/:businessId/exports/:jobId` | Bearer + membership |
@@ -253,26 +283,44 @@ Clients map `code` → i18n (`fa` / `en`).
 - PG `document_templates` + Mongo `template_bodies` (`businessId` + `templateId`) — see `docs/adr/003-template-mongo-body.md`
 - Schema v3: masters + `pages[].masterId`; core blocks include `text` | `image` | `section` | `divider` | `headerSlot` | `footerSlot` | `qr` | `toc` (+ module blocks)
 - Registry: `GET /api/businesses/:businessId/blocks`
+- Safe bindings (ADR 016): `{{business.name}}`, `{{item.*}}`, `{{count(source)}}`, `{{count(source where field=value)}}` — whitelist parser in `@vdb/document-schema`; see `docs/schema/bindings.md`
+- Smart pagination (ADR 017): optional `breakRules` on blocks; export/preview run `paginateDocumentBody` (estimate packer). Preview ≈ PDF packer; PDF adds CSS break hints. See `docs/schema/pagination.md`
+- Interactive PDF (ADR 018): optional block `link` (`external`|`email`|`phone`|`internal`); TOC → `#h-{id}` anchors; Playwright `outline`+`tagged` for bookmarks from headings
 - Layout only — no Business data in templates
 - Mutate routes use `EntitlementGuard` + `@RequireWritable`
 - Master render contract: see `docs/adr/006-master-pages.md` (header → body → footer → page number)
 
 ### Documents
 
-- PG `documents` (`title`, `status` draft|published, `template_id`) + Mongo `document_bodies`
+- PG `documents` (`title`, `status` draft|published, `template_id`, **`locale` fa|en**) + Mongo `document_bodies` (mirrors `locale`)
 - Create copies template block snapshot; `dataRefs` for Business Data (empty at create)
 - Soft-delete PG + remove Mongo body — see `docs/adr/004-document-crud.md`
 - Validate body with `@vdb/document-schema` v3 (`masters` + `pages`)
+- Content locale (ADR 015): PATCH `locale` / `body.locale`; PDF `dir`/`lang` + collections `?locale=` follow document locale — not UI chrome next-intl
 - Mutate routes use `EntitlementGuard` + `@RequireWritable`
-- **Editor (web):** flow shell at `/app/documents/:documentId` — Zustand undo/redo, dnd-kit vertical reorder, HTML preview with master header/footer/page numbers, autosave debounce **800ms** via PATCH (never PDF on keystroke). See `docs/adr/005-editor-shell-autosave.md` + `docs/adr/006-master-pages.md`
+- **Editor (web):** flow shell at `/app/documents/:documentId` — Zustand undo/redo, dnd-kit vertical reorder, HTML preview with master header/footer/page numbers, document-language switch, autosave debounce **800ms** via PATCH (never PDF on keystroke). See `docs/adr/005-editor-shell-autosave.md` + `docs/adr/006-master-pages.md`
+- **Versioning (ADR 020):** PG `document_versions` + Mongo `document_version_bodies`; auto snapshot on publish; manual snapshot; restore/clone; published body lock (`DOCUMENT_PUBLISHED_LOCKED`); editor history panel with metadata compare
+- **Approval workflow (ADR 021):** `draft → review → approved → published`; OWNER/ADMIN approve/publish; audit_events; PDF export only for `approved`|`published`
+- **Comments (ADR 022):** PG `document_comments` with optional `pageId`/`blockId`; resolve; mentions out of MVP
+- **Audit log (ADR 023):** writers for login / business / payment / license / export / document delete + workflow; `GET .../audit-events` OWNER/ADMIN; UI `/app/audit`
+- **Backup / restore (ADR 024):** ZIP `vdb.business-backup` v1; BullMQ jobs; OWNER + writable; restore preview + `confirmReplace`; UI `/app/backup`
 
 ### Projects / Portfolio (Phase 02)
 
 - PG `project_categories` + `projects` (`business_id`, soft-delete)
 - Sellable entitlement **`module.projects`** (not in `plan.core` base) — see `.cursor/rules/14-content-entities.mdc`
 - Fields: title, description, status (`draft|published|archived`), category, `coverMediaId` / `mediaIds`, flexible `fields` JSON, optional FK `locationId` → `locations`
+- Optional `translations` (ADR 015): `{ "en": { … } }` on create/update; FA in canonical columns; responses include `translations`
 - UI: `/app/projects` (fa/en); locked when module missing
 - Mutate + list require `@RequireModule(module.projects)`
+
+### Content import (Excel/CSV — Projects)
+
+- PG `import_jobs` + ObjectStorage temp file; ADR 019
+- Flow: upload → map columns → preview → transactional commit (valid rows)
+- Large files: BullMQ `import.content` when rows > `IMPORT_SYNC_MAX_ROWS`
+- Env: `IMPORT_MAX_BYTES`, `IMPORT_MAX_ROWS`, `IMPORT_SYNC_MAX_ROWS`
+- UI wizard on `/app/projects`
 
 ### Team & branches (Phase 02)
 
@@ -280,13 +328,14 @@ Clients map `code` → i18n (`fa` / `en`).
 - List/get: membership; mutate: `@RequireWritable`
 - Member: name, roleTitle, department, photoMediaId, branchId?, **parentMemberId?** (reporting line), sortOrder, fields
 - Branch: name, address fields, phone, optional FK `locationId` → `locations`, sortOrder, fields
+- Optional `translations` on members (`name`/`roleTitle`/`department`) and branches (name + address lines)
 - UI: `/app/team` — parent picker on create; feeds Org Chart / Map
 
 ### Organization Chart (Phase 02)
 
 - Sellable entitlement **`module.org_chart`** (catalog seeded)
 - Reporting edges on `team_members.parent_member_id` (same Business; cycle rejected)
-- Tree API: `GET /api/businesses/:businessId/org-chart/tree?rootMemberId=` (`@RequireModule(module.org_chart)`)
+- Tree API: `GET /api/businesses/:businessId/org-chart/tree?rootMemberId=&locale=` (`@RequireModule(module.org_chart)`)
 - Block type `orgChart` — props: layout (`tree-vertical`|`tree-horizontal`), rootMemberId?, showPhotos, heightPx
 - Editor + PDF: HTML/CSS tree (ADR 009)
 - Saving / exporting documents with `orgChart` blocks asserts `module.org_chart`
@@ -295,8 +344,8 @@ Clients map `code` → i18n (`fa` / `en`).
 ### Timeline (Phase 02)
 
 - Sellable entitlement **`module.timeline`** (catalog seeded)
-- PG `timeline_events` (`occurred_at`, `title`, `body`, optional `media_id`, `sort_order`, `fields`)
-- CRUD: `/api/businesses/:businessId/timeline-events` (`@RequireModule(module.timeline)`)
+- PG `timeline_events` (`occurred_at`, `title`, `body`, optional `media_id`, `sort_order`, `fields`, `translations`)
+- CRUD: `/api/businesses/:businessId/timeline-events` (`@RequireModule(module.timeline)`); optional `translations` `{ en: { title, body } }`
 - Block type `timeline` — props: layout (`vertical`|`alternating`), limit, heightPx
 - Editor + PDF: HTML/CSS timeline (ADR 010)
 - Saving / exporting documents with `timeline` blocks asserts `module.timeline`
@@ -345,9 +394,9 @@ Clients map `code` → i18n (`fa` / `en`).
 
 - PG `business_services`, `clients`, `certificates` — **foundational** Business Data (no sellable `module.*`)
 - List/get: membership; mutate: `@RequireWritable`
-- Service: name, description, iconMediaId?, sortOrder, fields
-- Client: name, website, logoMediaId?, sortOrder, fields
-- Certificate: name, issuer, issuedAt/expiresAt?, documentMediaId?, sortOrder, fields
+- Service: name, description, iconMediaId?, sortOrder, fields; optional `translations` (`name`/`description`)
+- Client: name, website, logoMediaId?, sortOrder, fields; optional `translations` (`name`)
+- Certificate: name, issuer, issuedAt/expiresAt?, documentMediaId?, sortOrder, fields; optional `translations` (`name`/`issuer`)
 - Media refs must belong to the same Business
 - UI: `/app/profile-content` (fa/en)
 
@@ -374,7 +423,7 @@ Clients map `code` → i18n (`fa` / `en`).
 
 - Sellable entitlement **`module.map`** (catalog seeded)
 - Block type `map` in Mongo document/template body — props: centerLat/Lng, zoom, markersSource (`locations|branches|projects|none`), countryRestriction, showMarkers, heightPx
-- Markers API: `GET /api/businesses/:businessId/map/markers?source=&country=` (`@RequireModule(module.map)`)
+- Markers API: `GET /api/businesses/:businessId/map/markers?source=&country=&locale=` (`@RequireModule(module.map)`); branch/project labels localized via `pickLocalized`
 - Editor: Leaflet + OSM interactive preview; PDF: static image or placeholder (`MAP_STATIC_URL_TEMPLATE`, ADR 008)
 - Saving / exporting documents that contain `map` blocks asserts `module.map`
 - UI: `/app/map` + editor palette when entitled

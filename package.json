@@ -24,7 +24,8 @@
     "docker:down": "docker compose down",
     "test:e2e:saas": "node scripts/e2e/saas-funnel.mjs",
     "test:e2e:self-hosted": "node scripts/e2e/self-hosted-funnel.mjs",
-    "test:e2e:corporate": "node scripts/e2e/corporate-sample.mjs"
+    "test:e2e:corporate": "node scripts/e2e/corporate-sample.mjs",
+    "test:e2e:professional": "node scripts/e2e/professional-funnel.mjs"
   },
   "engines": {
     "node": ">=20"
