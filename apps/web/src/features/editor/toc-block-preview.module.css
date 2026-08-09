@@ -1,0 +1,54 @@
+.wrap {
+  margin: 0.25rem 0;
+}
+
+.title {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+  color: var(--doc-primary, var(--fg));
+}
+
+.empty {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 0.9rem;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.l2 {
+  padding-inline-start: 1rem;
+}
+
+.l3 {
+  padding-inline-start: 2rem;
+}
+
+.label {
+  flex: 0 1 auto;
+}
+
+.dots {
+  flex: 1;
+  border-bottom: 1px dotted var(--border);
+  min-width: 1rem;
+  height: 0.6em;
+}
+
+.page {
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-muted);
+}

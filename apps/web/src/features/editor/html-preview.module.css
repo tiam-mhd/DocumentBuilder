@@ -111,3 +111,16 @@
   opacity: 0.6;
   font-style: italic;
 }
+
+.repeater {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.repeaterCard {
+  padding: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--doc-secondary, var(--border)) 55%, transparent);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 0.5rem;
+}

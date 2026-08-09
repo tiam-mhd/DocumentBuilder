@@ -62,7 +62,9 @@ function SortableRow({
       ? String(block.props.content ?? '').slice(0, 48) || t('emptyText')
       : block.type === 'section'
         ? String(block.props.title ?? '') || t('sectionUntitled')
-        : label;
+        : block.type === 'repeater'
+          ? String(block.props.source ?? '')
+          : label;
 
   return (
     <li
@@ -87,6 +89,9 @@ function SortableRow({
       >
         <span className={styles.type}>{label}</span>
         <span className={styles.summary}>{summary}</span>
+        {block.when ? (
+          <span className={styles.whenBadge}>{t('visibilityBadge')}</span>
+        ) : null}
       </button>
       <button
         type="button"

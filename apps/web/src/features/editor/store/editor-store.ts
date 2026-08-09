@@ -4,7 +4,8 @@ import {
   getPrimaryPage,
   parseDocumentBody,
   type BlockNode,
-  type CoreBlockType,
+  type BlockType,
+  type BlockVisibilityCondition,
   type DocumentBody,
   type MasterPage,
   type PageNumberFormat,
@@ -34,9 +35,14 @@ type EditorStore = {
   selectBlock: (id: string | null) => void;
   setTitle: (title: string) => void;
   reorderTopLevel: (activeId: string, overId: string) => void;
-  addBlock: (type: CoreBlockType) => void;
+  addBlock: (type: BlockType) => void;
+  appendChildBlock: (parentId: string, type: BlockType) => void;
   removeBlock: (id: string) => void;
   updateBlockProps: (id: string, props: Record<string, unknown>) => void;
+  updateBlockWhen: (
+    id: string,
+    when: BlockVisibilityCondition | null,
+  ) => void;
   updateTextContent: (id: string, content: string) => void;
   setPageMasterId: (masterId: string | null) => void;
   updateMaster: (
@@ -63,11 +69,11 @@ type EditorStore = {
   reset: () => void;
 };
 
-function newBlockId(type: CoreBlockType): string {
+function newBlockId(type: BlockType): string {
   return `${type.slice(0, 3)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function createBlock(type: CoreBlockType): BlockNode {
+function createBlock(type: BlockType): BlockNode {
   switch (type) {
     case 'text':
       return { id: newBlockId(type), type, props: { content: '' } };
@@ -76,6 +82,85 @@ function createBlock(type: CoreBlockType): BlockNode {
         id: newBlockId(type),
         type,
         props: { mediaAssetId: null, alt: '' },
+      };
+    case 'gallery':
+      return {
+        id: newBlockId(type),
+        type,
+        props: { galleryId: null },
+      };
+    case 'map':
+      return {
+        id: newBlockId(type),
+        type,
+        props: {
+          centerLat: 35.6892,
+          centerLng: 51.389,
+          zoom: 10,
+          markersSource: 'locations',
+          countryRestriction: null,
+          showMarkers: true,
+          heightPx: 280,
+        },
+      };
+    case 'orgChart':
+      return {
+        id: newBlockId(type),
+        type,
+        props: {
+          layout: 'tree-vertical',
+          rootMemberId: null,
+          showPhotos: false,
+          heightPx: 360,
+        },
+      };
+    case 'timeline':
+      return {
+        id: newBlockId(type),
+        type,
+        props: {
+          layout: 'vertical',
+          limit: 20,
+          heightPx: 420,
+        },
+      };
+    case 'qr':
+      return {
+        id: newBlockId(type),
+        type,
+        props: {
+          targetType: 'url',
+          value: '',
+          sizePx: 128,
+          caption: '',
+        },
+      };
+    case 'toc':
+      return {
+        id: newBlockId(type),
+        type,
+        props: {
+          maxLevel: 3,
+          showPageNumbers: true,
+          title: '',
+        },
+      };
+    case 'repeater':
+      return {
+        id: newBlockId(type),
+        type,
+        props: {
+          source: 'projects',
+          limit: 50,
+          emptyMessage: '',
+        },
+        children: [
+          {
+            id: newBlockId('text'),
+            type: 'text',
+            props: { content: '{{item.title}}' },
+          },
+        ],
       };
     case 'section':
       return {
@@ -217,6 +302,17 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     });
   },
 
+  appendChildBlock: (parentId, type) => {
+    const state = get();
+    if (!state.body) return;
+    const child = createBlock(type);
+    const blocks = mapBlocks(getPrimaryPage(state.body).blocks, parentId, (b) => ({
+      ...b,
+      children: [...(b.children ?? []), child],
+    }));
+    commit(set, get, withPrimaryBlocks(state.body, blocks));
+  },
+
   removeBlock: (id) => {
     const state = get();
     if (!state.body) return;
@@ -234,6 +330,20 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       ...b,
       props: { ...b.props, ...props },
     }));
+    commit(set, get, withPrimaryBlocks(state.body, blocks));
+  },
+
+  updateBlockWhen: (id, when) => {
+    const state = get();
+    if (!state.body) return;
+    const blocks = mapBlocks(getPrimaryPage(state.body).blocks, id, (b) => {
+      if (when === null) {
+        const { when: _removed, ...rest } = b;
+        void _removed;
+        return { ...rest, when: null };
+      }
+      return { ...b, when };
+    });
     commit(set, get, withPrimaryBlocks(state.body, blocks));
   },
 

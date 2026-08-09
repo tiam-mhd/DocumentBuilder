@@ -36,9 +36,13 @@ export function useEntitlements() {
     void refresh();
   }, [businessLoading, refresh]);
 
+  function has(code: string): boolean {
+    return entitlements?.codes.includes(code) ?? false;
+  }
+
   function can(code: string): boolean {
     if (!entitlements?.writable) return false;
-    return entitlements.codes.includes(code);
+    return has(code);
   }
 
   return {
@@ -47,6 +51,7 @@ export function useEntitlements() {
     error,
     refresh,
     writable: entitlements?.writable ?? false,
+    has,
     can,
   };
 }

@@ -1,23 +1,22 @@
 'use client';
 
-import Link from 'next/link';
-import { useLocale, useTranslations } from 'next-intl';
-import { EntitlementCodes } from '@vdb/shared-types';
+import { useTranslations } from 'next-intl';
+import {
+  EntitlementCodes,
+  MODULE_ENTITLEMENT_CODES,
+} from '@vdb/shared-types';
 import { useEntitlements } from '@/features/billing/use-entitlements';
+import { ModuleUpgradeCta } from '@/features/billing/module-upgrade-cta';
 import styles from './entitlements-panel.module.css';
 
 const FEATURE_CODES = [
   EntitlementCodes.ExportPdf,
-  EntitlementCodes.ModuleMap,
-  EntitlementCodes.ModuleOrgChart,
-  EntitlementCodes.ModuleTimeline,
-  EntitlementCodes.ModuleProjects,
+  ...MODULE_ENTITLEMENT_CODES,
 ] as const;
 
 export function EntitlementsPanel() {
   const t = useTranslations('entitlements');
-  const locale = useLocale();
-  const { entitlements, loading, writable, can } = useEntitlements();
+  const { entitlements, loading, writable, has } = useEntitlements();
 
   if (loading) {
     return <p className={styles.hint}>{t('loading')}</p>;
@@ -26,6 +25,9 @@ export function EntitlementsPanel() {
   if (!entitlements) {
     return <p className={styles.hint}>{t('noBusiness')}</p>;
   }
+
+  const anyLocked =
+    !writable || FEATURE_CODES.some((code) => !has(code));
 
   return (
     <section className={styles.panel} aria-label={t('title')}>
@@ -40,27 +42,21 @@ export function EntitlementsPanel() {
       </p>
       <ul className={styles.list}>
         {FEATURE_CODES.map((code) => {
-          const allowed = can(code);
+          const allowed = writable && has(code);
           return (
             <li key={code} className={styles.row}>
               <span className={styles.code}>{code}</span>
-              <button
-                type="button"
+              <span
                 className={allowed ? styles.action : styles.actionDisabled}
-                disabled={!allowed}
                 title={allowed ? t('allowed') : t('locked')}
               >
                 {allowed ? t('allowed') : t('locked')}
-              </button>
+              </span>
             </li>
           );
         })}
       </ul>
-      {!writable ? (
-        <Link className={styles.link} href={`/${locale}/app/billing`}>
-          {t('unlockCta')}
-        </Link>
-      ) : null}
+      {anyLocked ? <ModuleUpgradeCta /> : null}
     </section>
   );
 }

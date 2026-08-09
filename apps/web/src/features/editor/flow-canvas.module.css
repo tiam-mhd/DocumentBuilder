@@ -60,6 +60,18 @@
   white-space: nowrap;
 }
 
+.whenBadge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.1rem 0.35rem;
+  justify-self: start;
+}
+
 .remove {
   border: none;
   background: transparent;

@@ -18,8 +18,12 @@ import { MasterPanel } from './master-panel';
 import { ExportPanel } from './export-panel';
 import { useEditorAutosave } from './use-editor-autosave';
 import { useEditorStore } from './store/editor-store';
-import { getPrimaryPage } from '@vdb/document-schema';
+import {
+  documentCollectRequiredModuleCodes,
+  getPrimaryPage,
+} from '@vdb/document-schema';
 import { EntitlementCodes } from '@vdb/shared-types';
+import { ModuleUpgradeCta } from '@/features/billing/module-upgrade-cta';
 import styles from './editor-shell.module.css';
 
 type Props = { documentId: string };
@@ -29,7 +33,7 @@ export function EditorShell({ documentId }: Props) {
   const tErrors = useTranslations('errors');
   const locale = useLocale();
   const { activeBusiness } = useBusinesses();
-  const { writable, loading: entLoading, can } = useEntitlements();
+  const { writable, loading: entLoading, can, has } = useEntitlements();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [tokens, setTokens] = useState<DesignThemeTokens | null>(
@@ -49,6 +53,9 @@ export function EditorShell({ documentId }: Props) {
   const reset = useEditorStore((s) => s.reset);
 
   const disabled = !writable || entLoading;
+  const missingModules = body
+    ? documentCollectRequiredModuleCodes(body).filter((code) => !has(code))
+    : [];
 
   useEditorAutosave(writable && !entLoading);
 
@@ -188,6 +195,12 @@ export function EditorShell({ documentId }: Props) {
       </header>
 
       {!writable ? <p className={styles.warn}>{t('readOnly')}</p> : null}
+      {missingModules.length > 0 ? (
+        <div className={styles.warn}>
+          <p>{t('modulesMissing', { codes: missingModules.join(', ') })}</p>
+          <ModuleUpgradeCta />
+        </div>
+      ) : null}
 
       <div className={styles.layout}>
         <aside className={styles.side}>
