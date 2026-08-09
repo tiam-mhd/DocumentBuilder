@@ -1,0 +1,44 @@
+---
+description: Editor and document engine implementation constraints
+alwaysApply: true
+---
+
+# Document Engine & Editor (Permanent)
+
+## Model
+
+- **Data** (Business entities) ≠ **Template** (layout, tokens, blocks, bindings) ≠ **Document** (instance: data refs + template + page config).
+- Bindings use explicit placeholders (e.g. `{{business.name}}`, repeaters for collections).
+- Conditional visibility evaluated at render time from data + entitlements.
+
+## Editor UX rules
+
+- MVP layout model: **flow + sections/blocks + constraints** (keep-together, page break rules).
+- Absolute free-canvas positioning is out of MVP unless product explicitly unlocks it later.
+- Autosave with debounce (~800ms) to Documents PATCH; never call PDF/export on keystroke.
+- Undo/redo history required for editor mutations (client store; past/future stacks).
+- Live preview = DOM/HTML with **document brand** theme tokens; Export = queued Final Renderer.
+- Block reorder = vertical flow DnD only (e.g. dnd-kit sortable) — not x/y free placement.
+- Editor lives under `apps/web/src/features/editor/`; open route `/app/documents/[documentId]`.
+- Mutating editor actions respect subscription `writable` (disable UI; API still gates).
+
+## Pagination & print
+
+- Master header/footer and page numbers are first-class (`masters[]` + `pages[].masterId` in document-schema v3).
+- HTML preview and PDF final render share the same order: resolve master → header → page body → footer → page number.
+- `headerSlot` / `footerSlot` in flow are markers only; repeating chrome comes from the assigned master.
+- Smart breaks: avoid orphan titles; support keep-with-next where modeled.
+- Print presets (A4/A3/…, DPI tiers) live in export config, not hardcoded in Next.js UI components.
+
+## Assets
+
+- Uploads create derivatives (thumb/web/print) asynchronously when possible.
+- Fonts: upload + family/weight registration; PDF must embed approved fonts — see `11-fonts.mdc` (formats + storage key contract).
+- Document brand colors/typography come from Business `design_themes` tokens — see `12-design-themes.mdc` (separate from app dark/light).
+- Reuse assets by id; no duplicate binary per usage.
+
+## Extensibility
+
+- Sellable capabilities (Map, OrgChart, Timeline, …) are **modules** with stable codes.
+- Register block types in one registry; unknown block types must fail safely in renderer.
+- Template storage: PG metadata + Mongo body — see `13-templates-blocks.mdc`.

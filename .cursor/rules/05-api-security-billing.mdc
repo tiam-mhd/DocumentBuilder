@@ -1,0 +1,56 @@
+---
+description: API, security, entitlements, and billing implementation laws
+alwaysApply: true
+---
+
+# API, Security & Entitlements (Permanent)
+
+## Request context
+
+Every authenticated business-scoped request must resolve:
+
+1. `user` (from token)
+2. `business` (from **path** `:businessId` — canonical) — membership required
+3. `subscription` + entitlements for that business (when billing exists)
+
+Optional header `X-Business-Id` may mirror the active business for clients; **authorization still uses path `businessId`** on scoped routes. Never trust a header alone without membership check.
+
+Reject if membership missing or subscription not in `{trial, active, grace}` for mutating ops.
+
+## EntitlementGuard (required)
+
+Central Nest service + Guard; used on every mutating/export route:
+
+- `assertBusinessWritable(businessId)`
+- `assertModule(businessId, 'module.map')`
+- `assertCan(businessId, 'export.pdf')`
+
+UI mirrors the same codes from `/businesses/:businessId/entitlements`.
+
+## Billing integrity
+
+- Trial grant is transactional with first Business create; set `trial_consumed` atomically.
+- Payment webhooks: **idempotent** (store gateway ref unique); activate subscription only after verified success.
+- Never delete invoices/payments; append-only ledger mindset.
+- Module changes recalculate entitlements without wiping documents.
+- Route money/license through **edition adapters** (`SAAS` platform billing vs `SELF_HOSTED` license + optional local gateway). EntitlementGuard stays edition-agnostic.
+- PostgreSQL holds payments/invoices/subscriptions; Redis backs webhook idempotency locks when useful.
+
+## Security checklist (every feature)
+
+- OTP brute-force protection + cooldown.
+- Upload: MIME/extension allowlist, size limits, re-encode images; treat SVG as dangerous.
+- XSS: escape in PDF HTML pipeline; sanitize rich text.
+- IDOR: authorize `businessId` on every show/update/delete (PostgreSQL and MongoDB).
+- CSRF as applicable; CORS locked to known web origins.
+- Rate-limit export and OTP endpoints.
+- Audit log for: login, business create, plan change, payment, export, delete.
+
+## API shape
+
+- JSON:API-ish or consistent `{ data, meta, errors }` — pick one style and keep it.
+- Errors: machine `code` + human `message` (localizable; client maps `code` for fa/en).
+- List endpoints: pagination + default sort; never return entire tenant tables.
+- Idempotency-Key header supported on payment/subscribe endpoints when feasible.
+- **Documentation:** keep `docs/api/` in sync on every route add/change/delete.
+- **OpenAPI source of truth:** hand-maintained `docs/api/openapi.yaml` is canonical. Nest `@nestjs/swagger` may mirror for `/api/docs` UI but must not diverge — update YAML in the same change as routes.

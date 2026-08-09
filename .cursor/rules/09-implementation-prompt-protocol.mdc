@@ -1,0 +1,52 @@
+---
+description: Protocol for every implementation prompt — analyze, task, full-stack slice, status
+alwaysApply: true
+---
+
+# Implementation Prompt Protocol (Permanent)
+
+Whenever the user gives an **implementation** prompt, follow this protocol exactly.
+
+## 1) Full-stack vertical slice (mandatory)
+
+For that feature/section, implement **together and in sync**:
+
+- **Database** — migrations, indexes, constraints (`business_id` when tenant-owned)
+- **Backend** — NestJS modules/services, DTOs, guards (JWT + EntitlementGuard), queues
+- **Frontend** — Next.js UI, hooks, API client, types, i18n keys, theme-aware styles
+- Stores as required: **PostgreSQL** migrations, **Redis** keys/queues, **MongoDB** collections
+
+Do **not** ship backend-only or frontend-only for a user-facing feature unless the user explicitly asks for a partial slice.
+
+## 2) Before coding — analyze + write tasks
+
+1. Re-read relevant `.cursor/rules/`.
+2. Analyze the request: scope, entities, APIs, UI screens, entitlements, edition impact (`SELF_HOSTED` / `SAAS`).
+3. Write a clear **task list** (ordered steps). Prefer the todo tool when available.
+4. Only then implement **step by step**, one task at a time in order.
+
+## 3) End of every agent message (status contract)
+
+Close every implementation reply with an explicit status block:
+
+- If all tasks for this prompt are done: **`تموم شد`** (plus 1–2 lines of what was delivered).
+- If not done: **`تموم نشد`** and state **مرحله بعدی**: the exact next task(s) so the user can continue in the next prompt(s).
+
+Never leave the user guessing whether work is complete.
+
+## 4) Promote cross-cutting discoveries to rules first
+
+If during analysis or implementation you find a rule that must apply to **the whole project / every future task** (naming, security, tenancy, API shape, theme, i18n, deploy, etc.):
+
+1. **Add or update** the appropriate file under `.cursor/rules/` (and `AGENTS.md` index if new file).
+2. **Then** continue implementation under that new law.
+
+Do not silently invent a one-off pattern that other features will have to reverse later.
+
+## 5) API documentation lock
+
+Any time an HTTP API is **added, changed, or removed**:
+
+- Update API docs in the same change set (canonical path: `docs/api/` — OpenAPI/Swagger or structured Markdown kept current).
+- Docs must include: method, path, auth, business scope, entitlements, request/response shapes, error codes.
+- A PR/change that touches routes without doc updates is **incomplete**.

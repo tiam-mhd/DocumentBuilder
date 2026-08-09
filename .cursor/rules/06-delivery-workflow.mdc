@@ -1,0 +1,53 @@
+---
+description: Delivery workflow — phases, PRs, docs, Definition of Done
+alwaysApply: true
+---
+
+# Delivery Workflow (Permanent)
+
+## Phase discipline
+
+Build in product phases; do not pull Phase 4 marketplace into Phase 1.
+
+**Phase 1 must include:** OTP auth, multi-Business, subscription + trial + payment gate, **`APP_EDITION` (`SELF_HOSTED` | `SAAS`) + license/billing adapters**, core document/theme/PDF, media/fonts, entitlement middleware.
+
+Do not ship Editor without Feature Gate.
+
+## Before coding a feature
+
+1. Confirm domain rule fit (Business scope? Module code?).
+2. Place files in the mandated folders.
+3. Add/adjust migration + policy/gate + tests for billing/auth paths.
+4. Update `docs/` only when schema/ADR changes (keep short).
+
+## Definition of Done
+
+- Vertical slice complete when the feature needs it: **migration/DB + backend + frontend** aligned.
+- Works behind EntitlementGuard when applicable.
+- Tenant isolation verified (no cross-Business leak).
+- Types/schema updated if Document JSON changed.
+- API docs in `docs/api/` updated if routes changed.
+- Both **dark and light** themes verified for touched UI.
+- New UI strings have **fa** and **en** keys; RTL/LTR correct.
+- No secrets committed; env keys documented in `.env.example` only.
+- Lint/tests for touched critical paths pass.
+- Reply ends with **`تموم شد`** or **`تموم نشد` + مرحله بعدی**.
+
+## Phase exit E2E (Core+)
+
+- Runnable edition funnels live under `scripts/e2e/` (API-first; Playwright UI optional).
+- Acceptance checklists live under `docs/qa/` (`phase-01-saas-acceptance.md`, self-hosted counterpart).
+- Prefer `npm run test:e2e:saas` / `npm run test:e2e:self-hosted` over undocumented manual-only gates.
+
+## Git
+
+- Commit only when the user asks.
+- Small commits; messages explain **why**.
+- Never rewrite shared history unless explicitly requested.
+
+## Agent behavior on ambiguity
+
+- Prefer the locked **NestJS + Next.js** monorepo (PostgreSQL + Redis + MongoDB).
+- If stuck between two designs, choose the one that preserves: Business tenancy, server-side entitlements, Data/Template/Document split, flow-based editor, **one Core / two editions**, theme+i18n, and full-stack slices.
+- If a new cross-cutting rule emerges, write it into `.cursor/rules/` first.
+- Ask only when a decision changes product law or stack lock; otherwise implement per these rules.

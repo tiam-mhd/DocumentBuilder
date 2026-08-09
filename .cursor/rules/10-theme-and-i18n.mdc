@@ -1,0 +1,33 @@
+---
+description: UI must support dark/light theme and fa/en i18n from day one
+alwaysApply: true
+---
+
+# Theme & Internationalization (Permanent)
+
+## Theme (Dark / Light) — app chrome only
+
+- The web app **must** support **dark** and **light** themes from the start.
+- Use a single token system (CSS variables / theme provider). No hard-coded one-off colors in feature UI.
+- Persist user preference (local storage and/or user settings API when auth exists).
+- Respect system preference as default when the user has not chosen.
+- All shared `ui/` components and new screens must look correct in **both** themes before a task is done.
+- **Not** document brand themes (`design_themes` / PDF colors) — those are Business design tokens; see `12-design-themes.mdc`.
+
+## i18n (Multi-language)
+
+- The product is **multi-language**. Initial locales: **`fa` (Persian, default UX)** and **`en` (English)**.
+- No user-facing hard-coded strings in components. Use i18n keys/catalogs.
+- Locale files / messages under Next.js i18n convention: `apps/web/src/shared/i18n/messages/{fa,en}.json` with **next-intl only** (locked). Do not mix i18next or other i18n libraries.
+- Theme preference persistence (foundation): cookie `vdb-theme` (`light` | `dark` | `system`) — avoid FOUC; user-settings API may sync later.
+- Support **RTL for `fa`** and **LTR for `en`** at the document/app shell level (`dir` + layout).
+- API user-facing error `message` should be localizable (return `code` + optional localized message, or let client map `code` → i18n).
+- Document content language (company profile FA/EN) is a domain feature; UI chrome i18n is mandatory regardless.
+
+## Definition of Done add-ons
+
+A UI task is not done if:
+
+- It breaks in dark or light theme, or
+- New strings exist only in one locale (both `fa` and `en` keys required), or
+- RTL/`dir` is wrong for the active locale.

@@ -1,0 +1,45 @@
+---
+description: Product domain laws — User, OTP, Business, Subscription, modules
+alwaysApply: true
+---
+
+# Product Domain Laws (Permanent)
+
+## Identity
+
+- Auth is **mobile + OTP only** in MVP (no password login).
+- `User.mobile` is unique. One account per mobile number.
+- OTP: rate-limit, short TTL, single-use, hashed/stored securely; never log raw OTP.
+
+## Multi-business
+
+- A User may create **unlimited** Businesses.
+- All domain data (media, fonts, themes, templates, documents, projects, …) is scoped by `business_id`.
+- Switching context = switching active Business. Never mix data across businesses in one query without explicit admin tooling.
+
+## Subscription (per Business)
+
+- Working on a Business (edit data, editor, export) requires a valid Subscription for **that** Business.
+- Statuses: `trial` | `active` | `grace` (optional) | `expired` | `pending_payment`.
+- **Trial**: exactly **7 days**, only for the **first** Business of a User, once per account (`user.trial_consumed = true` after grant).
+- Business #2+: creatable, but work locked until paid (`pending_payment`).
+- Expired: read-only / CTA renew; **do not delete data**.
+- Creating a Business is free; **value unlock is subscription**.
+
+## Plans & modules
+
+- Pricing = Plan (by activity/vertical) + optional Modules (Map, OrgChart, Timeline, Projects, …).
+- Feature access = Entitlements derived from Plan + Modules on the Business Subscription.
+- UI may hide locked modules; **API must still reject** unauthorized module use.
+
+## Document product core
+
+- Separate: **Business Data** → **Template** → **Document**.
+- Prefer document **flow + blocks + constraints** over free-canvas absolute layout in MVP.
+- Primary export: **PDF** (RTL + font embed). Preview = fast HTML/CSS; final render = server job.
+
+## Deployment editions (locked)
+
+- Same product domain runs in **`SELF_HOSTED`** (sold as install/license on buyer’s server) and **`SAAS`** (you host; sell subscriptions).
+- Domain laws above apply in both editions. Edition only changes who hosts, who gets paid for the *platform*, signup openness, and branding — not tenancy model.
+- Full matrix: see `08-dual-deployment.mdc`.

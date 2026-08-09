@@ -1,0 +1,56 @@
+---
+description: Coding standards for NestJS and Next.js TypeScript
+alwaysApply: true
+---
+
+# Coding Standards (Permanent)
+
+## General
+
+- Write code for the next engineer: obvious names, small functions, explicit errors.
+- No commented-out dead code. No unused imports.
+- Avoid premature abstraction; extract when a pattern repeats **twice** with clear stability.
+- Every tenant-owned row/document: `businessId` required + indexed; queries always constrained.
+- Timestamps everywhere meaningful; soft-delete only where product needs restore — never soft-delete payment ledgers.
+
+## NestJS (API)
+
+- Strict TypeScript. Explicit DTO classes + `class-validator` (or Zod pipes) on inputs.
+- Use Enums for statuses (`SubscriptionStatus`, etc.).
+- Authorization: JWT AuthGuard + Business membership + EntitlementGuard.
+- Side effects (SMS, payment, PDF) via **BullMQ/Redis** jobs; HTTP handlers stay fast.
+- Domain exceptions mapped through a global filter to `{ code, message }` JSON.
+- PostgreSQL: no unbounded `findMany` on tenant tables — paginate.
+- MongoDB: always filter `businessId`; validate payload against `document-schema`.
+- Storage paths via config — never hardcode OS paths.
+
+```typescript
+// ✅ Gate then act
+await this.entitlements.assertCan(businessId, 'export.pdf');
+await this.exportQueue.add('pdf', { documentId });
+```
+
+## Next.js (Web)
+
+- App Router + TypeScript strict. No `any` unless justified with a short comment.
+- Server Components by default; Client Components only when interactivity requires.
+- User-facing copy via i18n (`fa`/`en`); colors via theme tokens (dark/light).
+- Call Nest through `shared/api`; do not scatter raw `fetch` with duplicated auth headers.
+- Entitlements: read from API; disable UI; never trust UI-only checks.
+- Editor state: client store with undo/redo + debounced autosave to API.
+
+```tsx
+// ✅ Feature hook + shared API
+const { data } = useBusinessDocuments(businessId);
+```
+
+## Shared packages
+
+- Document JSON changes go in `packages/document-schema` first, then Nest + Next consumers.
+- Breaking schema changes: version bump + note in `docs/`.
+
+## Tests (minimum bar)
+
+- Services with money/trial/entitlements: unit/e2e tests.
+- Critical HTTP: OTP happy-path + rate limit; subscription gate deny.
+- Do not merge billing or gate changes without tests.

@@ -1,0 +1,56 @@
+---
+description: Document templates — PG metadata + Mongo body + core block registry
+alwaysApply: true
+---
+
+# Templates & Core Blocks (Permanent)
+
+## Law
+
+**Data ≠ Template ≠ Document.** Templates hold layout/structure/bindings only — never Business content rows.
+
+## Storage split (locked)
+
+| Layer | Store | Contents |
+| --- | --- | --- |
+| Metadata | PostgreSQL `document_templates` | `business_id`, `name`, optional `theme_id`, soft-delete |
+| Body | MongoDB `template_bodies` | Flow of blocks + page config; **always** `businessId` + `templateId` |
+
+Do not put template page trees in PostgreSQL JSONB unless an ADR reverses this. Always filter Mongo by `businessId`.
+
+## Core block registry (Phase 01)
+
+Canonical types in `@vdb/document-schema` (`CORE_BLOCK_TYPES`):
+
+| Type | Role |
+| --- | --- |
+| `text` | Flow text / bindings |
+| `image` | Media asset ref |
+| `section` | Nested flow container (`children`) |
+| `divider` | Visual rule |
+| `headerSlot` | Master header placeholder (filled in master-page phase) |
+| `footerSlot` | Master footer placeholder |
+
+Unknown block types must **fail safely** at validate/render (reject or skip with audit) — never crash the worker.
+
+Sellable modules (Map, OrgChart, …) register **additional** types later with `moduleCode`; Core types have `moduleCode: null`.
+
+## API
+
+- Registry: `GET /api/businesses/:businessId/blocks` (membership)
+- Templates CRUD under `/api/businesses/:businessId/templates`
+- Mutate: `EntitlementGuard` + `@RequireWritable`
+- Validate body with `parseTemplateBody` before Mongo write
+
+## Schema version
+
+Bump `DOCUMENT_SCHEMA_VERSION` / template schema in `packages/document-schema` on incompatible block/page shape changes; note in `docs/`.
+
+## Documents (instances)
+
+| Layer | Store | Contents |
+| --- | --- | --- |
+| Metadata | PostgreSQL `documents` | `business_id`, `title`, `status` (`draft`\|`published`), `template_id`, soft-delete |
+| Body | MongoDB `document_bodies` | Validated `DocumentBody` with `businessId` + `documentId`; may hold `dataRefs` (not template content) |
+
+Create-from-template **copies** block structure into the document body (snapshot). Later template edits do not mutate existing documents. Soft-delete: PG `deleted_at`; Mongo body removed (restore = recreate / future recycle bin).

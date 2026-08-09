@@ -1,0 +1,73 @@
+---
+description: Locked system architecture — NestJS, Next.js, data stores, engines
+alwaysApply: true
+---
+
+# Architecture (Permanent)
+
+## Locked stack (do not fork without explicit product decision)
+
+| Layer | Choice |
+| --- | --- |
+| API | **NestJS** (Node.js LTS), modular monolith |
+| Web | **Next.js** (App Router) + TypeScript |
+| Primary DB | **PostgreSQL** — users, businesses, billing, memberships, jobs metadata |
+| Cache / Queue | **Redis** — OTP cooldown, cache, BullMQ (or equivalent) queues |
+| Document store | **MongoDB** — Document JSON / page trees / version snapshots |
+| Auth | Mobile OTP + **JWT** (access; refresh optional) |
+| ORM / data | **Prisma** for PostgreSQL; **official `mongodb` driver** for MongoDB (do not introduce TypeORM or Mongoose without ADR) |
+| PDF | Server Chromium (Playwright/Puppeteer) or Gotenberg via worker |
+| Maps | Leaflet + OSM when Map module enabled |
+| Object storage | S3-compatible (MinIO/local disk in dev) for media/fonts |
+
+Monorepo layout (required):
+
+```text
+/
+  apps/
+    api/                 # NestJS
+    web/                 # Next.js
+  packages/
+    document-schema/     # shared Document JSON types/schema (TS)
+    shared-types/        # DTOs, entitlement codes, constants
+  docs/                  # PRD, ADRs, api, deploy
+  .cursor/rules/
+```
+
+## Data placement rules
+
+- **PostgreSQL**: transactional tenancy & money — User, Business, Subscription, Plan, Payment, Membership, Audit pointers.
+- **Redis**: ephemeral/fast — rate limits, OTP challenge meta, sessions/blacklist if used, queues.
+- **MongoDB**: flexible document payloads — `documents`, pages/elements trees, optional render caches keyed by `businessId` + `documentId`.
+- Always mirror `businessId` on Mongo documents; never query cross-business without filter.
+- Do not invent a fourth primary store without an ADR + rule update.
+
+## Layering (API)
+
+Request → Auth Guard (JWT) → **BusinessContext** → **EntitlementGuard** → Controller → Domain Service → Repositories (PG / Mongo) → Stores.
+
+Rendering: `Document JSON` (Mongo) → HTML/CSS canonical → ExportJob (Redis queue) → PDF/Image.
+
+Never call PDF renderer on the interactive request path for every editor keystroke.
+
+## Domain modules (Nest modules)
+
+- `IdentityModule` — User, OTP
+- `TenancyModule` — Business, Membership
+- `BillingModule` — Plan, Module, Subscription, Payment, Invoice, License
+- `ContentModule` — business entities (projects, team, …)
+- `AssetsModule` — Media, Fonts
+- `DesignModule` — Theme, Template, MasterPage, Blocks
+- `DocumentsModule` — Document metadata (PG) + body (Mongo)
+- `ExportModule` — ExportJob, Renderer adapters
+- `AuditModule` — AuditEvent
+- `SystemModule` — health, APP_EDITION config
+
+## Hard boundaries
+
+- No cross-Business queries without `businessId` filter (PG and Mongo).
+- No entitlement logic only in Next.js.
+- No storing company content inside template rows (templates are structure/style/bindings).
+- New sellable features get a **module code** and gate.
+- **Dual deployment locked:** `SELF_HOSTED` | `SAAS` via `APP_EDITION` — see `08-dual-deployment.mdc`.
+- Stack is **NestJS + Next.js + PostgreSQL + Redis + MongoDB** — do not reintroduce Laravel/PHP/MySQL/Vite-SPA as the primary stack.

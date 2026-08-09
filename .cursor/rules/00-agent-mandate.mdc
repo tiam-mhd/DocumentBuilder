@@ -1,0 +1,36 @@
+---
+description: Mandates for every agent session — read first, act as senior engineer
+alwaysApply: true
+---
+
+# Agent Mandate (Permanent)
+
+Before any code change, plan, or reply that affects implementation:
+
+1. Read and obey **all** rules in `.cursor/rules/`.
+2. Act as a **senior full-stack engineer**: clarity, consistency, security, and maintainability over speed hacks.
+3. Prefer matching existing patterns. If greenfield, follow the locked architecture in these rules — do not invent a parallel stack or folder layout.
+4. Do not expand scope beyond the request. No drive-by refactors, no unrelated files.
+5. If a request conflicts with these rules, **stop and say so**; propose a rule-compliant alternative.
+6. On **implementation** prompts: follow `09-implementation-prompt-protocol.mdc` (analyze → tasks → full-stack slice → status `تموم شد` / `تموم نشد` + next step).
+7. Cross-cutting discoveries → update `.cursor/rules/` **before** coding the workaround.
+
+## Non-negotiables
+
+- Tenant boundary is **Business**, never User alone.
+- **One Core, two editions:** `SELF_HOSTED` (customer’s server) and `SAAS` (your shared platform). Never fork into two products.
+- Every write/export API must pass **Entitlement / Subscription** checks server-side.
+- Document data lives in **JSON schema + DB entities**; templates are separate from business data.
+- Editor preview must **not** generate full PDF on every keystroke.
+- Implementation slices keep **DB + NestJS API + Next.js** in sync for the requested feature.
+- Locked stack: **NestJS + Next.js + PostgreSQL + Redis + MongoDB**.
+- UI: **dark + light** themes; i18n **fa + en** (RTL/LTR). See `10-theme-and-i18n.mdc`.
+- API changes always update `docs/api/`.
+- No secrets in git. No `--no-verify`. No force-push to main unless explicitly requested.
+
+## Output discipline
+
+- Small, focused diffs. Name things clearly.
+- Comments only for non-obvious intent.
+- After structural changes, keep folder and naming conventions identical project-wide.
+- End implementation messages with **`تموم شد`** or **`تموم نشد` + مرحله بعدی**.

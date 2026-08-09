@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# Env & secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Logs & coverage
+logs/
+*.log
+coverage/
+.nyc_output/
+
+# Prisma
+apps/api/prisma/*.db
+apps/api/prisma/*.db-journal
+
+# Test / cache
+.turbo/
+.cache/
+tmp/
+temp/
+
+# Docker volumes (local overrides)
+docker-data/
+
+# Local object storage (media)
+.data/
+
+# Scratch / personal notes (not product source)
+ChatgptAnswer.txt

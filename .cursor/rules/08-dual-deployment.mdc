@@ -1,0 +1,51 @@
+---
+description: Locked dual deployment — one Core, SELF_HOSTED and SAAS editions
+alwaysApply: true
+---
+
+# Dual Deployment Architecture (Permanent — Critical)
+
+## Law
+
+**One codebase. Two deployment editions. Never two products.**
+
+| Edition | `APP_EDITION` | Who hosts | Who is the paying customer |
+| --- | --- | --- | --- |
+| Self-hosted / On-prem | `SELF_HOSTED` | Buyer’s VPS/server | You sell a **license/install** to one organization |
+| SaaS / Shared platform | `SAAS` | Your infrastructure | End users buy **subscriptions** on your platform |
+
+Same Core: Identity, Business tenancy, Entitlements, Document Engine, PDF, modules.
+
+## Non-negotiable design
+
+1. Build **Tenant-ready from day one** (`businessId` + guards). Do **not** build a single-company app and “add SaaS later”.
+2. Do **not** fork repos (`vdb-saas` vs `vdb-onprem`). Editions are **config + optional packages**, not copy-paste.
+3. `SELF_HOSTED` still uses Business isolation (org may have many businesses). Difference is **platform tenancy / billing owner**, not absence of `businessId`.
+4. Default deploy target for both editions: **Docker / VPS** with NestJS + Next.js + PostgreSQL + Redis + MongoDB. Shared PHP cPanel is **not** the primary target.
+
+## Edition behavior matrix
+
+| Concern | `SELF_HOSTED` | `SAAS` |
+| --- | --- | --- |
+| Platform multi-customer | One org owns the install (optional single root Organization) | Many independent customers on one install |
+| Business subscriptions | Internal plans/modules still apply for feature gates | Same; payment to platform owner (you) |
+| Software license | Env/license key / contract activation for the install | N/A (you operate the platform) |
+| Branding | Customer brand; optional hide “Powered by” | Your brand or white-label tier |
+| SMS / payment keys | Customer’s providers in `.env` | Your providers (or per-tenant overrides later) |
+| Signup | Often invite-only / admin-created users | Public OTP signup |
+| Trial 7-day first Business | Configurable; usually ON for SaaS UX, optional for on-prem | ON by default |
+
+## Implementation requirements
+
+- Central config: `APP_EDITION=SELF_HOSTED|SAAS` (and related flags). No scattered `if (saas)` without an Edition/Config service.
+- Billing adapters: `PlatformBilling` vs `LicenseGate` behind one Entitlement interface where possible.
+- Installer path for on-prem: `.env.example`, migrations, queue worker, storage, docs in `docs/deploy/`.
+- SaaS path: same artifact; different env + domain + backup strategy.
+- Features that only make sense on SaaS (public marketplace, cross-customer admin) must be edition-gated — never break self-hosted builds.
+
+## Forbidden
+
+- Separate divergent codebases for the two sales motions.
+- Removing `businessId` in self-hosted “to simplify”.
+- Hardcoding your SaaS payment gateway into the only billing path with no adapter.
+- Assuming shared cPanel/PHP hosting is the primary on-prem target.

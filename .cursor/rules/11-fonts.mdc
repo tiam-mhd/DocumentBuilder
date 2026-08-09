@@ -1,0 +1,48 @@
+---
+description: Business fonts — allowed formats, storage keys, PDF embed contract
+alwaysApply: true
+---
+
+# Font Manager (Permanent)
+
+## Allowed formats (locked)
+
+Upload / register only:
+
+| Ext | MIME (typical) |
+| --- | --- |
+| `.woff2` | `font/woff2` |
+| `.ttf` | `font/ttf` or `application/x-font-ttf` |
+| `.otf` | `font/otf` or `application/x-font-otf` |
+
+Optional accept `font/woff` / `.woff` only if product later unlocks — **not in MVP**.
+
+Forbidden for upload: EOT, SVG fonts, collection TTCs unless explicitly unlocked later.
+
+## Data model
+
+- PostgreSQL `font_faces`: `business_id`, `family`, `weight`, `style` (`normal`|`italic`), `storage_key`, mime, size.
+- Unique active face per `(businessId, family, weight, style)` (enforce in service; soft-delete allowed).
+- Binary in object storage (same `STORAGE_DRIVER` as media) — never Mongo for font bytes.
+
+## Storage key contract (PDF / export workers)
+
+```text
+{businessId}/fonts/{fontId}/original.{woff2|ttf|otf}
+```
+
+Workers must:
+
+1. Resolve face row from PG filtered by `businessId` + `id` + `deletedAt IS NULL`.
+2. Load bytes via shared ObjectStorage (`get(storageKey)`) using the same env as API — **not** a public CDN URL.
+3. Optionally stream via Nest `GET /api/businesses/:businessId/fonts/:fontId/file` (JWT + membership) for tooling; workers prefer direct storage access.
+
+## Gates
+
+- List/read: membership.
+- Upload / patch / delete: `EntitlementGuard` + `@RequireWritable` (+ SELF_HOSTED install license via existing adapter).
+
+## UI / theme / PDF
+
+- Theme picker and editor consume `GET .../fonts` (family list).
+- PDF final render **embeds** only registered, approved faces for that Business — never system fallbacks that break RTL without embed.

@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vdb-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vdb
+      POSTGRES_PASSWORD: vdb
+      POSTGRES_DB: vdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - vdb_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vdb -d vdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: vdb-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - vdb_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mongo:
+    image: mongo:7
+    container_name: vdb-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - vdb_mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  vdb_pg_data:
+  vdb_redis_data:
+  vdb_mongo_data:

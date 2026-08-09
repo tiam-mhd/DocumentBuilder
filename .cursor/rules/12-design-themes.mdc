@@ -1,0 +1,45 @@
+---
+description: Document brand Design Themes (tokens) vs app UI chrome theme
+alwaysApply: true
+---
+
+# Design Themes — Document Brand Tokens (Permanent)
+
+## Law
+
+**Two different “themes” — never conflate them.**
+
+| Concern | Store | Purpose |
+| --- | --- | --- |
+| **App chrome** (dark / light) | Cookie `vdb-theme`, CSS variables in Next | Product UI only — see `10-theme-and-i18n.mdc` |
+| **Document brand** (`design_themes`) | PostgreSQL per Business | Colors / typography / font refs for **documents, templates, PDF** |
+
+Do not put document brand colors in the app chrome cookie. Do not use Mongo for theme tokens unless an ADR says otherwise.
+
+## Data model
+
+- Table `design_themes`: `business_id`, `name`, `is_default`, `tokens` (JSONB), timestamps, optional soft-delete.
+- Every Business gets **at least one default** theme (seed on Business create; `ensureDefault` if missing).
+- Tokens live in PostgreSQL JSONB — validated against shared-types shape.
+
+## Token contract (MVP)
+
+Stable keys in `packages/shared-types` (`DesignThemeTokens`):
+
+- `colors.primary` | `secondary` | `text` | `background` (hex `#RRGGBB` or `#RGB`)
+- `typography.headingFamily` | `bodyFamily` | weights | `baseSizePx`
+- `fonts.headingFontFaceId` | `bodyFontFaceId` — optional FKs to `font_faces.id` (same `businessId`); null = CSS family name only
+
+Unknown keys may be rejected or stripped on write — prefer strict validation.
+
+## API / gates
+
+- Routes under `/api/businesses/:businessId/themes`
+- List / get: membership
+- Create / patch / delete / set-default: `EntitlementGuard` + `@RequireWritable`
+- Resolve font face ids against `font_faces` filtered by `businessId` + `deletedAt IS NULL`
+
+## Consumers
+
+- Theme picker UI, Template/Document editor, PDF renderer resolve tokens → CSS / embed fonts.
+- Preview in settings is HTML/CSS only — not a PDF render.

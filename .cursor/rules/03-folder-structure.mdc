@@ -1,0 +1,99 @@
+---
+description: Mandatory folder and file naming for NestJS API and Next.js web
+alwaysApply: true
+---
+
+# Folder & Naming Structure (Permanent)
+
+## `apps/api` (NestJS)
+
+```text
+apps/api/
+  src/
+    main.ts
+    app.module.ts
+    common/                 # guards, filters, pipes, decorators, interceptors
+    config/                 # edition, db, redis, mongo config
+    modules/
+      identity/
+      tenancy/
+      billing/
+      content/
+      assets/
+      design/
+      documents/
+      export/
+      audit/
+      system/
+    prisma/                 # if Prisma — schema + migrations (or ../prisma)
+  test/
+```
+
+Inside each `modules/{context}/`:
+
+```text
+{context}.module.ts
+{context}.controller.ts     # thin
+{context}.service.ts
+dto/
+entities/ or repositories/
+guards/                     # only if module-specific
+```
+
+- Controllers stay thin: validate DTO → service → response.
+- Prefer use-case services over god services.
+- PostgreSQL migrations via Prisma Migrate (or TypeORM migrations) — always include `businessId` where tenant-owned.
+- Mongo schemas/collections live under `documents` (and related) modules.
+
+## `apps/web` (Next.js App Router)
+
+```text
+apps/web/
+  src/
+    app/                    # App Router: [locale]/ layouts, pages
+      [locale]/
+        (auth)/
+        (app)/              # authenticated shell
+    features/
+      auth/
+      businesses/
+      billing/
+      content/
+      editor/
+      media/
+      settings/
+    shared/
+      api/                  # fetch/client, React Query if used
+      ui/                   # design-system (theme tokens)
+      i18n/                 # next-intl messages fa/en
+      lib/
+      types/
+    styles/                 # global tokens light/dark
+```
+
+- Feature folders own UI + hooks for that feature.
+- No deep imports across features; share only via `shared/` or `packages/*`.
+- Editor under `features/editor/`.
+- Theme + i18n providers in root/`[locale]` layout — see `10-theme-and-i18n.mdc`.
+
+## Docs (repo root)
+
+```text
+docs/
+  api/                 # OpenAPI — MUST stay current
+  deploy/
+  adr/
+```
+
+## Naming
+
+- TS everywhere: `PascalCase` classes/components; `camelCase` methods/fields in code; DB columns `snake_case` in PostgreSQL via Prisma `@map` if needed; Mongo field `businessId` camelCase consistent in app layer.
+- `businessId` everywhere tenant-scoped (API + PG + Mongo).
+- Routes: `/api/...` Nest global prefix; business-scoped resources under `/businesses/:businessId/...`.
+- Entitlement codes: `module.map`, `module.org_chart`, `export.pdf`.
+
+## Forbidden layouts
+
+- Do not create a Vite-SPA parallel app as the primary web.
+- Do not put Nest domain logic inside Next Route Handlers except BFF-thin proxies if explicitly needed — default: browser → Nest API.
+- Do not dump all code in one `controllers/` flat folder without modules.

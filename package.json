@@ -1,0 +1,35 @@
+{
+  "name": "visual-document-builder",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Visual Document Builder — NestJS + Next.js monorepo (SELF_HOSTED | SAAS)",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c cyan,magenta \"npm run api:dev\" \"npm run web:dev\"",
+    "api:dev": "npm run start:dev -w @vdb/api",
+    "web:dev": "npm run dev -w @vdb/web",
+    "build": "npm run build -w @vdb/document-schema -w @vdb/shared-types && npm run build -w @vdb/api -w @vdb/web",
+    "build:packages": "npm run build -w @vdb/document-schema -w @vdb/shared-types",
+    "postinstall": "npm run build:packages",
+    "lint": "npm run lint -w @vdb/api -w @vdb/web -w @vdb/document-schema -w @vdb/shared-types",
+    "test": "npm run test -w @vdb/api",
+    "typecheck": "npm run typecheck -w @vdb/api -w @vdb/web -w @vdb/document-schema -w @vdb/shared-types",
+    "migrate": "npm run prisma:migrate -w @vdb/api",
+    "prisma:generate": "npm run prisma:generate -w @vdb/api",
+    "db:seed": "npm run prisma:seed -w @vdb/api",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "test:e2e:saas": "node scripts/e2e/saas-funnel.mjs",
+    "test:e2e:self-hosted": "node scripts/e2e/self-hosted-funnel.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "npm@10.9.2",
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
