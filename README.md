@@ -1,110 +1,91 @@
-# DocumentBuilder — Visual Document Builder (VDB)
+# Visual Document Builder (VDB)
 
-سازندهٔ **سند بصری چندمستأجری** برای کسب‌وکارها:
+پلتفرم ساخت **بروشور و سند بصری سازمانی** با موتور Document مبتنی بر JSON، ادیتور جریان‌محور، و خروجی PDF سروری.
 
-**داده کسب‌وکار → قالب (Template) → سند (Document) → خروجی PDF**
+**یک Core · دو Edition** (`SAAS` | `SELF_HOSTED`) · **NestJS + Next.js + PostgreSQL + Redis + MongoDB**
 
-یک **Core** مشترک، دو **Edition** فروش — بدون فورک محصول:
-
-| Edition | `APP_EDITION` | مدل تجاری |
-| --- | --- | --- |
-| SaaS | `SAAS` | میزبانی شما؛ اشتراک و ماژول روی پلتفرم |
-| Self-hosted / On-prem | `SELF_HOSTED` | نصب روی VPS خریدار + لایسنس نصب |
-
-> مخزن: [tiam-mhd/DocumentBuilder](https://github.com/tiam-mhd/DocumentBuilder)
-
----
-
-## فهرست مطالب
-
-1. [وضعیت فاز](#وضعیت-فاز)
-2. [خلاصه محصول](#خلاصه-محصول)
-3. [چه چیزی پیاده شده — فاز ۰۱ Core](#چه-چیزی-پیاده-شده--فاز-۰۱-core)
-4. [چه چیزی پیاده شده — فاز ۰۲ Corporate](#چه-چیزی-پیاده-شده--فاز-۰۲-corporate)
-5. [استک قفل‌شده](#استک-قفل‌شده)
-6. [معماری و داده](#معماری-و-داده)
-7. [ساختار مونوریپو](#ساختار-مونوریپو)
-8. [قوانین دامنه](#قوانین-دامنه)
-9. [دو Edition](#دو-edition)
-10. [شروع سریع توسعه](#شروع-سریع-توسعه)
-11. [متغیرهای محیطی](#متغیرهای-محیطی)
-12. [اسکریپت‌های npm](#اسکریپتهای-npm)
-13. [API و مستندات](#api-و-مستندات)
-14. [پذیرش و E2E](#پذیرش-و-e2e)
-15. [تست](#تست)
-16. [قوانین عامل / توسعه](#قوانین-عامل--توسعه)
-17. [نقشه راه](#نقشه-راه)
-
----
-
-## وضعیت فاز
-
-| فاز | هدف | وضعیت |
-| --- | --- | --- |
-| **۰۱ — Core** | OTP، tenancy، بیلینگ/لایسنس، ادیتور، PDF، تم/i18n | **تکمیل** (`01`–`19`) |
-| **۰۲ — Corporate** | داده شرکتی، ماژول‌ها، بلوک‌های map/org/timeline/…، E2E نمونه | **تکمیل** (`01`–`14`) |
-| ۰۳+ | Import، فرمول پیشرفته، … | خارج از scope فعلی |
-
-### معیار خروج (خلاصه)
-
-| معیار | وضعیت |
+| | |
 | --- | --- |
-| SAAS: OTP → Business+Trial → سند → پرداخت → PDF | پیاده + `test:e2e:saas` |
-| SELF_HOSTED: لایسنس → همان هسته سند/PDF | پیاده + `test:e2e:self-hosted` |
-| Corporate: داده + ماژول‌ها → سند نمونه → PDF؛ deny بدون `module.map` | پیاده + `test:e2e:corporate` |
-| `EntitlementGuard` سمت Nest؛ UI فقط آینه | پیاده |
-| PG + Redis + Mongo + Object storage | پیاده |
-| `docs/api` · تم تیره/روشن · i18n fa/en | پیاده |
-
-**آخرین اجرای محلی واحد:** ۳۲ سوئیت / ۱۱۴ تست پاس + `typecheck` سبز.
+| وضعیت | فاز ۰۱ Core، فاز ۰۲ Corporate، و **فاز ۰۳ Professional** پیاده‌سازی شده‌اند |
+| زبان UI | فارسی (`fa`، پیش‌فرض) و انگلیسی (`en`) — RTL / LTR |
+| تم اپ | تیره / روشن (`vdb-theme`) — جدا از تم برند سند |
+| ریپو | مونوریپو npm workspaces |
 
 ---
 
-## خلاصه محصول
+## فهرست
 
-- ورود فقط با **موبایل + OTP**
-- هر کاربر چند **Business**؛ مرز داده = `businessId`
-- اشتراک per-Business (Trial ۷روزه فقط روی Business اول) یا لایسنس نصب در SELF_HOSTED
-- قابلیت‌های فروش‌پذیر با کدهای پایدار `module.*` و `export.pdf`
-- موتور سند: جریان عمودی بلوک‌ها + Master header/footer + Export صف‌محور
-- وب: Next.js، locale پیش‌فرض **fa (RTL)** و **en (LTR)**، تم chrome تاریک/روشن
+1. [چیست؟](#چیست)
+2. [وضعیت پیاده‌سازی](#وضعیت-پیاده‌سازی)
+3. [فاز ۰۱ — Core](#فاز-۰۱--core)
+4. [فاز ۰۲ — Corporate](#فاز-۰۲--corporate)
+5. [فاز ۰۳ — Professional](#فاز-۰۳--professional)
+6. [استک و معماری](#استک-و-معماری)
+7. [ساختار ریپو](#ساختار-ریپو)
+8. [دو Edition](#دو-edition)
+9. [شروع سریع](#شروع-سریع)
+10. [اسکریپت‌ها و تست](#اسکریپتها-و-تست)
+11. [API و مستندات](#api-و-مستندات)
+12. [قوانین توسعه](#قوانین-توسعه)
 
 ---
 
-## چه چیزی پیاده شده — فاز ۰۱ Core
+## چیست؟
 
-### هویت و جلسه
+VDB به سازمان‌ها امکان می‌دهد:
 
-- OTP در Redis (TTL، cooldown، rate-limit، هش؛ کد خام لاگ نمی‌شود)
-- در `SMS_PROVIDER=fake` + `NODE_ENV=development` فیلد `devCode`
-- JWT دسترسی؛ logout با blacklist در Redis
+1. چند **Business** بسازند و داده سازمانی (پروژه، تیم، گالری، …) را مدیریت کنند  
+2. **قالب** و **سند** را با بلوک‌های جریان‌محور طراحی کنند  
+3. با **تم برند** و **فونت** اختصاصی پیش‌نمایش HTML بگیرند  
+4. **PDF نهایی** را از صف سرور (نه روی هر keystroke) بگیرند  
+5. در مسیر حرفه‌ای: **نسخه‌گذاری، تأیید، کامنت، حسابرسی، پشتیبان، import** داشته باشند  
 
-### چند Business و اشتراک
+جداسازی دامنهٔ قفل‌شده: **Data ≠ Template ≠ Document**.
 
-- وضعیت‌ها: `trial | active | grace | expired | pending_payment`
-- Business دوم+ تا پرداخت: `pending_payment` و mutate/export قفل
-- کاتالوگ: `plan.core` (+ ماژول‌ها در seed)
-- SAAS: checkout + `fake` / زرین‌پال؛ وب‌هوک idempotent
-- SELF_HOSTED: `installation_licenses` (کلید خام ذخیره نمی‌شود)
+---
 
-### گیت قابلیت
+## وضعیت پیاده‌سازی
 
-- `EntitlementGuard` + `@RequireWritable` / `@RequireEntitlement` / `@RequireModule`
-- UI از `/entitlements` می‌خواند؛ **اجرا فقط روی API معتبر است**
+| فاز | نام | وضعیت |
+| --- | --- | --- |
+| ۰۱ | Core Platform | ✅ کامل |
+| ۰۲ | Corporate Brochure Engine | ✅ کامل |
+| ۰۳ | Professional Features | ✅ کامل (DOCX/PPTX = Won't — ADR 025) |
 
-### دارایی و برند سند
+چک‌لیست پذیرش: [`docs/qa/`](docs/qa/) · اسکریپت‌ها: [`scripts/e2e/`](scripts/e2e/)
 
-- Media: JPEG/PNG/WebP/GIF (SVG ممنوع) + مشتقات
-- Font: `woff2` / `ttf` / `otf` — کلید `{businessId}/fonts/{fontId}/original.{ext}`
-- Design themes: توکن رنگ/تایپوگرافی در PostgreSQL JSONB (جدا از تم chrome اپ)
+---
 
-### قالب، سند، ادیتور، PDF
+## فاز ۰۱ — Core
 
-- قالب/سند: متادیتا PG + بدنه Mongo
-- ساخت سند از قالب = **snapshot** بلوک‌ها
+### هویت و چند Business
+
+- ورود فقط **موبایل + OTP** (بدون رمز در MVP)
+- OTP: TTL کوتاه، تک‌مصرف، هش‌شده، rate-limit؛ در `SMS_PROVIDER=fake` کد `devCode`
+- کاربر می‌تواند **نامحدود** Business بسازد؛ همهٔ داده با `businessId` ایزوله است
+
+### اشتراک و Trial
+
+- اشتراک **per-Business**: `trial` | `active` | `grace` | `expired` | `pending_payment`
+- Trial **۷ روز فقط روی Business اول** یک‌بار (`trialConsumed`)
+- Business دوم+ تا پرداخت `pending_payment`؛ Expire داده را پاک نمی‌کند
+
+### دو Edition
+
+| | `SAAS` | `SELF_HOSTED` |
+| --- | --- | --- |
+| ثبت‌نام عمومی | بله | معمولاً خیر |
+| Checkout پلتفرم | بله (`PAYMENT_PROVIDER`) | خیر → `BILLING_CHECKOUT_UNAVAILABLE` |
+| لایسنس نصب | — | لازم برای mutate / export |
+
+### دارایی، تم برند، قالب، سند، PDF
+
+- رسانه + مشتقات؛ فونت `.woff2` / `.ttf` / `.otf`
+- `design_themes` در PostgreSQL (جدا از تم chrome اپ)
+- قالب/سند: متادیتا PG + بدنه Mongo؛ ساخت از قالب = snapshot
 - Schema v3: `masters[]` + `pages[].masterId`
-- ادیتور: DnD عمودی، undo/redo، autosave ~۸۰۰ms، پیش‌نمایش HTML — **بدون PDF روی keystroke**
-- Export: `export_jobs` + BullMQ + HTML (RTL + embed فونت) → `PDF_RENDERER=fake|playwright`
+- ادیتور: DnD عمودی، undo/redo، autosave ~۸۰۰ms؛ **بدون PDF روی keystroke**
+- Export: BullMQ + HTML (RTL + embed فونت) → `PDF_RENDERER=fake|playwright`
 
 ### وب Core
 
@@ -112,112 +93,117 @@
 
 ---
 
-## چه چیزی پیاده شده — فاز ۰۲ Corporate
+## فاز ۰۲ — Corporate
 
-### داده کسب‌وکار (Content)
+### داده کسب‌وکار
 
-| موجودیت | گیت | مسیر UI تقریبی |
+| موجودیت | گیت | UI تقریبی |
 | --- | --- | --- |
 | Projects / categories | `module.projects` | `/app/projects` |
-| Team + Branches (+ `parentMemberId` برای درخت) | عضویت / writable | `/app/team` |
+| Team + Branches (+ درخت) | عضویت / writable | `/app/team` |
 | Services · Clients · Certificates | foundational | `/app/profile-content` |
-| Galleries + items | `module.gallery` | `/app/galleries` |
-| Locations (lat/lng) | foundational | `/app/locations` |
-| Timeline events | `module.timeline` | `/app/timeline` |
-| Map markers (از Locations و …) | `module.map` | `/app/map` |
-| Org chart tree | `module.org_chart` | `/app/org-chart` |
+| Galleries | `module.gallery` | `/app/galleries` |
+| Locations | foundational | `/app/locations` |
+| Timeline | `module.timeline` | `/app/timeline` |
+| Map markers | `module.map` | `/app/map` |
+| Org chart | `module.org_chart` | `/app/org-chart` |
 
-### بلوک‌های سند
+### بلوک‌ها
 
-**Core (بدون ماژول فروش):**  
-`text` · `image` · `section` · `divider` · `headerSlot` · `footerSlot` · **`qr`** · **`toc`** · **`repeater`**
+**Core:** `text` · `image` · `section` · `divider` · `headerSlot` · `footerSlot` · `qr` · `toc` · `repeater`  
 
-**Module-gated:**  
-`gallery` · `map` · `orgChart` · `timeline`
+**Module-gated:** `gallery` · `map` · `orgChart` · `timeline`
 
 | قابلیت | قرارداد |
 | --- | --- |
-| QR | encode سرور → PNG data URL؛ بدون short-link پویا (ADR 011) |
-| TOC | سرفصل‌های section/text؛ شماره صفحه = ایندکس منطقی `pages[]` (ADR 012) |
-| Repeater | `source` + کارت `children`؛ binding فقط `{{item.*}}` (ADR 013) |
-| Conditional `when` | `exists` \| `empty` \| `eq` روی `collection.<source>` (ADR 014) |
-| Map PDF | تصویر استاتیک از `MAP_STATIC_URL_TEMPLATE` یا placeholder (ADR 008) |
-| Org / Timeline PDF | همان HTML/CSS پیش‌نمایش (ADR 009 / 010) |
+| QR | encode سرور → PNG؛ بدون short-link (ADR 011) |
+| TOC | شماره صفحه = ایندکس منطقی `pages[]` (ADR 012) |
+| Repeater | `{{item.*}}` فقط (ADR 013) |
+| `when` | `exists` \| `empty` \| `eq` روی collection (ADR 014) |
+| فرمول ساده | `{{count(...)}}` whitelist — بدون `eval` (ADR 016) |
+| locale سند | `fa` \| `en` جدا از UI chrome (ADR 015) |
+| Smart breaks | `breakRules` + packer مشترک preview/PDF (ADR 017) |
+| لینک تعاملی PDF | `link` روی بلوک + outline (ADR 018) |
 
-### Collections API
+### Collections
 
-`GET /api/businesses/:businessId/collections/:source` — آیتم‌های تخت برای binding + فیلد `total`.
+`GET /api/businesses/:businessId/collections/:source`  
+منابع: `projects` · `teamMembers` · `branches` · `services` · `clients` · `certificates` · `timelineEvents`
 
-منابع: `projects` · `teamMembers` · `branches` · `services` · `clients` · `certificates` · `timelineEvents`.
-
-### Wire-up entitlement ↔ ادیتور
-
-- پالت فقط بلوک‌های مجاز؛ لیست قفل + CTA ارتقا به `/app/billing`
-- ذخیره سند/قالب و enqueue PDF با `documentCollectRequiredModuleCodes` → **۴۰۳** `ENTITLEMENT_MODULE_REQUIRED`
-- صفحات ماژول قفل‌شده + پنل entitlements با CTA یکسان
-
-### E2E Corporate
-
-اسکریپت `scripts/e2e/corporate-sample.mjs`: checkout ماژول‌ها → seed داده → سند نمونه → PDF موفق → deny بدون `module.map`.
+ذخیره سند/قالب و PDF با `documentCollectRequiredModuleCodes` → **۴۰۳** در صورت کمبود ماژول.
 
 ---
 
-## استک قفل‌شده
+## فاز ۰۳ — Professional
+
+| تسک | قابلیت | مسیر / قرارداد |
+| --- | --- | --- |
+| T05 | Import Excel/CSV پروژه‌ها | `POST .../import/jobs` · صف `import.content` · ADR 019 · UI در Projects |
+| T06 | نسخه‌گذاری سند | `document_versions` + Mongo snapshot · publish auto · restore/clone · قفل بدنه published · ADR 020 |
+| T07 | گردش تأیید | draft → review → approved → published · OWNER/ADMIN · PDF فقط approved/published · ADR 021 |
+| T08 | کامنت سند | `document_comments` · resolve · بدون mention · ADR 022 · پنل ادیتور |
+| T09 | Audit Log UI | `GET .../audit-events` OWNER/ADMIN · صفحه `/app/audit` · ADR 023 |
+| T10 | Backup / Restore | ZIP `vdb.business-backup` v1 · OWNER · `/app/backup` · ADR 024 · قانون `16-backup-restore` |
+| T11 | DOCX / PPTX | **Won't** — Spike → ADR 025 |
+| T12 | E2E پذیرش | `npm run test:e2e:professional` · [`docs/qa/phase-03-professional-acceptance.md`](docs/qa/phase-03-professional-acceptance.md) |
+
+### گردش سند (خلاصه)
+
+```text
+draft ──submit──▶ review ──approve──▶ approved ──publish──▶ published
+  ▲                 │ reject              │ unpublish
+  └─────────────────┴─────────────────────┘
+```
+
+- در `review` / `approved` / `published` بدنه با autosave عوض نمی‌شود (باید به draft برگردد).
+- نسخه روی **publish** خودکار ساخته می‌شود؛ دستی هم `POST .../versions`.
+
+---
+
+## استک و معماری
 
 | لایه | انتخاب |
 | --- | --- |
 | API | NestJS (Node.js LTS) |
-| Web | Next.js (App Router) + TypeScript |
-| DB اصلی | PostgreSQL + Prisma |
-| کش / صف | Redis + BullMQ |
+| Web | Next.js App Router + TypeScript |
+| DB | PostgreSQL + Prisma |
+| صف / کش | Redis + BullMQ |
 | بدنه سند | MongoDB (official driver) |
-| احراز هویت | Mobile OTP + JWT |
-| استوریج | local یا S3-compatible (MinIO) |
-| PDF | Playwright Chromium یا `fake` |
-| نقشه UI | Leaflet + OSM |
+| Auth | Mobile OTP + JWT |
+| Storage | local یا S3 / MinIO |
+| PDF | Playwright یا `fake` |
+| Map UI | Leaflet + OSM |
 | i18n | **next-intl فقط** |
-
-هدف استقرار: **Docker / VPS**. هاستینگ اشتراکی PHP/cPanel مسیر اصلی نیست.
-
----
-
-## معماری و داده
 
 ```text
 Browser (Next)
-    → Nest API (/api)
-         → AuthGuard (JWT)
-         → Business membership (path :businessId)
-         → EntitlementGuard (+ لایسنس در SELF_HOSTED)
-         → Domain services
-              → PostgreSQL (کاربر، Business، پول، محتوا، فونت، تم، متادیتا)
-              → Redis (OTP، صف PDF، قفل webhook)
-              → MongoDB (بدنه قالب/سند)
-              → Object Storage (رسانه، فونت، PDF)
+  → Nest /api
+       → JWT → membership (:businessId) → EntitlementGuard
+       → PostgreSQL | Redis | MongoDB | Object Storage
 ```
 
-**جداسازی اجباری:** Data ≠ Template ≠ Document.
+هدف استقرار: **Docker / VPS** ([`docs/deploy/`](docs/deploy/)).
 
 ---
 
-## ساختار مونوریپو
+## ساختار ریپو
 
 ```text
 /
-├── apps/
-│   ├── api/                 # NestJS
-│   └── web/                 # Next.js
+├── apps/api/                 # NestJS
+├── apps/web/                 # Next.js
 ├── packages/
-│   ├── document-schema/     # JSON سند/قالب، بلوک‌ها، when، repeater
-│   └── shared-types/        # entitlement، DTOهای عمومی
+│   ├── document-schema/      # JSON سند/قالب، بلوک‌ها، when، count، …
+│   └── shared-types/         # entitlement، audit actions، backup، …
 ├── docs/
-│   ├── api/                 # OpenAPI canonical + README
-│   ├── deploy/              # Docker/VPS و Editionها
-│   ├── adr/                 # تصمیم‌های معماری (۰۰۱–۰۱۴)
-│   └── qa/                  # پذیرش فاز ۰۱ و ۰۲
-├── scripts/e2e/             # SAAS · SELF_HOSTED · corporate
-├── implementation-prompts/  # پرامپت‌های فازبندی‌شده
-├── .cursor/rules/           # قوانین دائمی پروژه
+│   ├── api/                  # OpenAPI + README
+│   ├── deploy/
+│   ├── adr/                  # ۰۰۱–۰۲۵
+│   ├── qa/                   # پذیرش فاز ۰۱–۰۳
+│   └── spikes/               # مثلاً DOCX
+├── scripts/e2e/              # saas · self-hosted · corporate · professional
+├── implementation-prompts/
+├── .cursor/rules/            # قوانین دائمی (۰۰–۱۶)
 ├── AGENTS.md
 ├── docker-compose.yml
 └── README.md
@@ -225,57 +211,28 @@ Browser (Next)
 
 ---
 
-## قوانین دامنه
-
-- مرز مستأجر = **Business**
-- هر ردیف/داکیومنت tenant: `businessId` + ایندکس + فیلتر کوئری
-- Trial فقط یک‌بار روی Business اول
-- Expire داده را پاک نمی‌کند؛ فقط قفل کار
-- UI ممکن است ماژول را مخفی کند؛ API باید رد کند
-- PDF زنده در مسیر ادیتور ممنوع است
-- یک Core / دو Edition — بدون فورک ریپو
-
-جزئیات: [`.cursor/rules/`](.cursor/rules/) و [`AGENTS.md`](AGENTS.md).
-
----
-
 ## دو Edition
 
-| نگرانی | `SAAS` | `SELF_HOSTED` |
-| --- | --- | --- |
-| `publicSignup` | true | false |
-| Checkout پلتفرم | فعال (`PAYMENT_PROVIDER`) | `BILLING_CHECKOUT_UNAVAILABLE` |
-| لایسنس نصب | لازم نیست | لازم برای mutate/export |
-| موتور سند/PDF / ماژول‌ها | یکسان | یکسان (اتصال ماژول در دموی SAAS با checkout) |
+پیکربندی: `APP_EDITION=SAAS|SELF_HOSTED` · `GET /api/system/config`
 
-پیکربندی عمومی: `GET /api/system/config`.
+همان موتور سند و entitlement؛ تفاوت در signup، checkout پلتفرم، و لایسنس نصب.
 
 ---
 
-## شروع سریع توسعه
+## شروع سریع
 
-پیش‌نیاز: Node.js ≥ ۲۰، Docker Desktop.
+پیش‌نیاز: **Node.js ≥ ۲۰**، **Docker Desktop**.
 
 ```bash
-# 1) استورها
 npm run docker:up
-
-# 2) وابستگی‌ها (+ build پکیج‌های shared)
 npm install
-
-# 3) env
 cp .env.example .env
 cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env.local
-
-# 4) Prisma
 npm run prisma:generate
 npm run migrate
 npm run db:seed
-
-# 5) اجرا
 npm run dev
-# یا: npm run api:dev  و  npm run web:dev
 ```
 
 | سرویس | آدرس |
@@ -287,95 +244,81 @@ npm run dev
 | MongoDB | `localhost:27017` |
 
 - **SAAS:** `APP_EDITION=SAAS`، `SMS_PROVIDER=fake`، `PAYMENT_PROVIDER=fake`، `PDF_RENDERER=fake`
-- **SELF_HOSTED:** `APP_EDITION=SELF_HOSTED`، لایسنس opaque مثل `VDB-DEV-LICENSE-KEY-0001`، سپس ریستارت API
+- **SELF_HOSTED:** `APP_EDITION=SELF_HOSTED` + لایسنس مثل `VDB-DEV-LICENSE-KEY-0001`
 
-راهنما: [docs/deploy/README.md](docs/deploy/README.md).
-
----
-
-## متغیرهای محیطی
-
-| فایل نمونه | نقش |
-| --- | --- |
-| `.env.example` | ریشه |
-| `apps/api/.env.example` | Nest |
-| `apps/web/.env.example` | Next |
-
-کلیدهای مهم API: `APP_EDITION` · `DATABASE_URL` · `REDIS_URL` · `MONGODB_URI` · `OTP_PEPPER` · `JWT_SECRET` · `PAYMENT_PROVIDER` · `LICENSE_*` · `STORAGE_DRIVER` · `PDF_RENDERER` · `MAP_STATIC_URL_TEMPLATE`
-
-**هرگز** فایل `.env` واقعی را commit نکنید.
+جزئیات env: [`.env.example`](.env.example) · [`docs/deploy/README.md`](docs/deploy/README.md)  
+**هرگز** `.env` واقعی را commit نکنید.
 
 ---
 
-## اسکریپت‌های npm
+## اسکریپت‌ها و تست
 
 | اسکریپت | کار |
 | --- | --- |
-| `npm install` | workspaces + build پکیج‌ها |
 | `npm run docker:up` / `docker:down` | استورهای محلی |
 | `npm run api:dev` / `web:dev` / `dev` | توسعه |
 | `npm run build` | پکیج‌ها + api + web |
 | `npm run lint` / `typecheck` | TypeScript |
-| `npm run test` | Jest API |
+| `npm run test` | Jest (`apps/api`) |
 | `npm run migrate` / `db:seed` | Prisma |
 | `npm run test:e2e:saas` | پذیرش Core SAAS |
 | `npm run test:e2e:self-hosted` | پذیرش SELF_HOSTED |
-| `npm run test:e2e:corporate` | پذیرش فاز ۰۲ Corporate |
+| `npm run test:e2e:corporate` | پذیرش فاز ۰۲ |
+| `npm run test:e2e:professional` | پذیرش فاز ۰۳ |
+
+### پذیرش
+
+| مسیر | چک‌لیست |
+| --- | --- |
+| SAAS | [phase-01-saas-acceptance.md](docs/qa/phase-01-saas-acceptance.md) |
+| SELF_HOSTED | [phase-01-self-hosted-acceptance.md](docs/qa/phase-01-self-hosted-acceptance.md) |
+| Corporate | [phase-02-corporate-acceptance.md](docs/qa/phase-02-corporate-acceptance.md) |
+| Professional | [phase-03-professional-acceptance.md](docs/qa/phase-03-professional-acceptance.md) |
+
+E2Eها API-first هستند (`devCode`، `PDF_RENDERER=fake`). برای UI: locale `fa` + هر دو تم chrome.
+
+```bash
+npm run test
+npm run typecheck
+```
 
 ---
 
 ## API و مستندات
 
-- **OpenAPI canonical:** [`docs/api/openapi.yaml`](docs/api/openapi.yaml)
-- خلاصه مسیرها: [`docs/api/README.md`](docs/api/README.md)
-- پیشوند: `/api` — منابع Business معمولاً زیر `/api/businesses/:businessId/...`
-- خطاها: `{ errors: [{ code, message }] }`
-- ADRها: [`docs/adr/`](docs/adr/) (فونت، تم، قالب، PDF، map، org، timeline، QR، TOC، repeater، visibility)
+- **OpenAPI:** [`docs/api/openapi.yaml`](docs/api/openapi.yaml) (منبع حقیقت)
+- خلاصه: [`docs/api/README.md`](docs/api/README.md)
+- پیشوند `/api` · Business زیر `/api/businesses/:businessId/...`
+- خطا: `{ errors: [{ code, message }] }`
+- ADRها: [`docs/adr/`](docs/adr/) (۰۰۱–۰۲۵)
 
-### نمونه‌های مهم
+### گروه‌های مسیر (نمونه)
 
 **Core:** OTP · businesses · subscription · entitlements · checkout/license · media · fonts · themes · templates · documents · export/pdf  
 
-**Corporate:** projects · team-members · branches · services/clients/certificates · galleries · locations · map/markers · org-chart/tree · timeline-events · qr/encode · collections/:source · gates/module-*
+**Corporate:** projects · team · galleries · locations · map · org-chart · timeline · qr/encode · collections · gates  
+
+**Professional:** import/jobs · documents/…/versions · submit-review · approve · reject · unpublish · comments · audit-events · backup/jobs · restore/jobs  
+
+هر تغییر route → هم‌زمان به‌روز کردن `docs/api`.
 
 ---
 
-## پذیرش و E2E
-
-| مسیر | اسکریپت | چک‌لیست |
-| --- | --- | --- |
-| SAAS Core | `npm run test:e2e:saas` | [phase-01-saas-acceptance.md](docs/qa/phase-01-saas-acceptance.md) |
-| SELF_HOSTED | `npm run test:e2e:self-hosted` | [phase-01-self-hosted-acceptance.md](docs/qa/phase-01-self-hosted-acceptance.md) |
-| Corporate | `npm run test:e2e:corporate` | [phase-02-corporate-acceptance.md](docs/qa/phase-02-corporate-acceptance.md) |
-
-اسکریپت‌ها API-first هستند (`devCode`، `PDF_RENDERER=fake`). UI دستی: locale `fa` + هر دو تم chrome.
-
----
-
-## تست
-
-```bash
-npm run test          # Jest در apps/api
-npm run typecheck     # api + web + packages
-```
-
-پوشش واحد شامل identity، trial، subscription، checkout، license، entitlement، media، font، theme، template، documents، export، projects، team، gallery، location، map، org-chart، timeline، QR، collections، repeater binding، visibility، module-code collect.
-
----
-
-## قوانین عامل / توسعه
+## قوانین توسعه
 
 - [`AGENTS.md`](AGENTS.md)
-- [`.cursor/rules/`](.cursor/rules/) — دامنه، معماری، امنیت، تم/i18n، فونت، قالب، محتوا، پروتکل پیاده‌سازی
+- [`.cursor/rules/`](.cursor/rules/) — دامنه، معماری، امنیت، تم/i18n، فونت، قالب، محتوا، audit، backup، پروتکل پیاده‌سازی
 
-هر تغییر API → هم‌زمان `docs/api`. فیچر کاربرمحور → برش **DB + Nest + Next** مگر خلافش صریح گفته شود.
+فیچر کاربرمحور = برش **DB + Nest + Next** مگر خلافش صریح گفته شود.  
+مرز مستأجر = **Business**. UI ممکن است قفل کند؛ **API باید رد کند**.
 
 ---
 
 ## نقشه راه
 
-- فاز ۰۱ و ۰۲ در `implementation-prompts/` تکمیل شده‌اند.
-- فازهای بعدی (Import، فرمول، …) نباید tenancy، entitlement، یا دو Edition را بشکنند.
+فازهای ۰۱–۰۳ در `implementation-prompts/` تکمیل شده‌اند.  
+فازهای بعدی نباید tenancy، entitlement، یا دو Edition را بشکنند.  
+خروجی Office (DOCX/PPTX) عمداً خارج از scope است (ADR 025).
 
 ---
 
