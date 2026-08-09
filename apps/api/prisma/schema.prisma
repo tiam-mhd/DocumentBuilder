@@ -66,6 +66,17 @@ model Business {
   templates    DocumentTemplate[]
   documents    Document[]
   exportJobs   ExportJob[]
+  projectCategories ProjectCategory[]
+  projects     Project[]
+  teamMembers  TeamMember[]
+  branches     Branch[]
+  services     BusinessService[]
+  clients      Client[]
+  certificates Certificate[]
+  galleries    Gallery[]
+  galleryItems GalleryItem[]
+  locations    Location[]
+  timelineEvents TimelineEvent[]
 
   @@map("businesses")
 }
@@ -373,4 +384,265 @@ model ExportJob {
   @@index([businessId, documentId, createdAt])
   @@index([businessId, status, createdAt])
   @@map("export_jobs")
+}
+
+/**
+ * Portfolio categories (ContentModule). Gated by module.projects —
+ * see `.cursor/rules/14-content-entities.mdc`.
+ */
+model ProjectCategory {
+  id         String    @id @default(cuid())
+  businessId String    @map("business_id")
+  name       String
+  sortOrder  Int       @default(0) @map("sort_order")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
+  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  projects   Project[]
+
+  @@index([businessId, deletedAt, sortOrder])
+  @@map("project_categories")
+}
+
+enum ProjectStatus {
+  draft
+  published
+  archived
+}
+
+/**
+ * Business portfolio / project rows. Flexible `fields` JSONB; optional
+ * FK to shared `locations` (P02-T05).
+ */
+model Project {
+  id           String           @id @default(cuid())
+  businessId   String           @map("business_id")
+  categoryId   String?          @map("category_id")
+  title        String
+  description  String           @default("")
+  status       ProjectStatus    @default(draft)
+  coverMediaId String?          @map("cover_media_id")
+  mediaIds     Json             @default("[]") @map("media_ids")
+  locationId   String?          @map("location_id")
+  fields       Json             @default("{}")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+  deletedAt    DateTime?        @map("deleted_at")
+  business     Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  category     ProjectCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  location     Location?        @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, deletedAt, createdAt])
+  @@index([businessId, status, deletedAt])
+  @@index([businessId, categoryId, deletedAt])
+  @@index([businessId, locationId])
+  @@map("projects")
+}
+
+/**
+ * Team roster (ContentModule). Foundational Business Data for Org Chart —
+ * see `.cursor/rules/14-content-entities.mdc`.
+ */
+model TeamMember {
+  id             String      @id @default(cuid())
+  businessId     String      @map("business_id")
+  branchId       String?     @map("branch_id")
+  parentMemberId String?     @map("parent_member_id")
+  name           String
+  roleTitle      String      @default("") @map("role_title")
+  department     String      @default("")
+  photoMediaId   String?     @map("photo_media_id")
+  sortOrder      Int         @default(0) @map("sort_order")
+  fields         Json        @default("{}")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+  deletedAt      DateTime?   @map("deleted_at")
+  business       Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  branch         Branch?     @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  parent         TeamMember? @relation("TeamReporting", fields: [parentMemberId], references: [id], onDelete: SetNull)
+  reports        TeamMember[] @relation("TeamReporting")
+
+  @@index([businessId, deletedAt, sortOrder])
+  @@index([businessId, branchId, deletedAt])
+  @@index([businessId, parentMemberId, deletedAt])
+  @@map("team_members")
+}
+
+/**
+ * Company branches / offices. Optional FK to shared `locations`.
+ */
+model Branch {
+  id          String       @id @default(cuid())
+  businessId  String       @map("business_id")
+  name        String
+  addressLine1 String      @default("") @map("address_line1")
+  addressLine2 String      @default("") @map("address_line2")
+  city        String       @default("")
+  province    String       @default("")
+  postalCode  String       @default("") @map("postal_code")
+  country     String       @default("")
+  phone       String       @default("")
+  locationId  String?      @map("location_id")
+  sortOrder   Int          @default(0) @map("sort_order")
+  fields      Json         @default("{}")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  deletedAt   DateTime?    @map("deleted_at")
+  business    Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  location    Location?    @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  teamMembers TeamMember[]
+
+  @@index([businessId, deletedAt, sortOrder])
+  @@index([businessId, locationId])
+  @@map("branches")
+}
+
+/**
+ * Company services / offerings (foundational Content — no sellable module).
+ */
+model BusinessService {
+  id          String    @id @default(cuid())
+  businessId  String    @map("business_id")
+  name        String
+  description String    @default("")
+  iconMediaId String?   @map("icon_media_id")
+  sortOrder   Int       @default(0) @map("sort_order")
+  fields      Json      @default("{}")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, deletedAt, sortOrder])
+  @@map("business_services")
+}
+
+/**
+ * Clients / partners (logo wall). Foundational Content.
+ */
+model Client {
+  id          String    @id @default(cuid())
+  businessId  String    @map("business_id")
+  name        String
+  website     String    @default("")
+  logoMediaId String?   @map("logo_media_id")
+  sortOrder   Int       @default(0) @map("sort_order")
+  fields      Json      @default("{}")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, deletedAt, sortOrder])
+  @@map("clients")
+}
+
+/**
+ * Certificates / accreditations. Optional media = scan or PDF asset.
+ */
+model Certificate {
+  id              String    @id @default(cuid())
+  businessId      String    @map("business_id")
+  name            String
+  issuer          String    @default("")
+  issuedAt        DateTime? @map("issued_at")
+  expiresAt       DateTime? @map("expires_at")
+  documentMediaId String?   @map("document_media_id")
+  sortOrder       Int       @default(0) @map("sort_order")
+  fields          Json      @default("{}")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+  business        Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, deletedAt, sortOrder])
+  @@map("certificates")
+}
+
+/**
+ * Media albums (ContentModule). Gated by module.gallery —
+ * see `.cursor/rules/14-content-entities.mdc`.
+ */
+model Gallery {
+  id          String        @id @default(cuid())
+  businessId  String        @map("business_id")
+  name        String
+  description String        @default("")
+  sortOrder   Int           @default(0) @map("sort_order")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  deletedAt   DateTime?     @map("deleted_at")
+  business    Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  items       GalleryItem[]
+
+  @@index([businessId, deletedAt, sortOrder])
+  @@map("galleries")
+}
+
+model GalleryItem {
+  id         String    @id @default(cuid())
+  businessId String    @map("business_id")
+  galleryId  String    @map("gallery_id")
+  mediaId    String    @map("media_id")
+  caption    String    @default("")
+  sortOrder  Int       @default(0) @map("sort_order")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
+  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  gallery    Gallery   @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, galleryId, deletedAt, sortOrder])
+  @@index([businessId, mediaId])
+  @@map("gallery_items")
+}
+
+/**
+ * Shared geography for Projects, Branches, and Map (P02-T06).
+ * Foundational Content — see `.cursor/rules/14-content-entities.mdc`.
+ */
+model Location {
+  id          String    @id @default(cuid())
+  businessId  String    @map("business_id")
+  name        String
+  country     String    @default("")
+  province    String    @default("")
+  city        String    @default("")
+  address     String    @default("")
+  lat         Float
+  lng         Float
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  projects    Project[]
+  branches    Branch[]
+
+  @@index([businessId, deletedAt, name])
+  @@index([businessId, lat, lng])
+  @@map("locations")
+}
+
+/**
+ * Company timeline events (ContentModule). Gated by module.timeline —
+ * see `.cursor/rules/14-content-entities.mdc`.
+ */
+model TimelineEvent {
+  id         String    @id @default(cuid())
+  businessId String    @map("business_id")
+  occurredAt DateTime  @map("occurred_at")
+  title      String
+  body       String    @default("")
+  mediaId    String?   @map("media_id")
+  sortOrder  Int       @default(0) @map("sort_order")
+  fields     Json      @default("{}")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
+  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, deletedAt, occurredAt])
+  @@index([businessId, deletedAt, sortOrder])
+  @@map("timeline_events")
 }

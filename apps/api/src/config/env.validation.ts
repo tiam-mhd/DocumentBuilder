@@ -31,6 +31,8 @@ export type AppEnv = {
   MEDIA_MAX_BYTES: number;
   FONT_MAX_BYTES: number;
   PDF_RENDERER: 'fake' | 'playwright';
+  /** Empty or `none` = placeholder box in PDF; otherwise URL template with {lat},{lng},{zoom},{w},{h},{markers}. */
+  MAP_STATIC_URL_TEMPLATE: string;
   S3_ENDPOINT: string;
   S3_REGION: string;
   S3_BUCKET: string;
@@ -165,6 +167,7 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
       String(config.PDF_RENDERER ?? 'fake') === 'playwright'
         ? 'playwright'
         : 'fake',
+    MAP_STATIC_URL_TEMPLATE: String(config.MAP_STATIC_URL_TEMPLATE ?? 'none'),
     S3_ENDPOINT: String(config.S3_ENDPOINT ?? ''),
     S3_REGION: String(config.S3_REGION ?? 'us-east-1'),
     S3_BUCKET: String(config.S3_BUCKET ?? ''),

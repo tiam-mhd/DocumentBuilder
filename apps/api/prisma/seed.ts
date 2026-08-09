@@ -54,6 +54,12 @@ async function main() {
       descriptionKey: 'modules.projects.description',
       priceMonthly: 190_000,
     },
+    {
+      code: EntitlementCodes.ModuleGallery,
+      nameKey: 'modules.gallery.name',
+      descriptionKey: 'modules.gallery.description',
+      priceMonthly: 150_000,
+    },
   ] as const;
 
   for (const def of moduleDefs) {
