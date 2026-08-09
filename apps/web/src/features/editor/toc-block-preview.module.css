@@ -39,6 +39,13 @@
 
 .label {
   flex: 0 1 auto;
+  color: inherit;
+  text-decoration: none;
+}
+
+.label:hover {
+  text-decoration: underline;
+  color: var(--doc-primary, var(--fg));
 }
 
 .dots {

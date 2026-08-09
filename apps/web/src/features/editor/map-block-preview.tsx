@@ -5,11 +5,15 @@ import { parseMapBlockProps, type BlockNode } from '@vdb/document-schema';
 import { listMapMarkers } from '@/shared/api/map';
 import { useBusinesses } from '@/shared/lib/business-context';
 import { MapLeafletPreview } from '@/features/content/map-leaflet';
+import { useEditorStore } from './store/editor-store';
 
 type Props = { block: BlockNode };
 
 export function MapBlockPreview({ block }: Props) {
   const { activeBusiness } = useBusinesses();
+  const docLocale = useEditorStore((s) =>
+    s.body?.locale === 'en' ? 'en' : 'fa',
+  );
   const props = parseMapBlockProps(block.props);
   const [markers, setMarkers] = useState<
     { id: string; name: string; lat: number; lng: number }[]
@@ -24,6 +28,7 @@ export function MapBlockPreview({ block }: Props) {
     void listMapMarkers(activeBusiness.id, {
       source: props.markersSource,
       country: props.countryRestriction ?? undefined,
+      locale: docLocale,
     })
       .then((list) => {
         if (!cancelled) {
@@ -48,6 +53,7 @@ export function MapBlockPreview({ block }: Props) {
     props.markersSource,
     props.countryRestriction,
     props.showMarkers,
+    docLocale,
   ]);
 
   return (

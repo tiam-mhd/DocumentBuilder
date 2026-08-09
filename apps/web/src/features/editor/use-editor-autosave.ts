@@ -41,6 +41,7 @@ export function useEditorAutosave(writable: boolean) {
         try {
           await updateDocument(businessId, documentId, {
             title: snapshot.title,
+            locale: snapshot.locale,
             body: snapshot,
           });
           const stillSame = JSON.stringify(bodyRef.current) === fingerprint;

@@ -3,6 +3,10 @@ import type {
   PublicDocument,
   PublicDocumentDetail,
   PublicDocumentList,
+  PublicDocumentVersion,
+  PublicDocumentVersionCompare,
+  PublicDocumentVersionDetail,
+  PublicDocumentVersionList,
 } from '@vdb/shared-types';
 
 export function listDocuments(
@@ -28,7 +32,7 @@ export function getDocument(businessId: string, documentId: string) {
 
 export function createDocument(
   businessId: string,
-  body: { title: string; templateId: string },
+  body: { title: string; templateId: string; locale?: 'fa' | 'en' },
 ) {
   return apiFetch<PublicDocumentDetail>(
     `/businesses/${businessId}/documents`,
@@ -45,7 +49,7 @@ export function updateDocument(
   documentId: string,
   body: {
     title?: string;
-    status?: 'draft' | 'published';
+    locale?: 'fa' | 'en';
     body?: unknown;
   },
 ) {
@@ -59,6 +63,56 @@ export function updateDocument(
   );
 }
 
+export function submitDocumentReview(businessId: string, documentId: string) {
+  return apiFetch<PublicDocumentDetail>(
+    `/businesses/${businessId}/documents/${documentId}/workflow/submit`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+  );
+}
+
+export function approveDocument(businessId: string, documentId: string) {
+  return apiFetch<PublicDocumentDetail>(
+    `/businesses/${businessId}/documents/${documentId}/workflow/approve`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+  );
+}
+
+export function rejectDocument(
+  businessId: string,
+  documentId: string,
+  note?: string,
+) {
+  return apiFetch<PublicDocumentDetail>(
+    `/businesses/${businessId}/documents/${documentId}/workflow/reject`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ note }),
+    },
+  );
+}
+
+export function publishDocument(businessId: string, documentId: string) {
+  return apiFetch<PublicDocumentDetail>(
+    `/businesses/${businessId}/documents/${documentId}/workflow/publish`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+  );
+}
+
+export function unpublishDocument(businessId: string, documentId: string) {
+  return apiFetch<PublicDocumentDetail>(
+    `/businesses/${businessId}/documents/${documentId}/workflow/unpublish`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+  );
+}
+
+export function reopenDocument(businessId: string, documentId: string) {
+  return apiFetch<PublicDocumentDetail>(
+    `/businesses/${businessId}/documents/${documentId}/workflow/reopen`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+  );
+}
+
 export function deleteDocument(businessId: string, documentId: string) {
   return apiFetch<{ ok: true }>(
     `/businesses/${businessId}/documents/${documentId}`,
@@ -66,4 +120,151 @@ export function deleteDocument(businessId: string, documentId: string) {
   );
 }
 
-export type { PublicDocument };
+export function listDocumentVersions(businessId: string, documentId: string) {
+  return apiFetch<PublicDocumentVersionList>(
+    `/businesses/${businessId}/documents/${documentId}/versions`,
+  );
+}
+
+export function createDocumentVersion(
+  businessId: string,
+  documentId: string,
+  body?: { note?: string },
+) {
+  return apiFetch<PublicDocumentVersionDetail>(
+    `/businesses/${businessId}/documents/${documentId}/versions`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body ?? {}),
+    },
+  );
+}
+
+export function getDocumentVersion(
+  businessId: string,
+  documentId: string,
+  versionId: string,
+) {
+  return apiFetch<PublicDocumentVersionDetail>(
+    `/businesses/${businessId}/documents/${documentId}/versions/${versionId}`,
+  );
+}
+
+export function compareDocumentVersions(
+  businessId: string,
+  documentId: string,
+  left: string,
+  right: string,
+) {
+  const q = new URLSearchParams({ left, right });
+  return apiFetch<PublicDocumentVersionCompare>(
+    `/businesses/${businessId}/documents/${documentId}/versions/compare?${q}`,
+  );
+}
+
+export function restoreDocumentVersion(
+  businessId: string,
+  documentId: string,
+  versionId: string,
+) {
+  return apiFetch<{ documentId: string }>(
+    `/businesses/${businessId}/documents/${documentId}/versions/${versionId}/restore`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+  );
+}
+
+export function cloneDocumentVersion(
+  businessId: string,
+  documentId: string,
+  versionId: string,
+  body?: { title?: string },
+) {
+  return apiFetch<{ documentId: string }>(
+    `/businesses/${businessId}/documents/${documentId}/versions/${versionId}/clone`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body ?? {}),
+    },
+  );
+}
+
+export type {
+  PublicDocument,
+  PublicDocumentVersion,
+  PublicDocumentVersionCompare,
+};
+
+export function listDocumentComments(
+  businessId: string,
+  documentId: string,
+  opts?: { resolved?: 'all' | 'open' | 'resolved' },
+) {
+  const q = new URLSearchParams();
+  if (opts?.resolved && opts.resolved !== 'all') {
+    q.set('resolved', opts.resolved);
+  }
+  const qs = q.toString();
+  return apiFetch<
+    import('@vdb/shared-types').PublicDocumentCommentList
+  >(
+    `/businesses/${businessId}/documents/${documentId}/comments${qs ? `?${qs}` : ''}`,
+  );
+}
+
+export function createDocumentComment(
+  businessId: string,
+  documentId: string,
+  body: { body: string; pageId?: string | null; blockId?: string | null },
+) {
+  return apiFetch<import('@vdb/shared-types').PublicDocumentComment>(
+    `/businesses/${businessId}/documents/${documentId}/comments`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  );
+}
+
+export function resolveDocumentComment(
+  businessId: string,
+  documentId: string,
+  commentId: string,
+) {
+  return apiFetch<import('@vdb/shared-types').PublicDocumentComment>(
+    `/businesses/${businessId}/documents/${documentId}/comments/${commentId}/resolve`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    },
+  );
+}
+
+export function unresolveDocumentComment(
+  businessId: string,
+  documentId: string,
+  commentId: string,
+) {
+  return apiFetch<import('@vdb/shared-types').PublicDocumentComment>(
+    `/businesses/${businessId}/documents/${documentId}/comments/${commentId}/unresolve`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    },
+  );
+}
+
+export function deleteDocumentComment(
+  businessId: string,
+  documentId: string,
+  commentId: string,
+) {
+  return apiFetch<{ ok: true }>(
+    `/businesses/${businessId}/documents/${documentId}/comments/${commentId}`,
+    { method: 'DELETE' },
+  );
+}

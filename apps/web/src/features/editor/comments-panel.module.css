@@ -1,0 +1,133 @@
+.panel {
+  display: grid;
+  gap: var(--space-2);
+  padding-block: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+.title {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.hint,
+.meta {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 0.8rem;
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.filterBtn {
+  appearance: none;
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg);
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.filterBtn[data-active='1'] {
+  color: var(--fg);
+  background: var(--bg-elevated);
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.textarea {
+  font: inherit;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg);
+  color: var(--fg);
+  resize: vertical;
+}
+
+.check {
+  display: flex;
+  gap: 0.4rem;
+  align-items: flex-start;
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+}
+
+.btn {
+  appearance: none;
+  font: inherit;
+  padding: 0.4rem 0.65rem;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.btn:disabled,
+.linkBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+  max-height: 16rem;
+  overflow: auto;
+}
+
+.item {
+  display: grid;
+  gap: 0.25rem;
+  padding-block: 0.35rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.item[data-resolved='1'] .body {
+  opacity: 0.7;
+  text-decoration: line-through;
+}
+
+.body {
+  margin: 0;
+  font-size: 0.88rem;
+  white-space: pre-wrap;
+}
+
+.rowActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.linkBtn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--fg-muted);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0;
+}

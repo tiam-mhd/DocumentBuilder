@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  blockAnchorId,
   buildTableOfContents,
   parseTocBlockProps,
   type BlockNode,
@@ -33,7 +34,9 @@ export function TocBlockPreview({ block, body, visibility }: Props) {
               key={e.id}
               className={`${styles.item} ${styles[`l${e.level}`]}`}
             >
-              <span className={styles.label}>{e.title}</span>
+              <a className={styles.label} href={`#${blockAnchorId(e.id)}`}>
+                {e.title}
+              </a>
               {props.showPageNumbers ? (
                 <>
                   <span className={styles.dots} aria-hidden />

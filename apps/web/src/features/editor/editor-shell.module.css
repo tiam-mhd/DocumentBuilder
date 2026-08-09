@@ -43,6 +43,32 @@
   min-width: 12rem;
 }
 
+.localeField {
+  display: grid;
+  gap: 0.15rem;
+  font-size: 0.75rem;
+  color: var(--fg-muted);
+}
+
+.localeLabel {
+  line-height: 1.2;
+}
+
+.localeSelect {
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 6px);
+  background: var(--bg);
+  color: var(--fg);
+  padding: 0.4rem 0.55rem;
+  font-size: 0.85rem;
+  min-width: 8rem;
+}
+
+.localeSelect:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .toolBtn {
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) - 6px);

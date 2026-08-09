@@ -1,0 +1,125 @@
+.wrap {
+  margin-block: var(--space-3);
+}
+
+.openBtn,
+.primary,
+.secondary {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--fg);
+  padding: 0.55rem 1rem;
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  font: inherit;
+}
+
+.primary {
+  background: var(--accent, var(--fg));
+  color: var(--accent-fg, var(--bg));
+  border-color: transparent;
+}
+
+.openBtn:disabled,
+.primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.panel {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg-subtle, var(--bg-elevated));
+}
+
+.panelHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: 1.15rem;
+  font-family: var(--font-display);
+}
+
+.hint,
+.meta {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 0.92rem;
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+}
+
+.ok {
+  margin: 0;
+  color: var(--fg);
+}
+
+.field {
+  display: grid;
+  gap: var(--space-2);
+  font-size: 0.9rem;
+}
+
+.select {
+  font: inherit;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.mapGrid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+}
+
+.mapGrid > .meta,
+.mapGrid > .actions {
+  grid-column: 1 / -1;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.linkBtn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--fg-muted);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+}
+
+.previewBlock {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.errorList {
+  margin: 0;
+  padding-inline-start: 1.2rem;
+  color: var(--danger);
+  font-size: 0.88rem;
+  max-height: 10rem;
+  overflow: auto;
+}

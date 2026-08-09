@@ -15,6 +15,29 @@
   color: var(--doc-secondary, var(--fg-muted));
 }
 
+.approx {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+}
+
+.pageFrame {
+  border: 1px dashed color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+  background: color-mix(in srgb, var(--bg) 92%, var(--doc-background, transparent));
+}
+
+.pageFrameLabel {
+  margin: 0;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+}
+
 .docTitle {
   margin: 0;
   font-family: var(--doc-heading-family, var(--font-display));
@@ -22,6 +45,11 @@
   color: var(--doc-primary, var(--fg));
   font-size: 1.6em;
   line-height: 1.25;
+}
+
+.docLink {
+  color: var(--doc-primary, var(--fg));
+  text-decoration: underline;
 }
 
 .flow {

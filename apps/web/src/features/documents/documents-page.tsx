@@ -9,11 +9,17 @@ import type {
   PublicDocumentDetail,
   PublicDocumentTemplate,
 } from '@vdb/shared-types';
+import { MembershipRole } from '@vdb/shared-types';
 import {
+  approveDocument,
   createDocument,
   deleteDocument,
   listDocuments,
-  updateDocument,
+  publishDocument,
+  rejectDocument,
+  reopenDocument,
+  submitDocumentReview,
+  unpublishDocument,
 } from '@/shared/api/documents';
 import { listTemplates } from '@/shared/api/templates';
 import { ApiClientError, mapApiErrorCode } from '@/shared/api/client';
@@ -36,6 +42,10 @@ export function DocumentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+
+  const isApprover =
+    activeBusiness?.role === MembershipRole.Owner ||
+    activeBusiness?.role === MembershipRole.Admin;
 
   async function refresh() {
     if (!activeBusiness) {
@@ -100,14 +110,35 @@ export function DocumentsPage() {
     }
   }
 
-  async function onPublishToggle(doc: PublicDocument) {    if (!activeBusiness) return;
+  async function onWorkflow(
+    doc: PublicDocument,
+    action: 'submit' | 'approve' | 'reject' | 'publish' | 'unpublish' | 'reopen',
+  ) {
+    if (!activeBusiness) return;
     setBusy(true);
     setError(null);
     try {
-      const next = doc.status === 'published' ? 'draft' : 'published';
-      const updated = await updateDocument(activeBusiness.id, doc.id, {
-        status: next,
-      });
+      let updated: PublicDocumentDetail;
+      switch (action) {
+        case 'submit':
+          updated = await submitDocumentReview(activeBusiness.id, doc.id);
+          break;
+        case 'approve':
+          updated = await approveDocument(activeBusiness.id, doc.id);
+          break;
+        case 'reject':
+          updated = await rejectDocument(activeBusiness.id, doc.id);
+          break;
+        case 'publish':
+          updated = await publishDocument(activeBusiness.id, doc.id);
+          break;
+        case 'unpublish':
+          updated = await unpublishDocument(activeBusiness.id, doc.id);
+          break;
+        case 'reopen':
+          updated = await reopenDocument(activeBusiness.id, doc.id);
+          break;
+      }
       if (detail?.id === doc.id) setDetail(updated);
       await refresh();
     } catch (err) {
@@ -217,9 +248,7 @@ export function DocumentsPage() {
               <div>
                 <p className={styles.name}>{item.title}</p>
                 <p className={styles.meta}>
-                  {item.status === 'published'
-                    ? t('statusPublished')
-                    : t('statusDraft')}
+                  {t(`status_${item.status}` as 'status_draft')}
                 </p>
               </div>
               <div className={styles.actions}>
@@ -233,14 +262,66 @@ export function DocumentsPage() {
                 >
                   {t('open')}
                 </button>
-                <button
-                  type="button"
-                  className={styles.secondary}
-                  disabled={!writable || busy}
-                  onClick={() => void onPublishToggle(item)}
-                >
-                  {item.status === 'published' ? t('unpublish') : t('publish')}
-                </button>
+                {item.status === 'draft' ? (
+                  <button
+                    type="button"
+                    className={styles.secondary}
+                    disabled={!writable || busy}
+                    onClick={() => void onWorkflow(item, 'submit')}
+                  >
+                    {t('workflowSubmit')}
+                  </button>
+                ) : null}
+                {item.status === 'review' && isApprover ? (
+                  <>
+                    <button
+                      type="button"
+                      className={styles.secondary}
+                      disabled={!writable || busy}
+                      onClick={() => void onWorkflow(item, 'approve')}
+                    >
+                      {t('workflowApprove')}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.secondary}
+                      disabled={!writable || busy}
+                      onClick={() => void onWorkflow(item, 'reject')}
+                    >
+                      {t('workflowReject')}
+                    </button>
+                  </>
+                ) : null}
+                {item.status === 'approved' && isApprover ? (
+                  <>
+                    <button
+                      type="button"
+                      className={styles.secondary}
+                      disabled={!writable || busy}
+                      onClick={() => void onWorkflow(item, 'publish')}
+                    >
+                      {t('workflowPublish')}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.secondary}
+                      disabled={!writable || busy}
+                      onClick={() => void onWorkflow(item, 'reopen')}
+                    >
+                      {t('workflowReopen')}
+                    </button>
+                  </>
+                ) : null}
+                {item.status === 'published' && isApprover ? (
+                  <button
+                    type="button"
+                    className={styles.secondary}
+                    disabled={!writable || busy}
+                    onClick={() => void onWorkflow(item, 'unpublish')}
+                  >
+                    {t('workflowUnpublish')}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className={styles.danger}

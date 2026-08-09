@@ -27,6 +27,7 @@ export function createTimelineEvent(
     mediaId?: string | null;
     sortOrder?: number;
     fields?: Record<string, unknown>;
+    translations?: { en?: Record<string, string> };
   },
 ) {
   return apiFetch<PublicTimelineEvent>(

@@ -20,6 +20,8 @@ type EditorStore = {
   businessId: string | null;
   documentId: string | null;
   title: string;
+  /** PG document status — non-draft locks body edits (ADR 020/021). */
+  status: 'draft' | 'review' | 'approved' | 'published';
   body: DocumentBody | null;
   selectedBlockId: string | null;
   dirty: boolean;
@@ -31,9 +33,12 @@ type EditorStore = {
     documentId: string;
     title: string;
     body: unknown;
+    status?: 'draft' | 'review' | 'approved' | 'published';
   }) => void;
+  setStatus: (status: 'draft' | 'review' | 'approved' | 'published') => void;
   selectBlock: (id: string | null) => void;
   setTitle: (title: string) => void;
+  setDocumentLocale: (locale: 'fa' | 'en') => void;
   reorderTopLevel: (activeId: string, overId: string) => void;
   addBlock: (type: BlockType) => void;
   appendChildBlock: (parentId: string, type: BlockType) => void;
@@ -42,6 +47,14 @@ type EditorStore = {
   updateBlockWhen: (
     id: string,
     when: BlockVisibilityCondition | null,
+  ) => void;
+  updateBlockBreakRules: (
+    id: string,
+    breakRules: import('@vdb/document-schema').BlockBreakRules | null,
+  ) => void;
+  updateBlockLink: (
+    id: string,
+    link: import('@vdb/document-schema').BlockLink | null,
   ) => void;
   updateTextContent: (id: string, content: string) => void;
   setPageMasterId: (masterId: string | null) => void;
@@ -241,6 +254,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   businessId: null,
   documentId: null,
   title: '',
+  status: 'draft',
   body: null,
   selectedBlockId: null,
   dirty: false,
@@ -248,7 +262,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   past: [],
   future: [],
 
-  loadDocument: ({ businessId, documentId, title, body }) => {
+  loadDocument: ({ businessId, documentId, title, body, status }) => {
     const parsed = parseDocumentBody({
       ...(body as object),
       businessId,
@@ -263,6 +277,12 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       businessId,
       documentId,
       title,
+      status:
+        status === 'review' ||
+        status === 'approved' ||
+        status === 'published'
+          ? status
+          : 'draft',
       body: parsed,
       selectedBlockId: null,
       dirty: false,
@@ -272,12 +292,21 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     });
   },
 
+  setStatus: (status) => set({ status }),
+
   selectBlock: (id) => set({ selectedBlockId: id }),
 
   setTitle: (title) => {
     const state = get();
     if (!state.body) return;
     commit(set, get, { ...state.body, title }, { title });
+  },
+
+  setDocumentLocale: (locale) => {
+    const state = get();
+    if (!state.body) return;
+    if (state.body.locale === locale) return;
+    commit(set, get, { ...state.body, locale });
   },
 
   reorderTopLevel: (activeId, overId) => {
@@ -343,6 +372,34 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         return { ...rest, when: null };
       }
       return { ...b, when };
+    });
+    commit(set, get, withPrimaryBlocks(state.body, blocks));
+  },
+
+  updateBlockBreakRules: (id, breakRules) => {
+    const state = get();
+    if (!state.body) return;
+    const blocks = mapBlocks(getPrimaryPage(state.body).blocks, id, (b) => {
+      if (breakRules === null) {
+        const { breakRules: _removed, ...rest } = b;
+        void _removed;
+        return { ...rest, breakRules: null };
+      }
+      return { ...b, breakRules: { ...breakRules } };
+    });
+    commit(set, get, withPrimaryBlocks(state.body, blocks));
+  },
+
+  updateBlockLink: (id, link) => {
+    const state = get();
+    if (!state.body) return;
+    const blocks = mapBlocks(getPrimaryPage(state.body).blocks, id, (b) => {
+      if (link === null) {
+        const { link: _removed, ...rest } = b;
+        void _removed;
+        return { ...rest, link: null };
+      }
+      return { ...b, link: { ...link } };
     });
     commit(set, get, withPrimaryBlocks(state.body, blocks));
   },
@@ -453,6 +510,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       businessId: null,
       documentId: null,
       title: '',
+      status: 'draft',
       body: null,
       selectedBlockId: null,
       dirty: false,
@@ -493,6 +551,24 @@ export function findBlock(
     }
   }
   return null;
+}
+
+/** True when `targetId` is nested under a `repeater` card template. */
+export function isUnderRepeater(
+  blocks: BlockNode[],
+  targetId: string,
+): boolean {
+  const walk = (list: BlockNode[], under: boolean): boolean | null => {
+    for (const b of list) {
+      if (b.id === targetId) return under;
+      if (b.children?.length) {
+        const found = walk(b.children, under || b.type === 'repeater');
+        if (found !== null) return found;
+      }
+    }
+    return null;
+  };
+  return walk(blocks, false) === true;
 }
 
 export function masterHeaderText(master: MasterPage): string {

@@ -4,22 +4,32 @@ import { useEffect, useState, type ReactNode } from 'react';
 import {
   bindBlockTree,
   parseRepeaterBlockProps,
+  type BindingContext,
   type BlockNode,
 } from '@vdb/document-schema';
 import type { PublicCollectionItem } from '@vdb/shared-types';
 import { listCollection } from '@/shared/api/collections';
 import { useBusinesses } from '@/shared/lib/business-context';
 import { useTranslations } from 'next-intl';
+import { useEditorStore } from './store/editor-store';
 import styles from './html-preview.module.css';
 
 type Props = {
   block: BlockNode;
+  binding: BindingContext;
   renderChild: (child: BlockNode) => ReactNode;
 };
 
-export function RepeaterBlockPreview({ block, renderChild }: Props) {
+export function RepeaterBlockPreview({
+  block,
+  binding,
+  renderChild,
+}: Props) {
   const t = useTranslations('editor');
   const { activeBusiness } = useBusinesses();
+  const docLocale = useEditorStore((s) =>
+    s.body?.locale === 'en' ? 'en' : 'fa',
+  );
   const props = parseRepeaterBlockProps(block.props);
   const [items, setItems] = useState<PublicCollectionItem[]>([]);
   const [failed, setFailed] = useState(false);
@@ -32,6 +42,7 @@ export function RepeaterBlockPreview({ block, renderChild }: Props) {
     let cancelled = false;
     void listCollection(activeBusiness.id, props.source, {
       limit: props.limit,
+      locale: docLocale,
     })
       .then((list) => {
         if (!cancelled) {
@@ -48,7 +59,7 @@ export function RepeaterBlockPreview({ block, renderChild }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [activeBusiness?.id, props.source, props.limit]);
+  }, [activeBusiness?.id, props.source, props.limit, docLocale]);
 
   if (failed) {
     return (
@@ -70,7 +81,10 @@ export function RepeaterBlockPreview({ block, renderChild }: Props) {
   return (
     <div className={styles.repeater} data-testid="repeater-preview">
       {items.map((item) => {
-        const bound = bindBlockTree(block.children ?? [], item.values);
+        const bound = bindBlockTree(block.children ?? [], {
+          ...binding,
+          item: item.values,
+        });
         return (
           <div key={item.id} className={styles.repeaterCard}>
             {bound.map((c) => renderChild(c))}

@@ -21,7 +21,11 @@ export function listProjectCategories(
 
 export function createProjectCategory(
   businessId: string,
-  body: { name: string; sortOrder?: number },
+  body: {
+    name: string;
+    sortOrder?: number;
+    translations?: { en?: Record<string, string> };
+  },
 ) {
   return apiFetch<PublicProjectCategory>(
     `/businesses/${businessId}/project-categories`,
@@ -32,7 +36,11 @@ export function createProjectCategory(
 export function updateProjectCategory(
   businessId: string,
   categoryId: string,
-  body: { name?: string; sortOrder?: number },
+  body: {
+    name?: string;
+    sortOrder?: number;
+    translations?: { en?: Record<string, string> };
+  },
 ) {
   return apiFetch<PublicProjectCategory>(
     `/businesses/${businessId}/project-categories/${categoryId}`,
@@ -86,6 +94,7 @@ export function createProject(
     mediaIds?: string[];
     locationId?: string | null;
     fields?: Record<string, unknown>;
+    translations?: { en?: Record<string, string> };
   },
 ) {
   return apiFetch<PublicProject>(`/businesses/${businessId}/projects`, {
@@ -106,6 +115,7 @@ export function updateProject(
     mediaIds?: string[];
     locationId?: string | null;
     fields?: Record<string, unknown>;
+    translations?: { en?: Record<string, string> };
   },
 ) {
   return apiFetch<PublicProject>(

@@ -16,17 +16,36 @@ import { FlowCanvas } from './flow-canvas';
 import { HtmlPreview } from './html-preview';
 import { MasterPanel } from './master-panel';
 import { ExportPanel } from './export-panel';
+import { VersionHistoryPanel } from './version-history-panel';
+import { WorkflowPanel } from './workflow-panel';
+import { CommentsPanel } from './comments-panel';
 import { useEditorAutosave } from './use-editor-autosave';
 import { useEditorStore } from './store/editor-store';
 import {
   documentCollectRequiredModuleCodes,
   getPrimaryPage,
 } from '@vdb/document-schema';
-import { EntitlementCodes } from '@vdb/shared-types';
+import {
+  DOCUMENT_BODY_LOCKED_STATUSES,
+  EntitlementCodes,
+  type DocumentStatusValue,
+} from '@vdb/shared-types';
 import { ModuleUpgradeCta } from '@/features/billing/module-upgrade-cta';
 import styles from './editor-shell.module.css';
 
 type Props = { documentId: string };
+
+function asDocStatus(raw: string): DocumentStatusValue {
+  if (
+    raw === 'review' ||
+    raw === 'approved' ||
+    raw === 'published' ||
+    raw === 'draft'
+  ) {
+    return raw;
+  }
+  return 'draft';
+}
 
 export function EditorShell({ documentId }: Props) {
   const t = useTranslations('editor');
@@ -42,22 +61,27 @@ export function EditorShell({ documentId }: Props) {
 
   const body = useEditorStore((s) => s.body);
   const title = useEditorStore((s) => s.title);
+  const docStatus = useEditorStore((s) => s.status);
   const selectedBlockId = useEditorStore((s) => s.selectedBlockId);
   const saveStatus = useEditorStore((s) => s.saveStatus);
   const pastLen = useEditorStore((s) => s.past.length);
   const futureLen = useEditorStore((s) => s.future.length);
   const loadDocument = useEditorStore((s) => s.loadDocument);
   const setTitle = useEditorStore((s) => s.setTitle);
+  const setDocumentLocale = useEditorStore((s) => s.setDocumentLocale);
   const undo = useEditorStore((s) => s.undo);
   const redo = useEditorStore((s) => s.redo);
   const reset = useEditorStore((s) => s.reset);
 
-  const disabled = !writable || entLoading;
+  const bodyLocked = DOCUMENT_BODY_LOCKED_STATUSES.includes(
+    docStatus as DocumentStatusValue,
+  );
+  const disabled = !writable || entLoading || bodyLocked;
   const missingModules = body
     ? documentCollectRequiredModuleCodes(body).filter((code) => !has(code))
     : [];
 
-  useEditorAutosave(writable && !entLoading);
+  useEditorAutosave(writable && !entLoading && !bodyLocked);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,6 +103,7 @@ export function EditorShell({ documentId }: Props) {
           documentId: doc.id,
           title: doc.title,
           body: doc.body,
+          status: asDocStatus(String(doc.status)),
         });
         setTokens(theme.tokens);
       } catch (err) {
@@ -170,6 +195,22 @@ export function EditorShell({ documentId }: Props) {
             onChange={(e) => setTitle(e.target.value)}
             aria-label={t('docTitle')}
           />
+          <span className={styles.meta}>{t(`status_${docStatus}`)}</span>
+          <label className={styles.localeField}>
+            <span className={styles.localeLabel}>{t('documentLocale')}</span>
+            <select
+              className={styles.localeSelect}
+              value={body.locale === 'en' ? 'en' : 'fa'}
+              disabled={disabled}
+              onChange={(e) =>
+                setDocumentLocale(e.target.value === 'en' ? 'en' : 'fa')
+              }
+              aria-label={t('documentLocale')}
+            >
+              <option value="fa">{t('localeFa')}</option>
+              <option value="en">{t('localeEn')}</option>
+            </select>
+          </label>
         </div>
         <div className={styles.toolbarEnd}>
           <button
@@ -195,6 +236,9 @@ export function EditorShell({ documentId }: Props) {
       </header>
 
       {!writable ? <p className={styles.warn}>{t('readOnly')}</p> : null}
+      {bodyLocked ? (
+        <p className={styles.warn}>{t('publishedLocked')}</p>
+      ) : null}
       {missingModules.length > 0 ? (
         <div className={styles.warn}>
           <p>{t('modulesMissing', { codes: missingModules.join(', ') })}</p>
@@ -206,9 +250,24 @@ export function EditorShell({ documentId }: Props) {
         <aside className={styles.side}>
           <BlockPalette disabled={disabled} />
           <MasterPanel disabled={disabled} />
+          <WorkflowPanel
+            businessId={activeBusiness.id}
+            documentId={documentId}
+            disabled={!writable || entLoading}
+          />
+          <CommentsPanel
+            businessId={activeBusiness.id}
+            documentId={documentId}
+            disabled={!writable || entLoading}
+          />
           <ExportPanel
-            disabled={disabled}
+            disabled={!writable || entLoading}
             canExport={can(EntitlementCodes.ExportPdf)}
+          />
+          <VersionHistoryPanel
+            businessId={activeBusiness.id}
+            documentId={documentId}
+            disabled={!writable || entLoading}
           />
           <BlockInspector disabled={disabled} />
         </aside>

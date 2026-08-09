@@ -15,6 +15,10 @@ import { listLocations } from '@/shared/api/locations';
 import { ApiClientError, mapApiErrorCode } from '@/shared/api/client';
 import { useBusinesses } from '@/shared/lib/business-context';
 import { useEntitlements } from '@/features/billing/use-entitlements';
+import {
+  EnTranslationFields,
+  buildEnTranslations,
+} from './en-translation-fields';
 import styles from './team-page.module.css';
 
 export function TeamPage() {
@@ -32,9 +36,13 @@ export function TeamPage() {
   const [memberName, setMemberName] = useState('');
   const [roleTitle, setRoleTitle] = useState('');
   const [department, setDepartment] = useState('');
+  const [memberNameEn, setMemberNameEn] = useState('');
+  const [roleTitleEn, setRoleTitleEn] = useState('');
+  const [departmentEn, setDepartmentEn] = useState('');
   const [memberBranchId, setMemberBranchId] = useState('');
   const [memberParentId, setMemberParentId] = useState('');
   const [branchName, setBranchName] = useState('');
+  const [branchNameEn, setBranchNameEn] = useState('');
   const [city, setCity] = useState('');
   const [addressLine1, setAddressLine1] = useState('');
   const [branchLocationId, setBranchLocationId] = useState('');
@@ -90,8 +98,10 @@ export function TeamPage() {
         city: city.trim(),
         addressLine1: addressLine1.trim(),
         locationId: branchLocationId || null,
+        translations: buildEnTranslations({ name: branchNameEn }),
       });
       setBranchName('');
+      setBranchNameEn('');
       setCity('');
       setAddressLine1('');
       setBranchLocationId('');
@@ -121,10 +131,18 @@ export function TeamPage() {
         department: department.trim(),
         branchId: memberBranchId || null,
         parentMemberId: memberParentId || null,
+        translations: buildEnTranslations({
+          name: memberNameEn,
+          roleTitle: roleTitleEn,
+          department: departmentEn,
+        }),
       });
       setMemberName('');
       setRoleTitle('');
       setDepartment('');
+      setMemberNameEn('');
+      setRoleTitleEn('');
+      setDepartmentEn('');
       setMemberParentId('');
       await refresh();
     } catch (err) {
@@ -210,6 +228,19 @@ export function TeamPage() {
             disabled={!writable || busy}
           />
         </label>
+        <EnTranslationFields
+          fieldClassName={styles.field}
+          inputClassName={styles.input}
+          disabled={!writable || busy}
+          fields={[
+            {
+              key: 'name',
+              label: t('nameEn'),
+              value: branchNameEn,
+              onChange: setBranchNameEn,
+            },
+          ]}
+        />
         <label className={styles.field}>
           {t('city')}
           <input
@@ -309,6 +340,31 @@ export function TeamPage() {
             disabled={!writable || busy}
           />
         </label>
+        <EnTranslationFields
+          fieldClassName={styles.field}
+          inputClassName={styles.input}
+          disabled={!writable || busy}
+          fields={[
+            {
+              key: 'name',
+              label: t('nameEn'),
+              value: memberNameEn,
+              onChange: setMemberNameEn,
+            },
+            {
+              key: 'roleTitle',
+              label: t('roleTitleEn'),
+              value: roleTitleEn,
+              onChange: setRoleTitleEn,
+            },
+            {
+              key: 'department',
+              label: t('departmentEn'),
+              value: departmentEn,
+              onChange: setDepartmentEn,
+            },
+          ]}
+        />
         <label className={styles.field}>
           {t('branch')}
           <select

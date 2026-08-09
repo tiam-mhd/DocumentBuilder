@@ -32,6 +32,7 @@ export function createTeamMember(
     parentMemberId?: string | null;
     sortOrder?: number;
     fields?: Record<string, unknown>;
+    translations?: { en?: Record<string, string> };
   },
 ) {
   return apiFetch<PublicTeamMember>(
@@ -52,6 +53,7 @@ export function updateTeamMember(
     parentMemberId?: string | null;
     sortOrder?: number;
     fields?: Record<string, unknown>;
+    translations?: { en?: Record<string, string> };
   },
 ) {
   return apiFetch<PublicTeamMember>(
@@ -95,6 +97,7 @@ export function createBranch(
     locationId?: string | null;
     sortOrder?: number;
     fields?: Record<string, unknown>;
+    translations?: { en?: Record<string, string> };
   },
 ) {
   return apiFetch<PublicBranch>(`/businesses/${businessId}/branches`, {
@@ -118,6 +121,7 @@ export function updateBranch(
     locationId?: string | null;
     sortOrder?: number;
     fields?: Record<string, unknown>;
+    translations?: { en?: Record<string, string> };
   },
 ) {
   return apiFetch<PublicBranch>(

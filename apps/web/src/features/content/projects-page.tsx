@@ -22,6 +22,11 @@ import { ApiClientError, mapApiErrorCode } from '@/shared/api/client';
 import { useBusinesses } from '@/shared/lib/business-context';
 import { useEntitlements } from '@/features/billing/use-entitlements';
 import { ModuleUpgradeCta } from '@/features/billing/module-upgrade-cta';
+import {
+  EnTranslationFields,
+  buildEnTranslations,
+} from './en-translation-fields';
+import { ProjectsImportWizard } from './projects-import-wizard';
 import styles from './projects-page.module.css';
 
 export function ProjectsPage() {
@@ -40,11 +45,14 @@ export function ProjectsPage() {
   >([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [titleEn, setTitleEn] = useState('');
+  const [descriptionEn, setDescriptionEn] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [locationId, setLocationId] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [q, setQ] = useState('');
   const [newCategory, setNewCategory] = useState('');
+  const [newCategoryEn, setNewCategoryEn] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -97,8 +105,10 @@ export function ProjectsPage() {
     try {
       await createProjectCategory(activeBusiness.id, {
         name: newCategory.trim(),
+        translations: buildEnTranslations({ name: newCategoryEn }),
       });
       setNewCategory('');
+      setNewCategoryEn('');
       await refresh();
     } catch (err) {
       if (err instanceof ApiClientError) {
@@ -126,9 +136,15 @@ export function ProjectsPage() {
         categoryId: categoryId || null,
         locationId: locationId || null,
         status: ProjectStatus.Draft,
+        translations: buildEnTranslations({
+          title: titleEn,
+          description: descriptionEn,
+        }),
       });
       setTitle('');
       setDescription('');
+      setTitleEn('');
+      setDescriptionEn('');
       setLocationId('');
       await refresh();
     } catch (err) {
@@ -236,6 +252,12 @@ export function ProjectsPage() {
       <p className={styles.sub}>{t('subtitle')}</p>
       {!writable ? <p className={styles.warn}>{t('readOnly')}</p> : null}
 
+      <ProjectsImportWizard
+        businessId={activeBusiness.id}
+        disabled={!canMutate || busy}
+        onCompleted={() => void refresh()}
+      />
+
       <div className={styles.create}>
         <label className={styles.field}>
           {t('categoryName')}
@@ -246,6 +268,19 @@ export function ProjectsPage() {
             disabled={!canMutate || busy}
           />
         </label>
+        <EnTranslationFields
+          fieldClassName={styles.field}
+          inputClassName={styles.input}
+          disabled={!canMutate || busy}
+          fields={[
+            {
+              key: 'name',
+              label: t('nameEn'),
+              value: newCategoryEn,
+              onChange: setNewCategoryEn,
+            },
+          ]}
+        />
         <button
           type="button"
           className={styles.secondary}
@@ -293,6 +328,25 @@ export function ProjectsPage() {
             disabled={!canMutate || busy}
           />
         </label>
+        <EnTranslationFields
+          fieldClassName={styles.field}
+          inputClassName={styles.input}
+          disabled={!canMutate || busy}
+          fields={[
+            {
+              key: 'title',
+              label: t('titleEn'),
+              value: titleEn,
+              onChange: setTitleEn,
+            },
+            {
+              key: 'description',
+              label: t('descriptionEn'),
+              value: descriptionEn,
+              onChange: setDescriptionEn,
+            },
+          ]}
+        />
         <label className={styles.field}>
           {t('category')}
           <select

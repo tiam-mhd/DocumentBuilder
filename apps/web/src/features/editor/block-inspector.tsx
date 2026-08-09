@@ -4,7 +4,10 @@ import { useTranslations } from 'next-intl';
 import { EntitlementCodes } from '@vdb/shared-types';
 import { getPrimaryPage } from '@vdb/document-schema';
 import { useEntitlements } from '@/features/billing/use-entitlements';
-import { findBlock, useEditorStore } from './store/editor-store';
+import { findBlock, isUnderRepeater, useEditorStore } from './store/editor-store';
+import { BindingInsertField } from './binding-insert-field';
+import { BlockLinkFields } from './block-link-fields';
+import { BreakRulesFields } from './break-rules-fields';
 import { VisibilityConditionFields } from './visibility-condition-fields';
 import styles from './block-inspector.module.css';
 
@@ -18,10 +21,28 @@ export function BlockInspector({ disabled }: Props) {
   const updateBlockProps = useEditorStore((s) => s.updateBlockProps);
   const updateTextContent = useEditorStore((s) => s.updateTextContent);
 
+  const primaryBlocks = body ? getPrimaryPage(body).blocks : [];
   const block =
     body && selectedBlockId
-      ? findBlock(getPrimaryPage(body).blocks, selectedBlockId)
+      ? findBlock(primaryBlocks, selectedBlockId)
       : null;
+  const repeaterScope = block
+    ? isUnderRepeater(primaryBlocks, block.id)
+    : false;
+
+  function insertIntoText(expression: string) {
+    if (!block || block.type !== 'text') return;
+    const current = String(block.props.content ?? '');
+    const sep = current && !current.endsWith(' ') ? ' ' : '';
+    updateTextContent(block.id, `${current}${sep}${expression}`);
+  }
+
+  function insertIntoSectionTitle(expression: string) {
+    if (!block || block.type !== 'section') return;
+    const current = String(block.props.title ?? '');
+    const sep = current && !current.endsWith(' ') ? ' ' : '';
+    updateBlockProps(block.id, { title: `${current}${sep}${expression}` });
+  }
 
   if (!block) {
     return (
@@ -50,6 +71,11 @@ export function BlockInspector({ disabled }: Props) {
               onChange={(e) => updateTextContent(block.id, e.target.value)}
             />
           </label>
+          <BindingInsertField
+            disabled={disabled}
+            repeaterScope={repeaterScope}
+            onInsert={insertIntoText}
+          />
           <label className={styles.field}>
             <span>{t('headingLevel')}</span>
             <select
@@ -92,6 +118,11 @@ export function BlockInspector({ disabled }: Props) {
               }
             />
           </label>
+          <BindingInsertField
+            disabled={disabled}
+            repeaterScope={repeaterScope}
+            onInsert={insertIntoSectionTitle}
+          />
           <label className={styles.field}>
             <span>{t('headingLevel')}</span>
             <select
@@ -426,6 +457,8 @@ export function BlockInspector({ disabled }: Props) {
       ) : null}
 
       <VisibilityConditionFields block={block} disabled={disabled} />
+      <BlockLinkFields block={block} disabled={disabled} />
+      <BreakRulesFields block={block} disabled={disabled} />
     </div>
   );
 }

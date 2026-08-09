@@ -7,6 +7,7 @@ import { getOrgChartTree } from '@/shared/api/org-chart';
 import { useBusinesses } from '@/shared/lib/business-context';
 import { OrgChartTreeView } from '@/features/content/org-chart-tree';
 import { useTranslations } from 'next-intl';
+import { useEditorStore } from './store/editor-store';
 import styles from './html-preview.module.css';
 
 type Props = { block: BlockNode };
@@ -14,6 +15,9 @@ type Props = { block: BlockNode };
 export function OrgChartBlockPreview({ block }: Props) {
   const t = useTranslations('editor');
   const { activeBusiness } = useBusinesses();
+  const docLocale = useEditorStore((s) =>
+    s.body?.locale === 'en' ? 'en' : 'fa',
+  );
   const props = parseOrgChartBlockProps(block.props);
   const [roots, setRoots] = useState<PublicOrgChartNode[]>([]);
   const [failed, setFailed] = useState(false);
@@ -26,6 +30,7 @@ export function OrgChartBlockPreview({ block }: Props) {
     let cancelled = false;
     void getOrgChartTree(activeBusiness.id, {
       rootMemberId: props.rootMemberId,
+      locale: docLocale,
     })
       .then((tree) => {
         if (!cancelled) {
@@ -42,7 +47,7 @@ export function OrgChartBlockPreview({ block }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [activeBusiness?.id, props.rootMemberId]);
+  }, [activeBusiness?.id, props.rootMemberId, docLocale]);
 
   if (failed) {
     return (

@@ -21,6 +21,10 @@ import {
 import { ApiClientError, mapApiErrorCode } from '@/shared/api/client';
 import { useBusinesses } from '@/shared/lib/business-context';
 import { useEntitlements } from '@/features/billing/use-entitlements';
+import {
+  EnTranslationFields,
+  buildEnTranslations,
+} from './en-translation-fields';
 import styles from './team-page.module.css';
 
 export function ProfileContentPage() {
@@ -35,10 +39,15 @@ export function ProfileContentPage() {
 
   const [serviceName, setServiceName] = useState('');
   const [serviceDesc, setServiceDesc] = useState('');
+  const [serviceNameEn, setServiceNameEn] = useState('');
+  const [serviceDescEn, setServiceDescEn] = useState('');
   const [clientName, setClientName] = useState('');
+  const [clientNameEn, setClientNameEn] = useState('');
   const [clientWebsite, setClientWebsite] = useState('');
   const [certName, setCertName] = useState('');
   const [certIssuer, setCertIssuer] = useState('');
+  const [certNameEn, setCertNameEn] = useState('');
+  const [certIssuerEn, setCertIssuerEn] = useState('');
   const [certIssued, setCertIssued] = useState('');
   const [certExpires, setCertExpires] = useState('');
 
@@ -92,9 +101,15 @@ export function ProfileContentPage() {
       await createService(activeBusiness.id, {
         name: serviceName.trim(),
         description: serviceDesc.trim(),
+        translations: buildEnTranslations({
+          name: serviceNameEn,
+          description: serviceDescEn,
+        }),
       });
       setServiceName('');
       setServiceDesc('');
+      setServiceNameEn('');
+      setServiceDescEn('');
       await refresh();
     } catch (err) {
       if (err instanceof ApiClientError) {
@@ -118,8 +133,10 @@ export function ProfileContentPage() {
       await createClient(activeBusiness.id, {
         name: clientName.trim(),
         website: clientWebsite.trim(),
+        translations: buildEnTranslations({ name: clientNameEn }),
       });
       setClientName('');
+      setClientNameEn('');
       setClientWebsite('');
       await refresh();
     } catch (err) {
@@ -150,9 +167,15 @@ export function ProfileContentPage() {
         expiresAt: certExpires
           ? new Date(certExpires).toISOString()
           : null,
+        translations: buildEnTranslations({
+          name: certNameEn,
+          issuer: certIssuerEn,
+        }),
       });
       setCertName('');
       setCertIssuer('');
+      setCertNameEn('');
+      setCertIssuerEn('');
       setCertIssued('');
       setCertExpires('');
       await refresh();
@@ -267,6 +290,25 @@ export function ProfileContentPage() {
             disabled={!writable || busy}
           />
         </label>
+        <EnTranslationFields
+          fieldClassName={styles.field}
+          inputClassName={styles.input}
+          disabled={!writable || busy}
+          fields={[
+            {
+              key: 'name',
+              label: t('nameEn'),
+              value: serviceNameEn,
+              onChange: setServiceNameEn,
+            },
+            {
+              key: 'description',
+              label: t('descriptionEn'),
+              value: serviceDescEn,
+              onChange: setServiceDescEn,
+            },
+          ]}
+        />
         <button
           type="button"
           className={styles.primary}
@@ -311,6 +353,19 @@ export function ProfileContentPage() {
             disabled={!writable || busy}
           />
         </label>
+        <EnTranslationFields
+          fieldClassName={styles.field}
+          inputClassName={styles.input}
+          disabled={!writable || busy}
+          fields={[
+            {
+              key: 'name',
+              label: t('nameEn'),
+              value: clientNameEn,
+              onChange: setClientNameEn,
+            },
+          ]}
+        />
         <label className={styles.field}>
           {t('clientWebsite')}
           <input
@@ -371,6 +426,25 @@ export function ProfileContentPage() {
             disabled={!writable || busy}
           />
         </label>
+        <EnTranslationFields
+          fieldClassName={styles.field}
+          inputClassName={styles.input}
+          disabled={!writable || busy}
+          fields={[
+            {
+              key: 'name',
+              label: t('nameEn'),
+              value: certNameEn,
+              onChange: setCertNameEn,
+            },
+            {
+              key: 'issuer',
+              label: t('issuerEn'),
+              value: certIssuerEn,
+              onChange: setCertIssuerEn,
+            },
+          ]}
+        />
         <label className={styles.field}>
           {t('certIssued')}
           <input

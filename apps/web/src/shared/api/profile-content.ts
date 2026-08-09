@@ -34,6 +34,7 @@ export function createService(
     iconMediaId?: string | null;
     sortOrder?: number;
     fields?: Record<string, unknown>;
+    translations?: { en?: Record<string, string> };
   },
 ) {
   return apiFetch<PublicBusinessService>(
@@ -51,6 +52,7 @@ export function updateService(
     iconMediaId?: string | null;
     sortOrder?: number;
     fields?: Record<string, unknown>;
+    translations?: { en?: Record<string, string> };
   },
 ) {
   return apiFetch<PublicBusinessService>(
@@ -83,6 +85,7 @@ export function createClient(
     logoMediaId?: string | null;
     sortOrder?: number;
     fields?: Record<string, unknown>;
+    translations?: { en?: Record<string, string> };
   },
 ) {
   return apiFetch<PublicClient>(`/businesses/${businessId}/clients`, {
@@ -100,6 +103,7 @@ export function updateClient(
     logoMediaId?: string | null;
     sortOrder?: number;
     fields?: Record<string, unknown>;
+    translations?: { en?: Record<string, string> };
   },
 ) {
   return apiFetch<PublicClient>(
@@ -134,6 +138,7 @@ export function createCertificate(
     documentMediaId?: string | null;
     sortOrder?: number;
     fields?: Record<string, unknown>;
+    translations?: { en?: Record<string, string> };
   },
 ) {
   return apiFetch<PublicCertificate>(
@@ -153,6 +158,7 @@ export function updateCertificate(
     documentMediaId?: string | null;
     sortOrder?: number;
     fields?: Record<string, unknown>;
+    translations?: { en?: Record<string, string> };
   },
 ) {
   return apiFetch<PublicCertificate>(

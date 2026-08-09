@@ -4,10 +4,12 @@ import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { MembershipRole } from '@vdb/shared-types';
 import { ThemeToggle } from '@/shared/ui/theme/theme-toggle';
 import { LocaleSwitcher } from '@/shared/ui/locale-switcher';
 import { BusinessSwitcher } from '@/features/businesses/business-switcher';
 import { useAuth } from '@/shared/lib/auth-context';
+import { useBusinesses } from '@/shared/lib/business-context';
 import { clearActiveBusinessId } from '@/shared/lib/business-storage';
 import { fetchSystemConfig } from '@/shared/api/system';
 import styles from './app-shell.module.css';
@@ -16,8 +18,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const t = useTranslations('app');
   const locale = useLocale();
   const { isAuthenticated, user, logout, loading } = useAuth();
+  const { activeBusiness } = useBusinesses();
   const router = useRouter();
   const [showLicense, setShowLicense] = useState(false);
+
+  const showAudit =
+    activeBusiness?.role === MembershipRole.Owner ||
+    activeBusiness?.role === MembershipRole.Admin;
 
   useEffect(() => {
     let cancelled = false;
@@ -134,6 +141,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   href={`/${locale}/app/license`}
                 >
                   {t('licenseLink')}
+                </Link>
+              ) : null}
+              {showAudit ? (
+                <Link
+                  className={styles.loginLink}
+                  href={`/${locale}/app/audit`}
+                >
+                  {t('auditLink')}
+                </Link>
+              ) : null}
+              {activeBusiness?.role === MembershipRole.Owner ? (
+                <Link
+                  className={styles.loginLink}
+                  href={`/${locale}/app/backup`}
+                >
+                  {t('backupLink')}
                 </Link>
               ) : null}
               <span className={styles.userChip}>{user?.mobile}</span>

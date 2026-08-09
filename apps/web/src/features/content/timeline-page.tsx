@@ -16,6 +16,10 @@ import { useBusinesses } from '@/shared/lib/business-context';
 import { useEntitlements } from '@/features/billing/use-entitlements';
 import { ModuleUpgradeCta } from '@/features/billing/module-upgrade-cta';
 import { TimelineView } from './timeline-view';
+import {
+  EnTranslationFields,
+  buildEnTranslations,
+} from './en-translation-fields';
 import styles from './team-page.module.css';
 
 export function TimelinePage() {
@@ -29,6 +33,8 @@ export function TimelinePage() {
   const [layout, setLayout] = useState<'vertical' | 'alternating'>('vertical');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [titleEn, setTitleEn] = useState('');
+  const [bodyEn, setBodyEn] = useState('');
   const [occurredAt, setOccurredAt] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -76,9 +82,15 @@ export function TimelinePage() {
         title: title.trim(),
         occurredAt: occurredAt.trim(),
         body: body.trim(),
+        translations: buildEnTranslations({
+          title: titleEn,
+          body: bodyEn,
+        }),
       });
       setTitle('');
       setBody('');
+      setTitleEn('');
+      setBodyEn('');
       setOccurredAt('');
       await refresh();
     } catch (err) {
@@ -174,6 +186,25 @@ export function TimelinePage() {
             disabled={!writable || busy}
           />
         </label>
+        <EnTranslationFields
+          fieldClassName={styles.field}
+          inputClassName={styles.input}
+          disabled={!writable || busy}
+          fields={[
+            {
+              key: 'title',
+              label: t('titleEn'),
+              value: titleEn,
+              onChange: setTitleEn,
+            },
+            {
+              key: 'body',
+              label: t('bodyEn'),
+              value: bodyEn,
+              onChange: setBodyEn,
+            },
+          ]}
+        />
         <button
           type="button"
           className={styles.primary}
