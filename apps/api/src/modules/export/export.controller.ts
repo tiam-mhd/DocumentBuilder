@@ -44,8 +44,11 @@ export class ExportController {
     @Param('businessId') businessId: string,
     @Param('documentId') documentId: string,
   ) {
-    void user;
-    const data = await this.exports.createPdfJob({ businessId, documentId });
+    const data = await this.exports.createPdfJob({
+      businessId,
+      documentId,
+      userId: user.userId,
+    });
     return { data };
   }
 

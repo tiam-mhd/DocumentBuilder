@@ -23,9 +23,14 @@ import { PaymentIdempotencyLock } from './payment/payment-idempotency.lock';
 import { TrialFirstBusinessHook } from './trial-first-business.hook';
 import { TenancyModule } from '../tenancy/tenancy.module';
 import { IdentityModule } from '../identity/identity.module';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
-  imports: [IdentityModule, forwardRef(() => TenancyModule)],
+  imports: [
+    IdentityModule,
+    forwardRef(() => TenancyModule),
+    forwardRef(() => AuditModule),
+  ],
   controllers: [
     SubscriptionController,
     CatalogController,

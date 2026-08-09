@@ -5,6 +5,11 @@ export type PdfRenderInput = {
   /** Print page size hint */
   format: 'A4' | 'A3';
   landscape: boolean;
+  /**
+   * When true (default for Playwright), request Chromium document outline
+   * from headings + tagged PDF (ADR 018). Fake driver ignores.
+   */
+  outline?: boolean;
 };
 
 export interface PdfRenderer {

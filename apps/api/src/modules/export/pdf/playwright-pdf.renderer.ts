@@ -31,6 +31,9 @@ export class PlaywrightPdfRenderer implements PdfRenderer {
         landscape: input.landscape,
         printBackground: true,
         preferCSSPageSize: true,
+        // ADR 018 — bookmarks from heading tags; tagged required for outline
+        outline: input.outline !== false,
+        tagged: input.outline !== false,
       });
       return Buffer.from(pdf);
     } finally {

@@ -2,6 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   bindBlockTree,
+  bindDocumentBlocks,
+  blockAnchorId,
+  effectiveBreakRules,
   formatPageNumberLabel,
   parseDocumentBody,
   parseMapBlockProps,
@@ -12,7 +15,9 @@ import {
   parseTocBlockProps,
   buildTableOfContents,
   isBlockVisible,
+  resolveBlockLinkHref,
   resolveMaster,
+  type BindingContext,
   type BlockNode,
   type DocumentBody,
   type MasterPage,
@@ -71,6 +76,7 @@ type RenderCtx = {
   qrByBlockId: Record<string, QrRenderData>;
   repeaterItemsByBlockId: Record<string, PublicCollectionItem[]>;
   visibility: VisibilityContext;
+  binding: BindingContext;
   /** Full body pages for TOC scan (logical page numbers). */
   pages: DocumentBody['pages'];
 };
@@ -95,6 +101,8 @@ export type BuildHtmlInput = {
   repeaterItemsByBlockId?: Record<string, PublicCollectionItem[]>;
   /** Collection counts for `when` evaluation (ADR 014). */
   visibility?: VisibilityContext;
+  /** Business + collection snapshots for {{business.*}} / {{count(...)}} (ADR 016). */
+  binding?: BindingContext;
 };
 
 function escapeHtml(value: string): string {
@@ -103,6 +111,16 @@ function escapeHtml(value: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+/** Wrap inner HTML with optional block link (ADR 018). */
+function withBlockLink(block: BlockNode, inner: string): string {
+  const href = resolveBlockLinkHref(block.link ?? null);
+  if (!href) return inner;
+  const external =
+    href.startsWith('http://') || href.startsWith('https://');
+  const rel = external ? ' rel="noopener noreferrer"' : '';
+  return `<a class="doc-link" href="${escapeHtml(href)}"${rel}>${inner}</a>`;
 }
 
 /** Build static map URL from ADR-008 template, or null for placeholder. */
@@ -133,7 +151,29 @@ export class DocumentHtmlRenderer {
   constructor(private readonly config: ConfigService<AppEnv, true>) {}
 
   build(input: BuildHtmlInput): string {
-    const body = parseDocumentBody(input.body);
+    const parsed = parseDocumentBody(input.body);
+    const binding: BindingContext = input.binding ?? {
+      business: { name: '' },
+      collections: {},
+    };
+    const body: DocumentBody = {
+      ...parsed,
+      pages: parsed.pages.map((p) => ({
+        ...p,
+        blocks: bindDocumentBlocks(p.blocks, binding),
+      })),
+      masters: parsed.masters.map((m) => ({
+        ...m,
+        header: {
+          ...m.header,
+          blocks: bindDocumentBlocks(m.header.blocks, binding),
+        },
+        footer: {
+          ...m.footer,
+          blocks: bindDocumentBlocks(m.footer.blocks, binding),
+        },
+      })),
+    };
     const { tokens } = input;
     const fontFaces = input.fonts
       .map(
@@ -165,6 +205,7 @@ export class DocumentHtmlRenderer {
             qrByBlockId: input.qrByBlockId ?? {},
             repeaterItemsByBlockId: input.repeaterItemsByBlockId ?? {},
             visibility: input.visibility ?? { collection: {} },
+            binding,
             pages: body.pages,
           },
         });
@@ -244,6 +285,13 @@ h1,h2,h3{font-family:${JSON.stringify(tokens.typography.headingFamily)},serif;co
 .toc-dots{flex:1;border-bottom:1px dotted ${tokens.colors.secondary};margin:0 6px;min-width:1rem;height:0.6em}
 .toc-page{font-variant-numeric:tabular-nums;color:${tokens.colors.secondary}}
 .heading{margin:0 0 8px;color:${tokens.colors.primary}}
+.keep-together{break-inside:avoid;page-break-inside:avoid}
+.break-before{break-before:page;page-break-before:always}
+.break-after{break-after:page;page-break-after:always}
+a.doc-link{color:${tokens.colors.primary};text-decoration:underline}
+a.doc-link:hover{color:${tokens.colors.secondary}}
+.toc-item a{color:inherit;text-decoration:none}
+.toc-item a:hover{text-decoration:underline;color:${tokens.colors.primary}}
 </style>
 </head>
 <body>
@@ -311,19 +359,40 @@ ${footerNum}
 
   private renderBlock(block: BlockNode, ctx: RenderCtx): string {
     if (!isBlockVisible(block, ctx.visibility)) return '';
+    const rules = effectiveBreakRules(block);
+    const wrapClass = [
+      rules.keepTogether ? 'keep-together' : '',
+      rules.breakBefore ? 'break-before' : '',
+      rules.breakAfter ? 'break-after' : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+    const wrap = (inner: string) =>
+      wrapClass
+        ? `<div class="${wrapClass}">${inner}</div>`
+        : inner;
+
     switch (block.type) {
       case 'text': {
         const content = escapeHtml(String(block.props.content ?? ''));
         const level = Number(block.props.headingLevel);
         if (level === 1 || level === 2 || level === 3) {
-          return `<h${level} class="heading" id="h-${escapeHtml(block.id)}">${content}</h${level}>`;
+          const heading = `<h${level} class="heading" id="${escapeHtml(blockAnchorId(block.id))}">${withBlockLink(block, content)}</h${level}>`;
+          return wrap(heading);
         }
-        return `<p>${content}</p>`;
+        return wrap(withBlockLink(block, `<p>${content}</p>`));
       }
       case 'image':
-        return `<div class="image-ph">${escapeHtml(String(block.props.alt ?? 'image'))}</div>`;
+        return wrap(
+          withBlockLink(
+            block,
+            `<div class="image-ph">${escapeHtml(String(block.props.alt ?? 'image'))}</div>`,
+          ),
+        );
       case 'gallery':
-        return `<div class="gallery-ph">gallery:${escapeHtml(String(block.props.galleryId ?? ''))}</div>`;
+        return wrap(
+          `<div class="gallery-ph">gallery:${escapeHtml(String(block.props.galleryId ?? ''))}</div>`,
+        );
       case 'map': {
         const props = parseMapBlockProps(block.props);
         const markers = ctx.mapMarkersByBlockId[block.id] ?? [];
@@ -332,10 +401,14 @@ ${footerNum}
         });
         const url = buildStaticMapUrl(template, props, markers);
         if (url) {
-          return `<figure class="map-wrap"><img class="map-img" src="${escapeHtml(url)}" alt="map" width="100%" style="height:${props.heightPx}px;object-fit:cover"/></figure>`;
+          return wrap(
+            `<figure class="map-wrap"><img class="map-img" src="${escapeHtml(url)}" alt="map" width="100%" style="height:${props.heightPx}px;object-fit:cover"/></figure>`,
+          );
         }
         const label = `map ${props.centerLat.toFixed(2)},${props.centerLng.toFixed(2)} z${props.zoom}${markers.length ? ` · ${markers.length} markers` : ''}`;
-        return `<div class="map-ph" style="min-height:${props.heightPx}px">${escapeHtml(label)}</div>`;
+        return wrap(
+          `<div class="map-ph" style="min-height:${props.heightPx}px">${escapeHtml(label)}</div>`,
+        );
       }
       case 'orgChart': {
         const props = parseOrgChartBlockProps(block.props);
@@ -348,9 +421,13 @@ ${footerNum}
         const layoutClass =
           tree.layout === 'tree-horizontal' ? 'horizontal' : 'vertical';
         if (tree.roots.length === 0) {
-          return `<div class="org-ph" style="min-height:${tree.heightPx}px">org chart</div>`;
+          return wrap(
+            `<div class="org-ph" style="min-height:${tree.heightPx}px">org chart</div>`,
+          );
         }
-        return `<div class="org-chart ${layoutClass}" style="max-height:${tree.heightPx}px">${this.renderOrgNodes(tree.roots)}</div>`;
+        return wrap(
+          `<div class="org-chart ${layoutClass}" style="max-height:${tree.heightPx}px">${this.renderOrgNodes(tree.roots)}</div>`,
+        );
       }
       case 'timeline': {
         const props = parseTimelineBlockProps(block.props);
@@ -360,7 +437,9 @@ ${footerNum}
           items: [],
         };
         if (data.items.length === 0) {
-          return `<div class="tl-ph" style="min-height:${data.heightPx}px">timeline</div>`;
+          return wrap(
+            `<div class="tl-ph" style="min-height:${data.heightPx}px">timeline</div>`,
+          );
         }
         const layoutClass =
           data.layout === 'alternating' ? 'alternating' : 'vertical';
@@ -373,7 +452,9 @@ ${footerNum}
             return `<li class="tl-item"><div class="tl-date">${dateLabel}</div><div class="tl-card"><p class="title">${escapeHtml(ev.title)}</p>${body}</div></li>`;
           })
           .join('');
-        return `<div class="timeline ${layoutClass}" style="max-height:${data.heightPx}px"><ul>${items}</ul></div>`;
+        return wrap(
+          `<div class="timeline ${layoutClass}" style="max-height:${data.heightPx}px"><ul>${items}</ul></div>`,
+        );
       }
       case 'qr': {
         const props = parseQrBlockProps(block.props);
@@ -384,12 +465,16 @@ ${footerNum}
           payload: '',
         };
         if (!data.dataUrl) {
-          return `<div class="qr-ph" style="width:${data.sizePx}px;height:${data.sizePx}px">QR</div>`;
+          return wrap(
+            `<div class="qr-ph" style="width:${data.sizePx}px;height:${data.sizePx}px">QR</div>`,
+          );
         }
         const caption = data.caption
           ? `<p class="qr-caption">${escapeHtml(data.caption)}</p>`
           : '';
-        return `<figure class="qr-wrap"><img class="qr-img" src="${escapeHtml(data.dataUrl)}" width="${data.sizePx}" height="${data.sizePx}" alt="QR"/>${caption}</figure>`;
+        return wrap(
+          `<figure class="qr-wrap"><img class="qr-img" src="${escapeHtml(data.dataUrl)}" width="${data.sizePx}" height="${data.sizePx}" alt="QR"/>${caption}</figure>`,
+        );
       }
       case 'toc': {
         const props = parseTocBlockProps(block.props);
@@ -402,41 +487,53 @@ ${footerNum}
           ? `<h2 class="toc-title">${escapeHtml(props.title)}</h2>`
           : '';
         if (entries.length === 0) {
-          return `<nav class="toc">${heading}<p class="toc-empty">—</p></nav>`;
+          return wrap(
+            `<nav class="toc">${heading}<p class="toc-empty">—</p></nav>`,
+          );
         }
         const items = entries
           .map((e) => {
             const page = props.showPageNumbers
               ? `<span class="toc-dots" aria-hidden="true"></span><span class="toc-page">${e.pageNumber}</span>`
               : '';
-            return `<li class="toc-item l${e.level}"><span class="toc-label">${escapeHtml(e.title)}</span>${page}</li>`;
+            const href = `#${blockAnchorId(e.id)}`;
+            return `<li class="toc-item l${e.level}"><a class="toc-label" href="${escapeHtml(href)}">${escapeHtml(e.title)}</a>${page}</li>`;
           })
           .join('');
-        return `<nav class="toc">${heading}<ul class="toc-list">${items}</ul></nav>`;
+        return wrap(
+          `<nav class="toc">${heading}<ul class="toc-list">${items}</ul></nav>`,
+        );
       }
       case 'repeater': {
         const props = parseRepeaterBlockProps(block.props);
         const items = ctx.repeaterItemsByBlockId[block.id] ?? [];
         if (items.length === 0) {
           const msg = props.emptyMessage.trim() || '—';
-          return `<div class="repeater-empty">${escapeHtml(msg)}</div>`;
+          return wrap(
+            `<div class="repeater-empty">${escapeHtml(msg)}</div>`,
+          );
         }
         const cards = items
           .map((item) => {
-            const bound = bindBlockTree(block.children ?? [], item.values);
+            const bound = bindBlockTree(block.children ?? [], {
+              ...ctx.binding,
+              item: item.values,
+            });
             return `<div class="repeater-card">${this.renderBlocks(bound, ctx)}</div>`;
           })
           .join('');
-        return `<div class="repeater">${cards}</div>`;
+        return wrap(`<div class="repeater">${cards}</div>`);
       }
       case 'section': {
         const titleRaw = String(block.props.title ?? '').trim();
         const level = Number(block.props.headingLevel);
         const h = level === 1 || level === 2 || level === 3 ? level : 2;
         const title = titleRaw
-          ? `<h${h} class="heading" id="h-${escapeHtml(block.id)}">${escapeHtml(titleRaw)}</h${h}>`
+          ? `<h${h} class="heading" id="${escapeHtml(blockAnchorId(block.id))}">${withBlockLink(block, escapeHtml(titleRaw))}</h${h}>`
           : '';
-        return `<section class="section">${title}${this.renderBlocks(block.children ?? [], ctx)}</section>`;
+        return wrap(
+          `<section class="section">${title}${this.renderBlocks(block.children ?? [], ctx)}</section>`,
+        );
       }
       case 'divider':
         return `<hr class="divider"/>`;

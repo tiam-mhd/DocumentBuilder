@@ -1,7 +1,8 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
+import { AuditModule } from '../audit/audit.module';
 import { IdentityController } from './identity.controller';
 import { AuthController } from './auth.controller';
 import { IdentityService } from './identity.service';
@@ -23,6 +24,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
         secret: config.getOrThrow<string>('JWT_SECRET'),
       }),
     }),
+    forwardRef(() => AuditModule),
   ],
   controllers: [IdentityController, AuthController],
   providers: [

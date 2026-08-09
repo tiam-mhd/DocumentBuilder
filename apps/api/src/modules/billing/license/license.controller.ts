@@ -7,6 +7,8 @@ import {
 } from '@nestjs/swagger';
 import { IsOptional, IsString, MinLength } from 'class-validator';
 import { JwtAuthGuard } from '../../identity/guards/jwt-auth.guard';
+import { CurrentUser } from '../../identity/decorators/current-user.decorator';
+import type { RequestUser } from '../../identity/auth.types';
 import { LicenseService } from './license.service';
 
 class ActivateLicenseDto {
@@ -42,10 +44,14 @@ export class LicenseController {
     summary: 'Activate SELF_HOSTED installation license (hashed at rest)',
   })
   @ApiOkResponse({ description: 'Activated license status' })
-  async activate(@Body() dto: ActivateLicenseDto) {
+  async activate(
+    @CurrentUser() user: RequestUser,
+    @Body() dto: ActivateLicenseDto,
+  ) {
     const data = await this.licenses.activate({
       licenseKey: dto.licenseKey,
       organizationName: dto.organizationName,
+      userId: user.userId,
     });
     return { data };
   }

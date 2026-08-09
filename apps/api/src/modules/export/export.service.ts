@@ -8,11 +8,14 @@ import {
   documentCollectRequiredModuleCodes,
   documentCollectRepeaterSources,
   documentCollectVisibilitySources,
+  documentCollectBindingSources,
+  paginateDocumentBody,
   parseDocumentBody,
   parseMapBlockProps,
   parseOrgChartBlockProps,
   parseRepeaterBlockProps,
   parseTimelineBlockProps,
+  type BindingContext,
   type BlockNode,
   type VisibilityContext,
 } from '@vdb/document-schema';
@@ -38,8 +41,13 @@ import {
 } from './document-html.renderer';
 import type { EntitlementCode, PublicCollectionItem } from '@vdb/shared-types';
 import {
+  AuditActions,
+  contentLocaleDir,
   DEFAULT_DESIGN_THEME_TOKENS,
+  DOCUMENT_EXPORT_ALLOWED_STATUSES,
+  DocumentErrorCodes,
   ExportErrorCodes,
+  parseContentLocale,
   type DesignThemeTokens,
   type PublicExportJob,
 } from '@vdb/shared-types';
@@ -48,6 +56,7 @@ import {
   type ExportPdfJobPayload,
 } from './export-queue.service';
 import { PDF_RENDERER, type PdfRenderer } from './pdf/pdf-renderer.port';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class ExportService implements OnModuleInit {
@@ -64,6 +73,7 @@ export class ExportService implements OnModuleInit {
     private readonly qr: QrService,
     private readonly collections: CollectionService,
     private readonly entitlements: EntitlementsService,
+    private readonly audit: AuditService,
     @Inject(PDF_RENDERER) private readonly pdf: PdfRenderer,
     @Inject(OBJECT_STORAGE) private readonly storage: ObjectStorage,
   ) {}
@@ -75,6 +85,7 @@ export class ExportService implements OnModuleInit {
   async createPdfJob(input: {
     businessId: string;
     documentId: string;
+    userId?: string | null;
   }): Promise<PublicExportJob> {
     const doc = await this.prisma.document.findFirst({
       where: {
@@ -88,6 +99,18 @@ export class ExportService implements OnModuleInit {
         ExportErrorCodes.DocumentNotFound,
         'Document not found',
         HttpStatus.NOT_FOUND,
+      );
+    }
+
+    if (
+      !DOCUMENT_EXPORT_ALLOWED_STATUSES.includes(
+        doc.status as (typeof DOCUMENT_EXPORT_ALLOWED_STATUSES)[number],
+      )
+    ) {
+      throw new DomainException(
+        DocumentErrorCodes.NotApprovedForExport,
+        'PDF export requires approved or published status',
+        HttpStatus.CONFLICT,
       );
     }
 
@@ -132,6 +155,15 @@ export class ExportService implements OnModuleInit {
         HttpStatus.SERVICE_UNAVAILABLE,
       );
     }
+
+    await this.audit.log({
+      action: AuditActions.ExportPdfEnqueued,
+      entityType: 'export_job',
+      entityId: row.id,
+      businessId: input.businessId,
+      userId: input.userId ?? null,
+      meta: { documentId: input.documentId },
+    });
 
     return this.toPublic(row);
   }
@@ -226,38 +258,63 @@ export class ExportService implements OnModuleInit {
 
       const theme = await this.resolveTheme(businessId, doc.templateId);
       const fonts = await this.loadFonts(businessId, theme);
+      const locale = parseContentLocale(body.locale ?? doc.locale);
       const mapMarkersByBlockId = await this.resolveMapMarkers(
         businessId,
         body,
+        locale,
       );
-      const orgChartByBlockId = await this.resolveOrgCharts(businessId, body);
-      const timelineByBlockId = await this.resolveTimelines(businessId, body);
+      const orgChartByBlockId = await this.resolveOrgCharts(
+        businessId,
+        body,
+        locale,
+      );
+      const timelineByBlockId = await this.resolveTimelines(
+        businessId,
+        body,
+        locale,
+      );
       const qrByBlockId = await this.resolveQrCodes(body);
       const repeaterItemsByBlockId = await this.resolveRepeaters(
         businessId,
         body,
+        locale,
       );
       const visibility = await this.resolveVisibility(businessId, body);
+      const binding = await this.resolveBindingContext(
+        businessId,
+        body,
+        locale,
+      );
+
+      const paginated = paginateDocumentBody(body, {
+        visibility,
+        repeaterItemsByBlockId,
+        binding,
+      });
 
       const html = this.html.build({
         title: doc.title,
-        body,
+        body: paginated,
         tokens: theme,
         fonts,
-        dir: 'rtl',
-        lang: 'fa',
+        dir: contentLocaleDir(locale),
+        lang: locale,
         mapMarkersByBlockId,
         orgChartByBlockId,
         timelineByBlockId,
         qrByBlockId,
-        repeaterItemsByBlockId,
+        // Repeaters already expanded into page cards by paginateDocumentBody
+        repeaterItemsByBlockId: {},
         visibility,
+        binding,
       });
 
       const pdf = await this.pdf.render({
         html,
         format: body.page.size === 'A3' ? 'A3' : 'A4',
         landscape: body.page.orientation === 'landscape',
+        outline: true,
       });
 
       const storageKey = `${businessId}/exports/${jobId}/document.pdf`;
@@ -294,6 +351,7 @@ export class ExportService implements OnModuleInit {
   private async resolveMapMarkers(
     businessId: string,
     body: ReturnType<typeof parseDocumentBody>,
+    locale?: string,
   ): Promise<Record<string, MapMarkerPoint[]>> {
     const out: Record<string, MapMarkerPoint[]> = {};
     const visit = async (blocks: BlockNode[]) => {
@@ -307,6 +365,7 @@ export class ExportService implements OnModuleInit {
               businessId,
               source: props.markersSource,
               country: props.countryRestriction ?? undefined,
+              locale,
             });
             out[b.id] = list.items.map((m) => ({
               lat: m.lat,
@@ -331,6 +390,7 @@ export class ExportService implements OnModuleInit {
   private async resolveOrgCharts(
     businessId: string,
     body: ReturnType<typeof parseDocumentBody>,
+    locale?: string,
   ): Promise<Record<string, OrgChartRenderTree>> {
     const out: Record<string, OrgChartRenderTree> = {};
     const visit = async (blocks: BlockNode[]) => {
@@ -340,6 +400,7 @@ export class ExportService implements OnModuleInit {
           const tree = await this.orgChart.getTree({
             businessId,
             rootMemberId: props.rootMemberId,
+            locale,
           });
           out[b.id] = {
             layout: props.layout,
@@ -364,6 +425,7 @@ export class ExportService implements OnModuleInit {
   private async resolveTimelines(
     businessId: string,
     body: ReturnType<typeof parseDocumentBody>,
+    locale?: string,
   ): Promise<Record<string, TimelineRenderData>> {
     const out: Record<string, TimelineRenderData> = {};
     const visit = async (blocks: BlockNode[]) => {
@@ -373,6 +435,7 @@ export class ExportService implements OnModuleInit {
           const items = await this.timeline.listForBlock({
             businessId,
             limit: props.limit,
+            locale,
           });
           out[b.id] = {
             layout: props.layout,
@@ -412,9 +475,43 @@ export class ExportService implements OnModuleInit {
     return { collection };
   }
 
+  private async resolveBindingContext(
+    businessId: string,
+    body: ReturnType<typeof parseDocumentBody>,
+    locale?: string,
+  ): Promise<BindingContext> {
+    const business = await this.prisma.business.findFirst({
+      where: { id: businessId, deletedAt: null },
+      select: { name: true },
+    });
+    const sources = documentCollectBindingSources(body);
+    const collections: BindingContext['collections'] = {};
+    for (const source of sources) {
+      try {
+        const list = await this.collections.list({
+          businessId,
+          source,
+          limit: 100,
+          locale,
+        });
+        collections[source] = {
+          total: list.total,
+          items: list.items,
+        };
+      } catch {
+        collections[source] = { total: 0, items: [] };
+      }
+    }
+    return {
+      business: { name: business?.name ?? '' },
+      collections,
+    };
+  }
+
   private async resolveRepeaters(
     businessId: string,
     body: ReturnType<typeof parseDocumentBody>,
+    locale?: string,
   ): Promise<Record<string, PublicCollectionItem[]>> {
     const out: Record<string, PublicCollectionItem[]> = {};
     const visit = async (blocks: BlockNode[]) => {
@@ -425,6 +522,7 @@ export class ExportService implements OnModuleInit {
             businessId,
             source: props.source,
             limit: props.limit,
+            locale,
           });
           out[b.id] = list.items;
         }

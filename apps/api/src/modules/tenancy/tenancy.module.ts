@@ -1,4 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { AuditModule } from '../audit/audit.module';
 import { IdentityModule } from '../identity/identity.module';
 import { BillingModule } from '../billing/billing.module';
 import { DesignModule } from '../design/design.module';
@@ -14,6 +15,7 @@ import { TenancyService } from './tenancy.service';
 @Module({
   imports: [
     IdentityModule,
+    forwardRef(() => AuditModule),
     forwardRef(() => BillingModule),
     forwardRef(() => DesignModule),
   ],

@@ -7,6 +7,7 @@ import {
   SubscriptionStatus as PrismaSubscriptionStatus,
 } from '@prisma/client';
 import {
+  AuditActions,
   BillingErrorCodes,
   SUBSCRIPTION_PERIOD_DAYS,
   type CheckoutSession,
@@ -16,6 +17,7 @@ import {
 import { DomainException } from '../../common/errors/domain.exception';
 import { EditionService } from '../../config/edition/edition.service';
 import { PrismaService } from '../../config/prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 import { BILLING_ADAPTER, type BillingAdapter } from './adapters/billing-adapter.token';
 import { SubscriptionService } from './subscription.service';
 import { PaymentIdempotencyLock } from './payment/payment-idempotency.lock';
@@ -35,6 +37,7 @@ export class CheckoutService {
     private readonly subscriptions: SubscriptionService,
     private readonly config: ConfigService,
     private readonly lock: PaymentIdempotencyLock,
+    private readonly audit: AuditService,
     @Inject(BILLING_ADAPTER) private readonly billingAdapter: BillingAdapter,
     @Inject(PAYMENT_PORT) private readonly paymentPort: PaymentPort,
   ) {}
@@ -392,6 +395,20 @@ export class CheckoutService {
       const subscription = await this.subscriptions.getForBusiness(
         payment.businessId,
       );
+
+      await this.audit.log({
+        action: AuditActions.BillingPaymentSucceeded,
+        entityType: 'payment',
+        entityId: paid.id,
+        businessId: paid.businessId,
+        userId: null,
+        meta: {
+          amount: paid.amount,
+          currency: paid.currency,
+          invoiceId: paid.invoiceId,
+        },
+      });
+
       return { payment: this.toPublicPayment(paid), subscription };
     } finally {
       if (locked) {

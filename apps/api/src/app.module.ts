@@ -14,6 +14,7 @@ import { DesignModule } from './modules/design/design.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { ExportModule } from './modules/export/export.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { BackupModule } from './modules/backup/backup.module';
 import { SystemModule } from './modules/system/system.module';
 
 @Module({
@@ -36,6 +37,7 @@ import { SystemModule } from './modules/system/system.module';
     DocumentsModule,
     ExportModule,
     AuditModule,
+    BackupModule,
     SystemModule,
   ],
 })

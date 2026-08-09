@@ -1,5 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { AuditModule } from '../audit/audit.module';
 import { BillingModule } from '../billing/billing.module';
 import { IdentityModule } from '../identity/identity.module';
 import { TenancyModule } from '../tenancy/tenancy.module';
@@ -23,6 +24,7 @@ import { PlaywrightPdfRenderer } from './pdf/playwright-pdf.renderer';
     AssetsModule,
     forwardRef(() => DocumentsModule),
     forwardRef(() => ContentModule),
+    forwardRef(() => AuditModule),
   ],
   controllers: [ExportController],
   providers: [

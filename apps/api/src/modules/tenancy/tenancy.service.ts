@@ -1,12 +1,14 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { MembershipRole } from '@prisma/client';
 import {
+  AuditActions,
   MembershipRole as PublicMembershipRole,
   TenancyErrorCodes,
   type PublicBusiness,
 } from '@vdb/shared-types';
 import { DomainException } from '../../common/errors/domain.exception';
 import { PrismaService } from '../../config/prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 import {
   BUSINESS_CREATED_HOOK,
   type BusinessCreatedHook,
@@ -18,6 +20,7 @@ export class TenancyService {
     private readonly prisma: PrismaService,
     @Inject(BUSINESS_CREATED_HOOK)
     private readonly createdHook: BusinessCreatedHook,
+    private readonly audit: AuditService,
   ) {}
 
   async listForUser(userId: string): Promise<PublicBusiness[]> {
@@ -66,6 +69,15 @@ export class TenancyService {
       });
 
       return { business, membership };
+    });
+
+    await this.audit.log({
+      action: AuditActions.BusinessCreate,
+      entityType: 'business',
+      entityId: created.business.id,
+      businessId: created.business.id,
+      userId,
+      meta: { name: created.business.name },
     });
 
     return this.toPublic(created.business, created.membership.role);
@@ -121,10 +133,52 @@ export class TenancyService {
       where: { id: businessId },
       data: { deletedAt: new Date() },
     });
+
+    await this.audit.log({
+      action: AuditActions.BusinessDelete,
+      entityType: 'business',
+      entityId: businessId,
+      businessId,
+      userId,
+      meta: { name: membership.business.name },
+    });
   }
 
   async assertMembership(userId: string, businessId: string): Promise<void> {
     await this.requireMembership(userId, businessId);
+  }
+
+  /** Returns membership role for an existing member. */
+  async getMembershipRole(
+    userId: string,
+    businessId: string,
+  ): Promise<MembershipRole> {
+    const membership = await this.requireMembership(userId, businessId);
+    return membership.role;
+  }
+
+  /** OWNER or ADMIN — document approvers / publishers (ADR 021). */
+  async assertApprover(userId: string, businessId: string): Promise<void> {
+    const role = await this.getMembershipRole(userId, businessId);
+    if (role !== MembershipRole.OWNER && role !== MembershipRole.ADMIN) {
+      throw new DomainException(
+        TenancyErrorCodes.BusinessForbidden,
+        'Approver role required (OWNER or ADMIN)',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+  }
+
+  /** OWNER only — backup/restore and destructive business ops. */
+  async assertOwner(userId: string, businessId: string): Promise<void> {
+    const role = await this.getMembershipRole(userId, businessId);
+    if (role !== MembershipRole.OWNER) {
+      throw new DomainException(
+        TenancyErrorCodes.BusinessForbidden,
+        'Owner role required',
+        HttpStatus.FORBIDDEN,
+      );
+    }
   }
 
   private async requireMembership(userId: string, businessId: string) {

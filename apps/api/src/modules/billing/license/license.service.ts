@@ -1,12 +1,14 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  AuditActions,
   LicenseErrorCodes,
   type PublicInstallationLicense,
 } from '@vdb/shared-types';
 import { DomainException } from '../../../common/errors/domain.exception';
 import { EditionService } from '../../../config/edition/edition.service';
 import { PrismaService } from '../../../config/prisma/prisma.service';
+import { AuditService } from '../../audit/audit.service';
 import {
   hashLicenseKey,
   licenseKeyHint,
@@ -20,6 +22,7 @@ export class LicenseService {
     private readonly prisma: PrismaService,
     private readonly edition: EditionService,
     private readonly config: ConfigService,
+    private readonly audit: AuditService,
   ) {}
 
   async getPublicStatus(): Promise<PublicInstallationLicense> {
@@ -86,6 +89,7 @@ export class LicenseService {
   async activate(input: {
     licenseKey: string;
     organizationName?: string;
+    userId?: string | null;
   }): Promise<PublicInstallationLicense> {
     if (!this.edition.isSelfHosted()) {
       throw new DomainException(
@@ -141,6 +145,21 @@ export class LicenseService {
         activatedAt: now,
         expiresAt: verified.expiresAt,
         revokedAt: null,
+      },
+    });
+
+    await this.audit.log({
+      action: AuditActions.BillingLicenseActivated,
+      entityType: 'installation_license',
+      entityId: null,
+      businessId: null,
+      userId: input.userId ?? null,
+      meta: {
+        keyHint: licenseKeyHint(normalized),
+        organizationName:
+          input.organizationName?.trim() ||
+          verified.organizationName ||
+          null,
       },
     });
 

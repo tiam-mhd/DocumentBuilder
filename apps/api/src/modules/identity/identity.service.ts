@@ -1,12 +1,14 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  AuditActions,
   AuthErrorCodes,
   type AuthTokens,
   type PublicUser,
 } from '@vdb/shared-types';
 import { DomainException } from '../../common/errors/domain.exception';
 import { PrismaService } from '../../config/prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 import { normalizeMobile } from './mobile.util';
 import { generateOtpCode, hashOtp, otpHashesEqual } from './otp.crypto';
 import { OtpChallengeStore } from './otp-challenge.store';
@@ -37,6 +39,7 @@ export class IdentityService {
     private readonly config: ConfigService,
     @Inject(SMS_SENDER) private readonly sms: SmsSender,
     private readonly tokens: AuthTokenService,
+    private readonly audit: AuditService,
   ) {}
 
   async requestOtp(rawMobile: string): Promise<RequestOtpResult> {
@@ -98,6 +101,15 @@ export class IdentityService {
     const isNewUser = !existing;
     const user = this.toPublic(userRow);
     const token: AuthTokens = await this.tokens.issueAccessToken(user);
+
+    await this.audit.log({
+      action: AuditActions.AuthLogin,
+      entityType: 'user',
+      entityId: user.id,
+      businessId: null,
+      userId: user.id,
+      meta: { isNewUser },
+    });
 
     return {
       user,
