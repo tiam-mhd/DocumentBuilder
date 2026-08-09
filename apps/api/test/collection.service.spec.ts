@@ -32,6 +32,7 @@ describe('CollectionService', () => {
             title: 'Alpha',
             description: 'Desc',
             status: 'active',
+            translations: {},
           },
         ]),
         count: jest.fn().mockResolvedValue(1),
@@ -61,5 +62,39 @@ describe('CollectionService', () => {
         take: 10,
       }),
     );
+  });
+
+  it('resolves English project titles from translations with FA fallback', async () => {
+    const prisma = {
+      project: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'p1',
+            title: 'آلفا',
+            description: 'توضیح',
+            status: 'published',
+            translations: { en: { title: 'Alpha EN' } },
+          },
+          {
+            id: 'p2',
+            title: 'بتا',
+            description: 'بدون ترجمه',
+            status: 'draft',
+            translations: {},
+          },
+        ]),
+        count: jest.fn().mockResolvedValue(2),
+      },
+    };
+    const svc = serviceWithPrisma(prisma);
+    const list = await svc.list({
+      businessId,
+      source: 'projects',
+      limit: 10,
+      locale: 'en',
+    });
+    expect(list.items[0]!.values.title).toBe('Alpha EN');
+    expect(list.items[0]!.values.description).toBe('توضیح');
+    expect(list.items[1]!.values.title).toBe('بتا');
   });
 });

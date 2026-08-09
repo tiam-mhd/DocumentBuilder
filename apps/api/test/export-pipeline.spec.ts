@@ -80,6 +80,18 @@ describe('PDF export pipeline (unit)', () => {
       ],
       dir: 'rtl',
       lang: 'fa',
+      binding: {
+        business: { name: 'شرکت نمونه' },
+        collections: {
+          projects: {
+            total: 2,
+            items: [
+              { values: { title: 'پروژه آلفا' } },
+              { values: { title: 'پروژه بتا' } },
+            ],
+          },
+        },
+      },
       mapMarkersByBlockId: {
         m1: [{ lat: 35.7, lng: 51.4, name: 'تهران' }],
       },
@@ -113,6 +125,7 @@ describe('PDF export pipeline (unit)', () => {
               occurredAt: '2020-03-15T00:00:00.000Z',
               title: 'تأسیس',
               body: 'شروع',
+              translations: {},
               mediaId: null,
               sortOrder: 0,
               fields: {},
@@ -142,6 +155,7 @@ describe('PDF export pipeline (unit)', () => {
     });
     expect(html).toContain('dir="rtl"');
     expect(html).toContain('lang="fa"');
+    expect(html).toContain('شرکت نمونه');
     expect(html).toContain('سلام دنیا');
     expect(html).toContain('@font-face');
     expect(html).toContain('Vazirmatn');
@@ -157,6 +171,73 @@ describe('PDF export pipeline (unit)', () => {
     expect(html).toContain('پروژه بتا');
     expect(html).toContain('درباره ما');
     expect(body.schemaVersion).toBe(DOCUMENT_SCHEMA_VERSION);
+  });
+
+  it('builds LTR HTML for English document locale with EN repeater titles', () => {
+    const config = {
+      get: jest.fn().mockReturnValue('none'),
+    };
+    const renderer = new DocumentHtmlRenderer(config as never);
+    const body = createEmptyDocumentBody('biz_1', 'doc_en', {
+      title: 'Company profile',
+    });
+    body.locale = 'en';
+    body.pages[0]!.blocks = [
+      {
+        id: 't1',
+        type: 'text',
+        props: {
+          content:
+            '{{business.name}} · {{count(projects)}} · Hello world — English sample',
+        },
+      },
+      {
+        id: 'rep1',
+        type: 'repeater',
+        props: { source: 'projects', limit: 10, emptyMessage: 'Empty' },
+        children: [
+          {
+            id: 'rep-t1',
+            type: 'text',
+            props: { content: '{{item.title}}' },
+          },
+        ],
+      },
+    ];
+    const html = renderer.build({
+      title: 'Company profile',
+      body,
+      tokens: DEFAULT_DESIGN_THEME_TOKENS,
+      fonts: [],
+      dir: 'ltr',
+      lang: 'en',
+      binding: {
+        business: { name: 'Acme' },
+        collections: {
+          projects: {
+            total: 2,
+            items: [
+              { values: { title: 'Alpha Project' } },
+              { values: { title: 'Beta Project' } },
+            ],
+          },
+        },
+      },
+      repeaterItemsByBlockId: {
+        rep1: [
+          { id: 'p1', values: { title: 'Alpha Project' } },
+          { id: 'p2', values: { title: 'Beta Project' } },
+        ],
+      },
+      visibility: { collection: { projects: 2 } },
+    });
+    expect(html).toContain('dir="ltr"');
+    expect(html).toContain('lang="en"');
+    expect(html).toContain('Acme');
+    expect(html).toContain('Acme · 2 · Hello world');
+    expect(html).toContain('Alpha Project');
+    expect(html).toContain('Beta Project');
+    expect(body.locale).toBe('en');
   });
 
   it('hides certificates section when collection is empty', () => {

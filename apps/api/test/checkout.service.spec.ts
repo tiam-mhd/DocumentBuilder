@@ -24,6 +24,10 @@ describe('CheckoutService', () => {
     describe: () => 'license',
   };
 
+  const audit = {
+    log: jest.fn().mockResolvedValue(undefined),
+  };
+
   function buildPrisma(overrides: Record<string, unknown> = {}) {
     const payment = {
       id: 'pay_1',
@@ -103,6 +107,7 @@ describe('CheckoutService', () => {
       {} as never,
       { getOrThrow: jest.fn() } as never,
       { acquire: jest.fn(), release: jest.fn() } as never,
+      audit as never,
       licenseAdapter as never,
       { provider: 'fake', createCheckout: jest.fn(), verifyPayment: jest.fn() } as never,
     );
@@ -140,6 +145,7 @@ describe('CheckoutService', () => {
         },
       } as never,
       { acquire: jest.fn(), release: jest.fn() } as never,
+      audit as never,
       platformAdapter as never,
       paymentPort as never,
     );
@@ -184,6 +190,7 @@ describe('CheckoutService', () => {
         acquire: jest.fn().mockResolvedValue(true),
         release: jest.fn(),
       } as never,
+      audit as never,
       platformAdapter as never,
       paymentPort as never,
     );
@@ -231,6 +238,7 @@ describe('CheckoutService', () => {
         acquire: jest.fn().mockResolvedValue(true),
         release: jest.fn(),
       } as never,
+      audit as never,
       platformAdapter as never,
       paymentPort as never,
     );

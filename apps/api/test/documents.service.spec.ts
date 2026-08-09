@@ -48,13 +48,31 @@ describe('DocumentsService', () => {
     const entitlements = {
       assertModule: jest.fn().mockResolvedValue(undefined),
     };
+    const versions = {
+      deleteBodiesForDocument: jest.fn().mockResolvedValue(undefined),
+      latestVersionNumber: jest.fn().mockResolvedValue(0),
+    };
+    const audit = {
+      log: jest.fn().mockResolvedValue(undefined),
+    };
     const service = new DocumentsService(
       prisma as never,
       bodies as never,
       entitlements as never,
       templateBodies as never,
+      versions as never,
+      audit as never,
     );
-    return { service, prisma, bodies, templateBodies, templateBody, entitlements };
+    return {
+      service,
+      prisma,
+      bodies,
+      templateBodies,
+      templateBody,
+      entitlements,
+      versions,
+      audit,
+    };
   }
 
   it('creates document from template snapshot with dataRefs empty', async () => {

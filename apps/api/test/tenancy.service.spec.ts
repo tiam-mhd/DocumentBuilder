@@ -49,7 +49,9 @@ describe('TenancyService', () => {
     };
 
     return {
-      service: new TenancyService(prisma as never, hook),
+      service: new TenancyService(prisma as never, hook, {
+        log: jest.fn().mockResolvedValue(undefined),
+      } as never),
       prisma,
       hook,
     };

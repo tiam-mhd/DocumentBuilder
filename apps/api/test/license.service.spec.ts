@@ -59,6 +59,7 @@ describe('LicenseService', () => {
       prisma as never,
       edition as never,
       config as never,
+      { log: jest.fn().mockResolvedValue(undefined) } as never,
     );
     return { service, prisma, edition };
   }

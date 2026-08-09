@@ -99,6 +99,7 @@ describe('IdentityService', () => {
         config as never,
         sms,
         tokens as never,
+        { log: jest.fn().mockResolvedValue(undefined) } as never,
       ),
       challenges,
       prisma,
