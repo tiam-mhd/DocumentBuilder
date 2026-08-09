@@ -45,12 +45,16 @@ describe('DocumentsService', () => {
         }),
       },
     };
+    const entitlements = {
+      assertModule: jest.fn().mockResolvedValue(undefined),
+    };
     const service = new DocumentsService(
       prisma as never,
       bodies as never,
+      entitlements as never,
       templateBodies as never,
     );
-    return { service, prisma, bodies, templateBodies, templateBody };
+    return { service, prisma, bodies, templateBodies, templateBody, entitlements };
   }
 
   it('creates document from template snapshot with dataRefs empty', async () => {
@@ -110,7 +114,7 @@ describe('DocumentsService', () => {
           schemaVersion: DOCUMENT_SCHEMA_VERSION,
           businessId: 'biz_1',
           documentId: 'doc_1',
-          blocks: [{ id: 'x', type: 'map', props: {} }],
+          blocks: [{ id: 'x', type: 'notARealBlock', props: {} }],
         },
       }),
     ).rejects.toMatchObject({ code: DocumentErrorCodes.InvalidBody });

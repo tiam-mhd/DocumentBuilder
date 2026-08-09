@@ -1,6 +1,6 @@
 import {
-  CORE_BLOCK_REGISTRY,
-  CORE_BLOCK_TYPES,
+  ALL_BLOCK_TYPES,
+  BLOCK_REGISTRY,
   TEMPLATE_SCHEMA_VERSION,
   createEmptyTemplateBody,
   parseTemplateBody,
@@ -38,18 +38,28 @@ describe('TemplateService', () => {
         findFirst: jest.fn().mockResolvedValue({ id: 'theme_1' }),
       },
     };
-    const service = new TemplateService(prisma as never, bodies as never);
-    return { service, prisma, bodies };
+    const entitlements = {
+      assertModule: jest.fn().mockResolvedValue({}),
+    };
+    const service = new TemplateService(
+      prisma as never,
+      bodies as never,
+      entitlements as never,
+    );
+    return { service, prisma, bodies, entitlements };
   }
 
-  it('exposes core block registry aligned with document-schema', () => {
+  it('exposes full block registry aligned with document-schema', () => {
     const { service } = build();
     const reg = service.getRegistry();
     expect(reg.schemaVersion).toBe(TEMPLATE_SCHEMA_VERSION);
     expect(reg.items.map((i) => i.type).sort()).toEqual(
-      [...CORE_BLOCK_TYPES].sort(),
+      [...ALL_BLOCK_TYPES].sort(),
     );
-    expect(reg.items).toHaveLength(CORE_BLOCK_REGISTRY.length);
+    expect(reg.items).toHaveLength(BLOCK_REGISTRY.length);
+    expect(reg.items.find((i) => i.type === 'gallery')?.moduleCode).toBe(
+      'module.gallery',
+    );
   });
 
   it('creates template with empty starter body in Mongo', async () => {
@@ -98,16 +108,41 @@ describe('TemplateService', () => {
     ).rejects.toMatchObject({ code: TemplateErrorCodes.ThemeNotFound });
   });
 
-  it('rejects body with unknown block type', async () => {
-    const { service } = build();
-    const bad = createEmptyTemplateBody('biz_1', 'tmp');
-    (bad.pages[0]!.blocks[0] as { type: string }).type = 'map';
+  it('denies create when body requires a locked module', async () => {
+    const { service, entitlements, prisma } = build();
+    const { DomainException } = await import(
+      '../src/common/errors/domain.exception'
+    );
+    const { EntitlementErrorCodes } = await import('@vdb/shared-types');
+    entitlements.assertModule.mockRejectedValue(
+      new DomainException(
+        EntitlementErrorCodes.ModuleRequired,
+        'Missing entitlement: module.map',
+        403,
+      ),
+    );
+    const body = createEmptyTemplateBody('biz_1', 'tmp');
+    body.pages[0]!.blocks = [
+      {
+        id: 'm1',
+        type: 'map',
+        props: {
+          centerLat: 35,
+          centerLng: 51,
+          zoom: 10,
+          markersSource: 'none',
+          showMarkers: false,
+          heightPx: 200,
+        },
+      },
+    ];
     await expect(
       service.create({
         businessId: 'biz_1',
-        name: 'Bad',
-        body: bad,
+        name: 'Map tpl',
+        body,
       }),
-    ).rejects.toMatchObject({ code: TemplateErrorCodes.InvalidBody });
+    ).rejects.toMatchObject({ code: EntitlementErrorCodes.ModuleRequired });
+    expect(prisma.documentTemplate.delete).toHaveBeenCalled();
   });
 });
