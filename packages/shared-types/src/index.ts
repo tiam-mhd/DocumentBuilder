@@ -48,6 +48,7 @@ export const EntitlementCodes = {
   ModuleOrgChart: 'module.org_chart',
   ModuleTimeline: 'module.timeline',
   ModuleProjects: 'module.projects',
+  ModuleGallery: 'module.gallery',
 } as const;
 
 export type EntitlementCode =
@@ -89,6 +90,7 @@ export const MODULE_ENTITLEMENT_CODES = [
   EntitlementCodes.ModuleOrgChart,
   EntitlementCodes.ModuleTimeline,
   EntitlementCodes.ModuleProjects,
+  EntitlementCodes.ModuleGallery,
 ] as const;
 
 export type PublicPlan = {
@@ -555,4 +557,401 @@ export type PublicExportJob = {
   updatedAt: string;
   startedAt: string | null;
   finishedAt: string | null;
+};
+
+/** Portfolio / project status (ContentModule — gated by module.projects). */
+export const ProjectStatus = {
+  Draft: 'draft',
+  Published: 'published',
+  Archived: 'archived',
+} as const;
+
+export type ProjectStatusValue =
+  (typeof ProjectStatus)[keyof typeof ProjectStatus];
+
+export const ProjectErrorCodes = {
+  NotFound: 'PROJECT_NOT_FOUND',
+  CategoryNotFound: 'PROJECT_CATEGORY_NOT_FOUND',
+  InvalidTitle: 'PROJECT_INVALID_TITLE',
+  InvalidStatus: 'PROJECT_INVALID_STATUS',
+  InvalidFields: 'PROJECT_INVALID_FIELDS',
+  MediaNotFound: 'PROJECT_MEDIA_NOT_FOUND',
+  CategoryInUse: 'PROJECT_CATEGORY_IN_USE',
+  LocationNotFound: 'PROJECT_LOCATION_NOT_FOUND',
+} as const;
+
+export type ProjectErrorCode =
+  (typeof ProjectErrorCodes)[keyof typeof ProjectErrorCodes];
+
+export type PublicProjectCategory = {
+  id: string;
+  businessId: string;
+  name: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PublicProjectCategoryList = {
+  items: PublicProjectCategory[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
+export type PublicProject = {
+  id: string;
+  businessId: string;
+  categoryId: string | null;
+  categoryName: string | null;
+  title: string;
+  description: string;
+  status: ProjectStatusValue | string;
+  coverMediaId: string | null;
+  mediaIds: string[];
+  /** Optional FK to shared Location entity. */
+  locationId: string | null;
+  locationName: string | null;
+  fields: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PublicProjectList = {
+  items: PublicProject[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
+/** Team / branches — foundational Content (writable gate; feeds Org Chart & Map). */
+export const TeamErrorCodes = {
+  MemberNotFound: 'TEAM_MEMBER_NOT_FOUND',
+  BranchNotFound: 'BRANCH_NOT_FOUND',
+  InvalidName: 'TEAM_INVALID_NAME',
+  InvalidFields: 'TEAM_INVALID_FIELDS',
+  MediaNotFound: 'TEAM_MEDIA_NOT_FOUND',
+  BranchInUse: 'BRANCH_IN_USE',
+  LocationNotFound: 'BRANCH_LOCATION_NOT_FOUND',
+  InvalidParent: 'TEAM_INVALID_PARENT',
+  ParentCycle: 'TEAM_PARENT_CYCLE',
+} as const;
+
+export type TeamErrorCode =
+  (typeof TeamErrorCodes)[keyof typeof TeamErrorCodes];
+
+export type PublicTeamMember = {
+  id: string;
+  businessId: string;
+  branchId: string | null;
+  branchName: string | null;
+  parentMemberId: string | null;
+  name: string;
+  roleTitle: string;
+  department: string;
+  photoMediaId: string | null;
+  sortOrder: number;
+  fields: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PublicTeamMemberList = {
+  items: PublicTeamMember[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
+export type PublicBranch = {
+  id: string;
+  businessId: string;
+  name: string;
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  province: string;
+  postalCode: string;
+  country: string;
+  phone: string;
+  /** Optional FK to shared Location entity. */
+  locationId: string | null;
+  locationName: string | null;
+  sortOrder: number;
+  fields: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PublicBranchList = {
+  items: PublicBranch[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
+/**
+ * Services / Clients / Certificates — foundational Content (writable gate; no sellable module).
+ */
+export const ProfileContentErrorCodes = {
+  ServiceNotFound: 'SERVICE_NOT_FOUND',
+  ClientNotFound: 'CLIENT_NOT_FOUND',
+  CertificateNotFound: 'CERTIFICATE_NOT_FOUND',
+  InvalidName: 'PROFILE_INVALID_NAME',
+  InvalidFields: 'PROFILE_INVALID_FIELDS',
+  InvalidDate: 'PROFILE_INVALID_DATE',
+  MediaNotFound: 'PROFILE_MEDIA_NOT_FOUND',
+} as const;
+
+export type ProfileContentErrorCode =
+  (typeof ProfileContentErrorCodes)[keyof typeof ProfileContentErrorCodes];
+
+export type PublicBusinessService = {
+  id: string;
+  businessId: string;
+  name: string;
+  description: string;
+  iconMediaId: string | null;
+  sortOrder: number;
+  fields: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PublicBusinessServiceList = {
+  items: PublicBusinessService[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
+export type PublicClient = {
+  id: string;
+  businessId: string;
+  name: string;
+  website: string;
+  logoMediaId: string | null;
+  sortOrder: number;
+  fields: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PublicClientList = {
+  items: PublicClient[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
+export type PublicCertificate = {
+  id: string;
+  businessId: string;
+  name: string;
+  issuer: string;
+  issuedAt: string | null;
+  expiresAt: string | null;
+  documentMediaId: string | null;
+  sortOrder: number;
+  fields: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PublicCertificateList = {
+  items: PublicCertificate[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
+/** Gallery albums — gated by module.gallery. */
+export const GalleryErrorCodes = {
+  NotFound: 'GALLERY_NOT_FOUND',
+  ItemNotFound: 'GALLERY_ITEM_NOT_FOUND',
+  InvalidName: 'GALLERY_INVALID_NAME',
+  InvalidCaption: 'GALLERY_INVALID_CAPTION',
+  MediaNotFound: 'GALLERY_MEDIA_NOT_FOUND',
+  InvalidReorder: 'GALLERY_INVALID_REORDER',
+} as const;
+
+export type GalleryErrorCode =
+  (typeof GalleryErrorCodes)[keyof typeof GalleryErrorCodes];
+
+export type PublicGalleryItem = {
+  id: string;
+  businessId: string;
+  galleryId: string;
+  mediaId: string;
+  caption: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PublicGallery = {
+  id: string;
+  businessId: string;
+  name: string;
+  description: string;
+  sortOrder: number;
+  itemCount: number;
+  items?: PublicGalleryItem[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PublicGalleryList = {
+  items: PublicGallery[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
+/** Shared geography — foundational Content (writable gate; feeds Map). */
+export const LocationErrorCodes = {
+  NotFound: 'LOCATION_NOT_FOUND',
+  InvalidName: 'LOCATION_INVALID_NAME',
+  InvalidCoordinates: 'LOCATION_INVALID_COORDINATES',
+  InUse: 'LOCATION_IN_USE',
+} as const;
+
+export type LocationErrorCode =
+  (typeof LocationErrorCodes)[keyof typeof LocationErrorCodes];
+
+export type PublicLocation = {
+  id: string;
+  businessId: string;
+  name: string;
+  country: string;
+  province: string;
+  city: string;
+  address: string;
+  lat: number;
+  lng: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PublicLocationList = {
+  items: PublicLocation[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
+/** Map markers — gated by module.map. */
+export const MapErrorCodes = {
+  InvalidSource: 'MAP_INVALID_SOURCE',
+} as const;
+
+export type MapErrorCode =
+  (typeof MapErrorCodes)[keyof typeof MapErrorCodes];
+
+export type PublicMapMarker = {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  country: string;
+  /** locations | branches | projects */
+  source: string;
+};
+
+export type PublicMapMarkerList = {
+  items: PublicMapMarker[];
+  source: string;
+  countryRestriction: string | null;
+};
+
+/** Org chart tree — gated by module.org_chart; nodes from team_members. */
+export const OrgChartErrorCodes = {
+  RootNotFound: 'ORG_CHART_ROOT_NOT_FOUND',
+} as const;
+
+export type OrgChartErrorCode =
+  (typeof OrgChartErrorCodes)[keyof typeof OrgChartErrorCodes];
+
+export type PublicOrgChartNode = {
+  id: string;
+  name: string;
+  roleTitle: string;
+  department: string;
+  photoMediaId: string | null;
+  parentMemberId: string | null;
+  sortOrder: number;
+  children: PublicOrgChartNode[];
+};
+
+export type PublicOrgChartTree = {
+  roots: PublicOrgChartNode[];
+  rootMemberId: string | null;
+  memberCount: number;
+};
+
+/** Timeline events — gated by module.timeline. */
+export const TimelineErrorCodes = {
+  NotFound: 'TIMELINE_EVENT_NOT_FOUND',
+  InvalidTitle: 'TIMELINE_INVALID_TITLE',
+  InvalidDate: 'TIMELINE_INVALID_DATE',
+  InvalidFields: 'TIMELINE_INVALID_FIELDS',
+  MediaNotFound: 'TIMELINE_MEDIA_NOT_FOUND',
+} as const;
+
+export type TimelineErrorCode =
+  (typeof TimelineErrorCodes)[keyof typeof TimelineErrorCodes];
+
+export type PublicTimelineEvent = {
+  id: string;
+  businessId: string;
+  occurredAt: string;
+  title: string;
+  body: string;
+  mediaId: string | null;
+  sortOrder: number;
+  fields: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PublicTimelineEventList = {
+  items: PublicTimelineEvent[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
+/** QR encode — core block (no sellable module). */
+export const QrErrorCodes = {
+  EmptyPayload: 'QR_EMPTY_PAYLOAD',
+  EncodeFailed: 'QR_ENCODE_FAILED',
+} as const;
+
+export type QrErrorCode = (typeof QrErrorCodes)[keyof typeof QrErrorCodes];
+
+export type PublicQrEncode = {
+  payload: string;
+  dataUrl: string;
+  sizePx: number;
+};
+
+/** Flat collection items for repeater `{{item.*}}` binding. */
+export const CollectionErrorCodes = {
+  InvalidSource: 'COLLECTION_INVALID_SOURCE',
+} as const;
+
+export type CollectionErrorCode =
+  (typeof CollectionErrorCodes)[keyof typeof CollectionErrorCodes];
+
+export type PublicCollectionItem = {
+  id: string;
+  /** Flat string map for {{item.key}} placeholders. */
+  values: Record<string, string>;
+};
+
+export type PublicCollectionList = {
+  source: string;
+  items: PublicCollectionItem[];
+  /** Total matching rows (not limited by page size). */
+  total: number;
 };
