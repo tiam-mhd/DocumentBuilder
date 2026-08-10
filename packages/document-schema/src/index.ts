@@ -42,15 +42,82 @@ export type CoreBlockType = z.infer<typeof CoreBlockTypeSchema>;
 export const ModuleBlockTypeSchema = z.enum(MODULE_BLOCK_TYPES);
 export type ModuleBlockType = z.infer<typeof ModuleBlockTypeSchema>;
 
-export const BlockTypeSchema = z.enum(ALL_BLOCK_TYPES);
-export type BlockType = z.infer<typeof BlockTypeSchema>;
+/** Built-in types only (core + sellable modules). */
+export const BuiltinBlockTypeSchema = z.enum(ALL_BLOCK_TYPES);
+export type BuiltinBlockType = z.infer<typeof BuiltinBlockTypeSchema>;
+
+/**
+ * Effective block type string: built-in or first-party `plugin.*` (ADR 030).
+ * Prefer `isKnownBlockType` / `getBlockRegistry` over assuming a closed enum.
+ */
+export type BlockType = string;
+
+/** Plugin block types must be namespaced — never collide with core/module. */
+export const PLUGIN_BLOCK_TYPE_RE = /^plugin\.[a-z][a-z0-9_]*$/;
+
+export function isPluginBlockType(type: string): boolean {
+  return PLUGIN_BLOCK_TYPE_RE.test(type);
+}
 
 export type BlockRegistryEntry = {
-  type: BlockType;
+  type: string;
   labelKey: string;
   allowsChildren: boolean;
   moduleCode: string | null;
+  /** Set when contributed by a first-party plugin. */
+  pluginId?: string;
 };
+
+/** Mutable first-party plugin contributions (boot via `@vdb/plugins`). */
+let pluginBlockEntries: BlockRegistryEntry[] = [];
+
+export function registerPluginBlocks(
+  pluginId: string,
+  entries: readonly Omit<BlockRegistryEntry, 'pluginId'>[],
+): void {
+  const id = pluginId.trim();
+  if (!id) {
+    throw new Error('pluginId is required');
+  }
+  for (const e of entries) {
+    if (!isPluginBlockType(e.type)) {
+      throw new Error(
+        `Plugin block type must match ${PLUGIN_BLOCK_TYPE_RE}: ${e.type}`,
+      );
+    }
+    if ((ALL_BLOCK_TYPES as readonly string[]).includes(e.type)) {
+      throw new Error(`Plugin block collides with built-in type: ${e.type}`);
+    }
+    const existing = pluginBlockEntries.find((x) => x.type === e.type);
+    if (existing && existing.pluginId !== id) {
+      throw new Error(`Duplicate plugin block type: ${e.type}`);
+    }
+    if (existing) continue;
+    pluginBlockEntries.push({ ...e, pluginId: id });
+  }
+}
+
+/** Test helper — clears plugin contributions. */
+export function clearPluginBlockRegistry(): void {
+  pluginBlockEntries = [];
+}
+
+/** Built-in + registered first-party plugin blocks. */
+export function getBlockRegistry(): readonly BlockRegistryEntry[] {
+  return [...BLOCK_REGISTRY, ...pluginBlockEntries];
+}
+
+export function getPluginBlockRegistry(): readonly BlockRegistryEntry[] {
+  return pluginBlockEntries;
+}
+
+export const BlockTypeSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .refine((t) => isKnownBlockType(t), {
+    message: 'Unknown block type',
+  });
 
 export const CORE_BLOCK_REGISTRY: readonly BlockRegistryEntry[] = [
   {
@@ -330,7 +397,7 @@ export const BlockNodeSchema: z.ZodType<BlockNode> = z.lazy(() =>
       link: BlockLinkSchema.nullable().optional(),
     })
     .superRefine((node, ctx) => {
-      const entry = BLOCK_REGISTRY.find((e) => e.type === node.type);
+      const entry = getBlockRegistry().find((e) => e.type === node.type);
       if (!entry) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -698,8 +765,51 @@ export function createDocumentBodyFromTemplate(input: {
   });
 }
 
-export function isKnownBlockType(type: string): type is BlockType {
-  return (ALL_BLOCK_TYPES as readonly string[]).includes(type);
+/** Snapshot marketplace listing body into a Business-owned TemplateBody. */
+export function createTemplateBodyFromMarketplace(input: {
+  businessId: string;
+  templateId: string;
+  marketplaceBody: unknown;
+}): TemplateBody {
+  const source = parseTemplateBody(input.marketplaceBody);
+  const idMap = new Map<string, string>();
+  const masters = source.masters.map((m) => {
+    const cloned = cloneMasterWithNewIds(m);
+    idMap.set(m.id, cloned.id);
+    return cloned;
+  });
+  if (masters.length === 0) {
+    masters.push(createDefaultMasterPage());
+  }
+  const pages = source.pages.map((p) => ({
+    id: newId('pg'),
+    masterId: p.masterId
+      ? (idMap.get(p.masterId) ?? masters[0]!.id)
+      : masters[0]!.id,
+    blocks: cloneBlocksWithNewIds(p.blocks),
+  }));
+
+  return TemplateBodySchema.parse({
+    schemaVersion: TEMPLATE_SCHEMA_VERSION,
+    businessId: input.businessId,
+    templateId: input.templateId,
+    page: source.page,
+    masters,
+    pages:
+      pages.length > 0
+        ? pages
+        : [
+            {
+              id: newId('pg'),
+              masterId: masters[0]!.id,
+              blocks: [],
+            },
+          ],
+  });
+}
+
+export function isKnownBlockType(type: string): boolean {
+  return getBlockRegistry().some((e) => e.type === type);
 }
 
 export function isCoreBlockType(type: string): type is CoreBlockType {
@@ -1457,7 +1567,7 @@ export function documentCollectRequiredModuleCodes(body: {
   const out = new Set<string>();
   const visit = (blocks: BlockNode[]) => {
     for (const b of blocks) {
-      const entry = BLOCK_REGISTRY.find((e) => e.type === b.type);
+      const entry = getBlockRegistry().find((e) => e.type === b.type);
       if (entry?.moduleCode) out.add(entry.moduleCode);
       if (b.type === 'repeater') {
         const props = parseRepeaterBlockProps(b.props);

@@ -8,6 +8,74 @@ export enum SubscriptionStatus {
 
 export const TRIAL_DURATION_DAYS = 7 as const;
 
+/** Days after endsAt where subscription stays writable as `grace` (ADR 032). */
+export const GRACE_DURATION_DAYS = 3 as const;
+
+/** Reminder offsets (days before endsAt) for dunning SMS. */
+export const DUNNING_REMINDER_DAYS = [7, 1] as const;
+
+export const DunningNoticeKind = {
+  Reminder7d: 'reminder_7d',
+  Reminder1d: 'reminder_1d',
+  EnteredGrace: 'entered_grace',
+  EnteredExpired: 'entered_expired',
+} as const;
+
+export type DunningNoticeKindValue =
+  (typeof DunningNoticeKind)[keyof typeof DunningNoticeKind];
+
+/**
+ * Resolve lifecycle status from stored status + endsAt + grace window.
+ * Past endsAt → grace for GRACE_DURATION_DAYS, then expired.
+ */
+export function resolveSubscriptionEffectiveStatus(
+  status: SubscriptionStatus | string,
+  endsAt: Date | string | null,
+  now: Date = new Date(),
+  graceDays: number = GRACE_DURATION_DAYS,
+): SubscriptionStatus {
+  const mapped = status as SubscriptionStatus;
+  if (
+    mapped !== SubscriptionStatus.Trial &&
+    mapped !== SubscriptionStatus.Active &&
+    mapped !== SubscriptionStatus.Grace
+  ) {
+    return mapped;
+  }
+  if (!endsAt) return mapped;
+  const endMs =
+    typeof endsAt === 'string' ? Date.parse(endsAt) : endsAt.getTime();
+  if (Number.isNaN(endMs)) return mapped;
+  const nowMs = now.getTime();
+  if (nowMs < endMs) return mapped;
+  const graceEndMs = endMs + Math.max(0, graceDays) * 86_400_000;
+  if (nowMs < graceEndMs) return SubscriptionStatus.Grace;
+  return SubscriptionStatus.Expired;
+}
+
+export function subscriptionGraceEndsAt(
+  endsAt: Date | string | null,
+  graceDays: number = GRACE_DURATION_DAYS,
+): Date | null {
+  if (!endsAt) return null;
+  const endMs =
+    typeof endsAt === 'string' ? Date.parse(endsAt) : endsAt.getTime();
+  if (Number.isNaN(endMs)) return null;
+  return new Date(endMs + Math.max(0, graceDays) * 86_400_000);
+}
+
+/** Whole calendar days from `now` until `endsAt` (negative if past). */
+export function daysUntilSubscriptionEnd(
+  endsAt: Date | string | null,
+  now: Date = new Date(),
+): number | null {
+  if (!endsAt) return null;
+  const endMs =
+    typeof endsAt === 'string' ? Date.parse(endsAt) : endsAt.getTime();
+  if (Number.isNaN(endMs)) return null;
+  return Math.ceil((endMs - now.getTime()) / 86_400_000);
+}
+
 /** Statuses that allow mutating / export work (EntitlementGuard). */
 export const WRITABLE_SUBSCRIPTION_STATUSES: SubscriptionStatus[] = [
   SubscriptionStatus.Trial,
@@ -112,11 +180,15 @@ export type PublicSubscription = {
   planId: string | null;
   planCode: string | null;
   status: SubscriptionStatus;
-  /** Status after applying endsAt clock (may differ from stored status). */
+  /** Status after applying endsAt + grace window (may differ from stored status). */
   effectiveStatus: SubscriptionStatus;
   writable: boolean;
   startsAt: string;
   endsAt: string | null;
+  /** endsAt + GRACE_DURATION_DAYS when endsAt is set. */
+  graceEndsAt: string | null;
+  /** Whole days until endsAt (negative if past). */
+  daysUntilEnd: number | null;
 };
 
 export enum AppEdition {
@@ -132,6 +204,10 @@ export const EntitlementCodes = {
   ModuleTimeline: 'module.timeline',
   ModuleProjects: 'module.projects',
   ModuleGallery: 'module.gallery',
+  /** SAAS paid white-label; SELF_HOSTED always allowed via edition. */
+  BrandingWhiteLabel: 'branding.white_label',
+  /** SAAS template marketplace browse/install access (ADR 029). */
+  MarketplaceTemplates: 'marketplace.templates',
 } as const;
 
 export type EntitlementCode =
@@ -174,6 +250,8 @@ export const MODULE_ENTITLEMENT_CODES = [
   EntitlementCodes.ModuleTimeline,
   EntitlementCodes.ModuleProjects,
   EntitlementCodes.ModuleGallery,
+  EntitlementCodes.BrandingWhiteLabel,
+  EntitlementCodes.MarketplaceTemplates,
 ] as const;
 
 export type PublicPlan = {
@@ -322,13 +400,172 @@ export type AuthTokens = {
 export enum MembershipRole {
   Owner = 'OWNER',
   Admin = 'ADMIN',
-  Member = 'MEMBER',
+  Editor = 'EDITOR',
+  Viewer = 'VIEWER',
 }
+
+/** Higher = more privileged. */
+export const MEMBERSHIP_ROLE_RANK: Record<MembershipRole, number> = {
+  [MembershipRole.Viewer]: 1,
+  [MembershipRole.Editor]: 2,
+  [MembershipRole.Admin]: 3,
+  [MembershipRole.Owner]: 4,
+};
+
+export function membershipRoleAtLeast(
+  role: MembershipRole | string,
+  minimum: MembershipRole,
+): boolean {
+  const rank = MEMBERSHIP_ROLE_RANK[role as MembershipRole];
+  if (rank === undefined) return false;
+  return rank >= MEMBERSHIP_ROLE_RANK[minimum];
+}
+
+export function membershipCanWriteContent(
+  role: MembershipRole | string,
+): boolean {
+  return roleHasPermission(role, MembershipPermissionCodes.ManageDocuments);
+}
+
+export function membershipCanManageSettings(
+  role: MembershipRole | string,
+): boolean {
+  return roleHasPermission(role, MembershipPermissionCodes.ManageSettings);
+}
+
+export function membershipCanManageBilling(
+  role: MembershipRole | string,
+): boolean {
+  return roleHasPermission(role, MembershipPermissionCodes.ManageBilling);
+}
+
+export function membershipCanManageMembers(
+  role: MembershipRole | string,
+): boolean {
+  return roleHasPermission(role, MembershipPermissionCodes.ManageMembers);
+}
+
+/** Fine-grained membership RBAC (P04-T02) — not subscription entitlements. */
+export const MembershipPermissionCodes = {
+  ManageData: 'manage.data',
+  ManageTemplates: 'manage.templates',
+  ManageAssets: 'manage.assets',
+  ManageThemes: 'manage.themes',
+  ManageDocuments: 'manage.documents',
+  /** Role gate for PDF enqueue; still requires entitlement `export.pdf`. */
+  ExportPdf: 'rbac.export.pdf',
+  DocumentsPublish: 'documents.publish',
+  ManageSettings: 'manage.settings',
+  ManageMembers: 'manage.members',
+  ManageBilling: 'manage.billing',
+  ManageBackup: 'manage.backup',
+  AuditRead: 'audit.read',
+} as const;
+
+export type MembershipPermissionCode =
+  (typeof MembershipPermissionCodes)[keyof typeof MembershipPermissionCodes];
+
+export const MEMBERSHIP_PERMISSION_LIST: MembershipPermissionCode[] =
+  Object.values(MembershipPermissionCodes);
+
+const EDITOR_PERMISSIONS: MembershipPermissionCode[] = [
+  MembershipPermissionCodes.ManageData,
+  MembershipPermissionCodes.ManageTemplates,
+  MembershipPermissionCodes.ManageAssets,
+  MembershipPermissionCodes.ManageThemes,
+  MembershipPermissionCodes.ManageDocuments,
+  MembershipPermissionCodes.ExportPdf,
+];
+
+const ADMIN_EXTRA: MembershipPermissionCode[] = [
+  MembershipPermissionCodes.DocumentsPublish,
+  MembershipPermissionCodes.ManageSettings,
+  MembershipPermissionCodes.ManageMembers,
+  MembershipPermissionCodes.AuditRead,
+];
+
+const OWNER_EXTRA: MembershipPermissionCode[] = [
+  MembershipPermissionCodes.ManageBilling,
+  MembershipPermissionCodes.ManageBackup,
+];
+
+/** Locked role → permission matrix (P04-T02). */
+export const ROLE_PERMISSIONS: Record<
+  MembershipRole,
+  readonly MembershipPermissionCode[]
+> = {
+  [MembershipRole.Viewer]: [],
+  [MembershipRole.Editor]: EDITOR_PERMISSIONS,
+  [MembershipRole.Admin]: [...EDITOR_PERMISSIONS, ...ADMIN_EXTRA],
+  [MembershipRole.Owner]: [
+    ...EDITOR_PERMISSIONS,
+    ...ADMIN_EXTRA,
+    ...OWNER_EXTRA,
+  ],
+};
+
+export function permissionsForRole(
+  role: MembershipRole | string,
+): MembershipPermissionCode[] {
+  const list = ROLE_PERMISSIONS[role as MembershipRole];
+  return list ? [...list] : [];
+}
+
+export function roleHasPermission(
+  role: MembershipRole | string,
+  permission: MembershipPermissionCode | string,
+): boolean {
+  return permissionsForRole(role).includes(
+    permission as MembershipPermissionCode,
+  );
+}
+
+export type PublicBusinessPermissions = {
+  businessId: string;
+  role: MembershipRole;
+  permissions: MembershipPermissionCode[];
+};
+
+export const MembershipPermissionErrorCodes = {
+  Denied: 'MEMBERSHIP_PERMISSION_DENIED',
+} as const;
+
+/** Roles that may be assigned via invite (never OWNER). */
+export const INVITABLE_MEMBERSHIP_ROLES = [
+  MembershipRole.Admin,
+  MembershipRole.Editor,
+  MembershipRole.Viewer,
+] as const;
+
+export type InvitableMembershipRole =
+  (typeof INVITABLE_MEMBERSHIP_ROLES)[number];
+
+export const InvitationStatus = {
+  Pending: 'pending',
+  Accepted: 'accepted',
+  Revoked: 'revoked',
+  Expired: 'expired',
+} as const;
+
+export type InvitationStatusValue =
+  (typeof InvitationStatus)[keyof typeof InvitationStatus];
 
 export const TenancyErrorCodes = {
   BusinessNotFound: 'BUSINESS_NOT_FOUND',
   BusinessForbidden: 'BUSINESS_FORBIDDEN',
   BusinessNameInvalid: 'BUSINESS_NAME_INVALID',
+  InvitationNotFound: 'INVITATION_NOT_FOUND',
+  InvitationExpired: 'INVITATION_EXPIRED',
+  InvitationRevoked: 'INVITATION_REVOKED',
+  InvitationMobileMismatch: 'INVITATION_MOBILE_MISMATCH',
+  InvitationInvalidRole: 'INVITATION_INVALID_ROLE',
+  InvitationDuplicate: 'INVITATION_DUPLICATE',
+  MemberNotFound: 'MEMBER_NOT_FOUND',
+  MemberCannotModifyOwner: 'MEMBER_CANNOT_MODIFY_OWNER',
+  MemberCannotRemoveSelf: 'MEMBER_CANNOT_REMOVE_SELF',
+  MemberAlreadyExists: 'MEMBER_ALREADY_EXISTS',
+  MobileInvalid: 'MOBILE_INVALID',
+  MembershipPermissionDenied: 'MEMBERSHIP_PERMISSION_DENIED',
 } as const;
 
 export type TenancyErrorCode =
@@ -340,6 +577,39 @@ export type PublicBusiness = {
   role: MembershipRole;
   createdAt: string;
   updatedAt: string;
+  /** SAAS platform suspension (ADR 031). */
+  suspended: boolean;
+};
+
+export type PublicBusinessMember = {
+  userId: string;
+  mobile: string;
+  role: MembershipRole;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PublicBusinessInvitation = {
+  id: string;
+  businessId: string;
+  mobile: string;
+  role: InvitableMembershipRole | string;
+  status: InvitationStatusValue | string;
+  expiresAt: string;
+  createdAt: string;
+  /** Present only when creating (shareable once). */
+  token?: string;
+  acceptPath?: string;
+};
+
+export type PublicInvitationPreview = {
+  token: string;
+  businessId: string;
+  businessName: string;
+  role: InvitableMembershipRole | string;
+  mobile: string;
+  status: InvitationStatusValue | string;
+  expiresAt: string;
 };
 
 /** Cookie / localStorage key for active business in the web shell. */
@@ -515,6 +785,53 @@ export type PublicDesignThemeList = {
   total: number;
 };
 
+/** White-label / customer chrome brand (P04-T03) — not design_themes. */
+export const BrandingErrorCodes = {
+  NotAllowed: 'BRANDING_NOT_ALLOWED',
+  InvalidColor: 'BRANDING_INVALID_COLOR',
+  InvalidDomain: 'BRANDING_INVALID_DOMAIN',
+  DomainTaken: 'BRANDING_DOMAIN_TAKEN',
+  LogoInvalidType: 'BRANDING_LOGO_INVALID_TYPE',
+  LogoTooLarge: 'BRANDING_LOGO_TOO_LARGE',
+  LogoNotFound: 'BRANDING_LOGO_NOT_FOUND',
+} as const;
+
+export type BrandingErrorCode =
+  (typeof BrandingErrorCodes)[keyof typeof BrandingErrorCodes];
+
+export type PublicBusinessBrandingCapabilities = {
+  /** Edition SELF_HOSTED or entitlement branding.white_label. */
+  canCustomize: boolean;
+  canHidePoweredBy: boolean;
+  canSetCustomDomain: boolean;
+  requiresEntitlement: boolean;
+};
+
+export type PublicBusinessBranding = {
+  businessId: string;
+  displayName: string | null;
+  primaryColor: string | null;
+  hasLogo: boolean;
+  logoUrl: string | null;
+  customDomain: string | null;
+  hidePoweredBy: boolean;
+  /** Effective footer flag after edition + entitlement + setting. */
+  showPoweredByEffective: boolean;
+  capabilities: PublicBusinessBrandingCapabilities;
+  updatedAt: string;
+};
+
+export type PublicBrandingResolve = {
+  businessId: string;
+  displayName: string | null;
+  primaryColor: string | null;
+  hasLogo: boolean;
+  logoUrl: string | null;
+  hidePoweredBy: boolean;
+  showPoweredByEffective: boolean;
+  customDomain: string | null;
+};
+
 export const TemplateErrorCodes = {
   NotFound: 'TEMPLATE_NOT_FOUND',
   InvalidName: 'TEMPLATE_INVALID_NAME',
@@ -549,16 +866,172 @@ export type PublicDocumentTemplateList = {
   total: number;
 };
 
+/** SAAS global catalog listing (ADR 029) — not business-owned. */
+export const MarketplaceErrorCodes = {
+  EditionRequired: 'MARKETPLACE_EDITION_REQUIRED',
+  NotFound: 'MARKETPLACE_NOT_FOUND',
+  InvalidBody: 'MARKETPLACE_INVALID_BODY',
+  InstallFailed: 'MARKETPLACE_INSTALL_FAILED',
+} as const;
+
+export type MarketplaceErrorCode =
+  (typeof MarketplaceErrorCodes)[keyof typeof MarketplaceErrorCodes];
+
+export type PublicMarketplaceTemplate = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  locale: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PublicMarketplaceTemplateDetail = PublicMarketplaceTemplate & {
+  /** TemplateBody-shaped JSON (platform catalog). */
+  body: unknown;
+};
+
+export type PublicMarketplaceTemplateList = {
+  items: PublicMarketplaceTemplate[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
+export type PublicMarketplaceInstallResult = {
+  template: PublicDocumentTemplateDetail;
+  marketplaceTemplateId: string;
+};
+
+/** SAAS platform admin console (ADR 031). */
+export const PlatformAdminErrorCodes = {
+  EditionRequired: 'PLATFORM_ADMIN_EDITION_REQUIRED',
+  Forbidden: 'PLATFORM_ADMIN_FORBIDDEN',
+  IpDenied: 'PLATFORM_ADMIN_IP_DENIED',
+  BusinessNotFound: 'PLATFORM_ADMIN_BUSINESS_NOT_FOUND',
+  BusinessSuspended: 'BUSINESS_SUSPENDED',
+} as const;
+
+export type PlatformAdminErrorCode =
+  (typeof PlatformAdminErrorCodes)[keyof typeof PlatformAdminErrorCodes];
+
+export type PublicPlatformAdminMe = {
+  isPlatformAdmin: boolean;
+  edition: AppEdition;
+};
+
+export type PublicPlatformAdminUser = {
+  id: string;
+  /** Account login identity — platform ops only. */
+  mobile: string;
+  trialConsumed: boolean;
+  membershipCount: number;
+  createdAt: string;
+};
+
+export type PublicPlatformAdminUserList = {
+  items: PublicPlatformAdminUser[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
+export type PublicPlatformAdminBusiness = {
+  id: string;
+  name: string;
+  suspended: boolean;
+  suspendedReason: string | null;
+  suspendedAt: string | null;
+  memberCount: number;
+  createdAt: string;
+};
+
+export type PublicPlatformAdminBusinessList = {
+  items: PublicPlatformAdminBusiness[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
+export type PublicPlatformAdminSubscription = {
+  id: string;
+  businessId: string;
+  businessName: string;
+  planCode: string | null;
+  status: string;
+  effectiveStatus: string;
+  startsAt: string;
+  endsAt: string | null;
+  businessSuspended: boolean;
+};
+
+export type PublicPlatformAdminSubscriptionList = {
+  items: PublicPlatformAdminSubscription[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
+export type PublicPlatformAdminFailedJob = {
+  id: string;
+  kind: 'export';
+  businessId: string;
+  documentId: string;
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  finishedAt: string | null;
+};
+
+export type PublicPlatformAdminFailedJobList = {
+  items: PublicPlatformAdminFailedJob[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
 export type PublicBlockRegistryEntry = {
+  type: string;
+  labelKey: string;
+  allowsChildren: boolean;
+  moduleCode: string | null;
+  pluginId?: string;
+};
+
+export type PublicBlockRegistry = {
+  schemaVersion: number;
+  items: PublicBlockRegistryEntry[];
+};
+
+/** First-party plugin catalog (ADR 030). */
+export const PluginErrorCodes = {
+  NotFound: 'PLUGIN_NOT_FOUND',
+} as const;
+
+export type PluginErrorCode =
+  (typeof PluginErrorCodes)[keyof typeof PluginErrorCodes];
+
+export type PublicPluginBlock = {
   type: string;
   labelKey: string;
   allowsChildren: boolean;
   moduleCode: string | null;
 };
 
-export type PublicBlockRegistry = {
-  schemaVersion: number;
-  items: PublicBlockRegistryEntry[];
+export type PublicPluginManifest = {
+  id: string;
+  version: string;
+  name: string;
+  description: string | null;
+  moduleCode: string | null;
+  trust: 'first-party';
+  blocks: PublicPluginBlock[];
+};
+
+export type PublicPluginList = {
+  items: PublicPluginManifest[];
 };
 
 export const DocumentStatus = {
@@ -601,6 +1074,18 @@ export const DocumentErrorCodes = {
   CommentNotFound: 'DOCUMENT_COMMENT_NOT_FOUND',
   CommentInvalidBody: 'DOCUMENT_COMMENT_INVALID_BODY',
   CommentForbidden: 'DOCUMENT_COMMENT_FORBIDDEN',
+  WebSlugInvalid: 'DOCUMENT_WEB_SLUG_INVALID',
+  WebSlugTaken: 'DOCUMENT_WEB_SLUG_TAKEN',
+  WebNotAllowed: 'DOCUMENT_WEB_NOT_ALLOWED',
+  WebNotPublished: 'DOCUMENT_WEB_NOT_PUBLISHED',
+  ShareNotFound: 'DOCUMENT_SHARE_NOT_FOUND',
+  ShareExpired: 'DOCUMENT_SHARE_EXPIRED',
+  ShareRevoked: 'DOCUMENT_SHARE_REVOKED',
+  SharePasswordRequired: 'DOCUMENT_SHARE_PASSWORD_REQUIRED',
+  SharePasswordInvalid: 'DOCUMENT_SHARE_PASSWORD_INVALID',
+  ShareRateLimited: 'DOCUMENT_SHARE_RATE_LIMITED',
+  ShareInvalidScope: 'DOCUMENT_SHARE_INVALID_SCOPE',
+  ShareNotAllowed: 'DOCUMENT_SHARE_NOT_ALLOWED',
 } as const;
 
 export type DocumentErrorCode =
@@ -617,8 +1102,151 @@ export type PublicDocument = {
   status: DocumentStatusValue | string;
   /** Latest version number if any snapshots exist. */
   latestVersionNumber: number | null;
+  /** Public web profile slug (ADR 026) — unique per business when set. */
+  webSlug: string | null;
+  webPublished: boolean;
+  webPublishedAt: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+/** Member view of web-publish settings. */
+export type PublicDocumentWebPublish = {
+  documentId: string;
+  businessId: string;
+  webSlug: string | null;
+  webPublished: boolean;
+  webPublishedAt: string | null;
+  /** Relative app path when published, e.g. `/fa/p/{businessId}/{slug}`. */
+  publicPath: string | null;
+  canPublishToWeb: boolean;
+};
+
+/** Unauthenticated public profile payload (Nest → Next). */
+export type PublicWebDocumentView = {
+  businessId: string;
+  documentId: string;
+  slug: string;
+  title: string;
+  locale: ContentLocale | string;
+  dir: 'rtl' | 'ltr';
+  html: string;
+  branding: {
+    displayName: string | null;
+    primaryColor: string | null;
+    hasLogo: boolean;
+    logoUrl: string | null;
+    showPoweredByEffective: boolean;
+  };
+};
+
+export const ShareLinkScope = {
+  Web: 'web',
+  Pdf: 'pdf',
+} as const;
+
+export type ShareLinkScopeValue =
+  (typeof ShareLinkScope)[keyof typeof ShareLinkScope];
+
+/** Member list item — never includes raw token after create. */
+export type PublicDocumentShareLink = {
+  id: string;
+  businessId: string;
+  documentId: string;
+  tokenHint: string;
+  scope: ShareLinkScopeValue | string;
+  hasPassword: boolean;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+  /** Relative public path `/s/{token}` only present on create response. */
+  publicPath?: string;
+  /** Raw token — create response only. */
+  token?: string;
+};
+
+export type PublicDocumentShareLinkList = {
+  items: PublicDocumentShareLink[];
+};
+
+/** Public meta before unlock / content. */
+export type PublicShareLinkMeta = {
+  scope: ShareLinkScopeValue | string;
+  title: string;
+  locale: ContentLocale | string;
+  requiresPassword: boolean;
+  unlocked: boolean;
+  expired: boolean;
+  revoked: boolean;
+};
+
+/** Payload after successful access (web scope). */
+export type PublicShareLinkWebView = {
+  scope: 'web';
+  businessId: string;
+  documentId: string;
+  title: string;
+  locale: ContentLocale | string;
+  dir: 'rtl' | 'ltr';
+  html: string;
+  branding: PublicWebDocumentView['branding'];
+};
+
+export type PublicShareLinkPdfView = {
+  scope: 'pdf';
+  businessId: string;
+  documentId: string;
+  title: string;
+  /** Relative API path to stream PDF (session may be required). */
+  filePath: string;
+};
+
+export const AnalyticsEventKind = {
+  View: 'view',
+  Download: 'download',
+} as const;
+
+export type AnalyticsEventKindValue =
+  (typeof AnalyticsEventKind)[keyof typeof AnalyticsEventKind];
+
+export const AnalyticsEventSource = {
+  WebPublish: 'web_publish',
+  ShareWeb: 'share_web',
+  SharePdf: 'share_pdf',
+  ExportDownload: 'export_download',
+} as const;
+
+export type AnalyticsEventSourceValue =
+  (typeof AnalyticsEventSource)[keyof typeof AnalyticsEventSource];
+
+export const AnalyticsDevice = {
+  Desktop: 'desktop',
+  Mobile: 'mobile',
+  Tablet: 'tablet',
+  Bot: 'bot',
+  Unknown: 'unknown',
+} as const;
+
+export type AnalyticsDeviceValue =
+  (typeof AnalyticsDevice)[keyof typeof AnalyticsDevice];
+
+export const AnalyticsErrorCodes = {
+  Unavailable: 'ANALYTICS_UNAVAILABLE',
+} as const;
+
+export type PublicAnalyticsSummary = {
+  from: string | null;
+  to: string | null;
+  totals: { views: number; downloads: number };
+  byDay: { day: string; views: number; downloads: number }[];
+  byDevice: { device: string; count: number }[];
+  byCountry: { country: string; count: number }[];
+  byDocument: {
+    documentId: string;
+    title: string;
+    views: number;
+    downloads: number;
+  }[];
 };
 
 export type PublicDocumentDetail = PublicDocument & {
@@ -720,6 +1348,19 @@ export const AuditActions = {
   DocumentWorkflowReopen: 'document.workflow.reopen',
   WorkspaceBackupCompleted: 'workspace.backup.completed',
   WorkspaceRestoreCompleted: 'workspace.restore.completed',
+  MembershipInvite: 'membership.invite',
+  MembershipAccept: 'membership.accept',
+  MembershipRoleChange: 'membership.role_change',
+  MembershipRemove: 'membership.remove',
+  DocumentWebPublish: 'document.web.publish',
+  DocumentWebUnpublish: 'document.web.unpublish',
+  DocumentShareCreate: 'document.share.create',
+  DocumentShareRevoke: 'document.share.revoke',
+  PlatformBusinessSuspend: 'platform.business.suspend',
+  PlatformBusinessUnsuspend: 'platform.business.unsuspend',
+  BillingSubscriptionGrace: 'billing.subscription.grace',
+  BillingSubscriptionExpired: 'billing.subscription.expired',
+  BillingDunningNotice: 'billing.dunning.notice',
 } as const;
 
 export type AuditAction =
@@ -760,6 +1401,8 @@ export const ExportErrorCodes = {
   Failed: 'EXPORT_FAILED',
   QueueUnavailable: 'EXPORT_QUEUE_UNAVAILABLE',
   RenderFailed: 'EXPORT_RENDER_FAILED',
+  RateLimited: 'EXPORT_RATE_LIMITED',
+  TooManyConcurrent: 'EXPORT_TOO_MANY_CONCURRENT',
 } as const;
 
 export type ExportErrorCode =
