@@ -23,6 +23,54 @@ APP_EDITION=SAAS          # or SELF_HOSTED
 
 Public flags are exposed at `GET /api/system/config` (no secrets).
 
+## Custom domain (white-label)
+
+White-label stores a **hostname only** on `business_branding.custom_domain` (API validates uniqueness). TLS and reverse-proxy are operational:
+
+1. Create a DNS **CNAME** (or A/AAAA) for `docs.customer.com` → your VPS / load balancer.
+2. Terminate TLS at the proxy (Let’s Encrypt / Cloudflare).
+3. Route `Host: docs.customer.com` to the **web** (Next) and keep Nest on the API origin; or terminate at a gateway that sets the public host.
+4. Resolve brand for publish: `GET /api/branding/resolve?host=docs.customer.com` (public).
+
+`SELF_HOSTED` installs always may set custom domains. On **SAAS**, the Business needs entitlement `branding.white_label`.
+
+See also: `.cursor/rules/18-white-label-branding.mdc`.
+
+## Analytics opt-out
+
+Product view/download metrics enqueue to Redis (`analytics.ingest`) and land in PostgreSQL `analytics_events`. No raw IP/UA is stored.
+
+```bash
+ANALYTICS_ENABLED=true   # set false to disable ingest install-wide
+```
+
+Dashboard: `/[locale]/app/analytics` (OWNER/ADMIN). See ADR 028 / `.cursor/rules/21-analytics.mdc`.
+
+## SAAS platform admin
+
+Cross-tenant operator console (ADR 031 / `.cursor/rules/24-saas-platform-admin.mdc`). **Not** Business OWNER/ADMIN.
+
+```bash
+APP_EDITION=SAAS
+# After users exist, seed/boot upserts platform_admins for these mobiles:
+PLATFORM_ADMIN_MOBILES=09121234567
+# Optional: restrict /api/platform-admin/* by client IP (empty = allow all).
+# Behind a reverse proxy, ensure X-Forwarded-For is trusted or terminate allowlist at the edge.
+PLATFORM_ADMIN_IP_ALLOWLIST=
+```
+
+UI: `/[locale]/app/platform-admin` (hidden unless SAAS + `platform_admins` row). SELF_HOSTED returns 403 on admin routes.
+
+## SAAS billing dunning / renewal
+
+Daily BullMQ job `billing.dunning` (03:15 UTC) persists `grace` → `expired` and sends SMS to Business OWNERs (idempotent `subscription_dunning_notices`). Email is out of scope.
+
+```bash
+BILLING_GRACE_DAYS=3
+```
+
+Manual tick (platform admin): `POST /api/platform-admin/dunning/run` with optional `{ "nowIso": "..." }` for clock tests. See ADR 032 / `.cursor/rules/25-billing-dunning.mdc`.
+
 ### SAAS payment env
 
 ```bash
@@ -101,7 +149,9 @@ Export artifacts:
 
 Redis must be reachable (`REDIS_URL`). Without Redis, enqueue fails with `EXPORT_QUEUE_UNAVAILABLE`.
 
-See [ADR 007](../adr/007-pdf-export-pipeline.md).
+Cost controls (ADR 033): set `EXPORT_MAX_CONCURRENT_PER_BUSINESS`, `EXPORT_RATE_*`, and `EXPORT_WORKER_CONCURRENCY`. Behind a reverse proxy set `TRUST_PROXY=true` and lock `CORS_ORIGINS`. Checklist: [pre-ga-hardening](../qa/pre-ga-hardening.md). GA catalog exit: [GA-checklist](../qa/GA-checklist.md).
+
+See [ADR 007](../adr/007-pdf-export-pipeline.md) and [ADR 033](../adr/033-performance-security-hardening.md).
 
 ## Local data stores
 

@@ -31,6 +31,22 @@ tags:
     description: Append-only audit_events list (OWNER/ADMIN)
   - name: backup
     description: Business workspace ZIP backup / restore (OWNER)
+  - name: branding
+    description: White-label business branding (logo, colors, custom domain, Powered-by)
+  - name: members
+    description: Business membership and invitations
+  - name: web-publish
+    description: Public HTML document profiles (ADR 026)
+  - name: share-links
+    description: Tokenized document share links (ADR 027)
+  - name: analytics
+    description: Product analytics views/downloads (ADR 028)
+  - name: marketplace
+    description: SAAS template marketplace catalog + install (ADR 029)
+  - name: plugins
+    description: First-party plugin manifests (ADR 030) — no user eval
+  - name: platform-admin
+    description: SAAS platform operator console (ADR 031)
 paths:
   /health:
     get:
@@ -64,6 +80,222 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/PublicSystemConfig'
+  /plugins:
+    get:
+      tags: [plugins]
+      summary: List first-party plugin manifests
+      description: |
+        Compiled allowlist from `@vdb/plugins`. Both editions.
+        Does not load user-uploaded or remote unsigned code (ADR 030).
+      operationId: listPlugins
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Plugin catalog
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicPluginList'
+        '401':
+          $ref: '#/components/responses/ApiError'
+  /platform-admin/me:
+    get:
+      tags: [platform-admin]
+      summary: Am I a SAAS platform admin?
+      operationId: getPlatformAdminMe
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Me
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicPlatformAdminMe'
+  /platform-admin/users:
+    get:
+      tags: [platform-admin]
+      summary: List users (minimal fields)
+      operationId: listPlatformAdminUsers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: q
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Paginated users
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicPlatformAdminUserList'
+        '403':
+          $ref: '#/components/responses/ApiError'
+  /platform-admin/businesses:
+    get:
+      tags: [platform-admin]
+      summary: List businesses
+      operationId: listPlatformAdminBusinesses
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: suspended
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: Paginated businesses
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicPlatformAdminBusinessList'
+        '403':
+          $ref: '#/components/responses/ApiError'
+  /platform-admin/businesses/{businessId}/suspend:
+    post:
+      tags: [platform-admin]
+      summary: Suspend a Business
+      operationId: suspendPlatformBusiness
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: businessId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  maxLength: 500
+      responses:
+        '200':
+          description: Suspended business
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /platform-admin/businesses/{businessId}/unsuspend:
+    post:
+      tags: [platform-admin]
+      summary: Unsuspend a Business
+      operationId: unsuspendPlatformBusiness
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: businessId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Active business
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /platform-admin/subscriptions:
+    get:
+      tags: [platform-admin]
+      summary: List subscriptions
+      operationId: listPlatformAdminSubscriptions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: status
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Paginated subscriptions
+        '403':
+          $ref: '#/components/responses/ApiError'
+  /platform-admin/jobs/failed:
+    get:
+      tags: [platform-admin]
+      summary: List failed export jobs
+      operationId: listPlatformAdminFailedJobs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        '200':
+          description: Failed jobs
+        '403':
+          $ref: '#/components/responses/ApiError'
+  /platform-admin/dunning/run:
+    post:
+      tags: [platform-admin]
+      summary: Run billing dunning tick (optional fake clock)
+      description: |
+        SAAS platform admin only. Persists grace/expired and sends idempotent SMS.
+        Optional body `nowIso` for tests. See ADR 032.
+      operationId: runPlatformDunning
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nowIso:
+                  type: string
+                  format: date-time
+      responses:
+        '200':
+          description: Tick summary
+        '403':
+          $ref: '#/components/responses/ApiError'
   /system/license:
     get:
       tags: [system]
@@ -2947,6 +3179,431 @@ paths:
           $ref: '#/components/responses/ApiError'
         '402':
           $ref: '#/components/responses/EntitlementDenied'
+  /businesses/{businessId}/documents/{documentId}/web-publish:
+    parameters:
+      - $ref: '#/components/parameters/businessId'
+      - name: documentId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [web-publish]
+      summary: Get web-publish settings
+      operationId: getDocumentWebPublish
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Settings
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentWebPublish'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    patch:
+      tags: [web-publish]
+      summary: Update slug / publish to public HTML
+      description: |
+        Requires `documents.publish` + writable. `webPublished=true` only when
+        workflow status is approved or published (ADR 026). Not the same as workflow publish.
+      operationId: updateDocumentWebPublish
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                webSlug:
+                  type: string
+                  nullable: true
+                webPublished:
+                  type: boolean
+      responses:
+        '200':
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentWebPublish'
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '409':
+          $ref: '#/components/responses/ApiError'
+  /public/documents/{businessId}/{slug}:
+    get:
+      tags: [web-publish]
+      summary: Public document HTML + meta (no JWT)
+      operationId: getPublicWebDocument
+      parameters:
+        - name: businessId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Public view
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicWebDocumentView'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /public/documents/by-host:
+    get:
+      tags: [web-publish]
+      summary: Public document by custom domain host + slug
+      operationId: getPublicWebDocumentByHost
+      parameters:
+        - name: host
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: slug
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Public view
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicWebDocumentView'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/documents/{documentId}/share-links:
+    parameters:
+      - $ref: '#/components/parameters/businessId'
+      - name: documentId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [share-links]
+      summary: List share links
+      operationId: listDocumentShareLinks
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentShareLinkList'
+    post:
+      tags: [share-links]
+      summary: Create share link (raw token once)
+      operationId: createDocumentShareLink
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scope]
+              properties:
+                scope:
+                  type: string
+                  enum: [web, pdf]
+                password:
+                  type: string
+                  nullable: true
+                expiresAt:
+                  type: string
+                  format: date-time
+                  nullable: true
+      responses:
+        '200':
+          description: Created (includes token)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentShareLink'
+        '409':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/documents/{documentId}/share-links/{shareId}/revoke:
+    post:
+      tags: [share-links]
+      summary: Revoke share link
+      operationId: revokeDocumentShareLink
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicDocumentShareLink'
+  /public/share/{token}:
+    get:
+      tags: [share-links]
+      summary: Resolve share link
+      operationId: resolveShareLink
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Meta (+ view when unlocked)
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /public/share/{token}/unlock:
+    post:
+      tags: [share-links]
+      summary: Unlock password-protected share link
+      operationId: unlockShareLink
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Unlocked view
+        '401':
+          $ref: '#/components/responses/ApiError'
+        '429':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/analytics/summary:
+    get:
+      tags: [analytics]
+      summary: Analytics summary (OWNER/ADMIN)
+      operationId: getAnalyticsSummary
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Aggregates
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicAnalyticsSummary'
+        '403':
+          $ref: '#/components/responses/ApiError'
+  /marketplace/templates:
+    get:
+      tags: [marketplace]
+      summary: List SAAS marketplace catalog templates
+      description: |
+        SAAS only. Requires membership on `businessId` + entitlement `marketplace.templates`.
+        Catalog is global (not tenant-owned). Payments / seller publish are non-goals (ADR 029).
+      operationId: listMarketplaceTemplates
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: businessId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Filter by name or slug
+        - name: locale
+          in: query
+          schema:
+            type: string
+            enum: [fa, en]
+      responses:
+        '200':
+          description: Paginated catalog
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicMarketplaceTemplateList'
+        '403':
+          $ref: '#/components/responses/ApiError'
+  /marketplace/templates/{id}:
+    get:
+      tags: [marketplace]
+      summary: Get marketplace template detail (includes body)
+      operationId: getMarketplaceTemplate
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: businessId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Catalog detail
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicMarketplaceTemplateDetail'
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/marketplace/templates/{id}/install:
+    post:
+      tags: [marketplace]
+      summary: Install marketplace template into Business (snapshot copy)
+      description: |
+        Creates a new `document_templates` row + Mongo `template_bodies` copy.
+        Later catalog edits do not mutate installed templates. Requires writable
+        subscription, `marketplace.templates`, and `manage.templates`.
+      operationId: installMarketplaceTemplate
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/businessId'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Marketplace template id
+      responses:
+        '200':
+          description: Installed business template
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicMarketplaceInstallResult'
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /public/share/{token}/file:
+    get:
+      tags: [share-links]
+      summary: Download PDF for pdf-scope share
+      operationId: downloadSharePdf
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: PDF bytes
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
   /businesses/{businessId}/documents/{documentId}:
     get:
       tags: [documents]
@@ -3676,6 +4333,9 @@ paths:
         Never runs on editor keystrokes. Requires entitlement `export.pdf`.
         Document status must be `approved` or `published` (ADR 021); otherwise
         `DOCUMENT_NOT_APPROVED_FOR_EXPORT`.
+        Cost controls (ADR 033): Redis rate limit per business (`EXPORT_RATE_*` →
+        `EXPORT_RATE_LIMITED`) and in-flight cap `queued`+`processing`
+        (`EXPORT_MAX_CONCURRENT_PER_BUSINESS` → `EXPORT_TOO_MANY_CONCURRENT`).
       operationId: createPdfExport
       security:
         - bearerAuth: []
@@ -3700,6 +4360,10 @@ paths:
         '402':
           $ref: '#/components/responses/EntitlementDenied'
         '404':
+          $ref: '#/components/responses/ApiError'
+        '409':
+          $ref: '#/components/responses/ApiError'
+        '429':
           $ref: '#/components/responses/ApiError'
         '503':
           $ref: '#/components/responses/ApiError'
@@ -3983,7 +4647,7 @@ paths:
           $ref: '#/components/responses/ApiError'
     patch:
       tags: [businesses]
-      summary: Update business (OWNER only)
+      summary: Update business name (ADMIN+)
       operationId: updateBusiness
       security:
         - bearerAuth: []
@@ -4042,6 +4706,397 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/ApiError'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/permissions:
+    parameters:
+      - $ref: '#/components/parameters/businessId'
+    get:
+      tags: [members]
+      summary: List membership RBAC permissions for current user
+      description: |
+        Returns role + fine-grained permission codes (`manage.data`, `rbac.export.pdf`, …).
+        Separate from subscription entitlements (`export.pdf`, `module.map`, …).
+      operationId: getBusinessPermissions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Permissions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicBusinessPermissions'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/members:
+    parameters:
+      - $ref: '#/components/parameters/businessId'
+    get:
+      tags: [members]
+      summary: List business members
+      operationId: listBusinessMembers
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Members
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PublicBusinessMember'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/members/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/businessId'
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      tags: [members]
+      summary: Change member role (ADMIN+; OWNER for admin targets)
+      operationId: updateBusinessMemberRole
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  type: string
+                  enum: [ADMIN, EDITOR, VIEWER]
+      responses:
+        '200':
+          description: Updated member
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicBusinessMember'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    delete:
+      tags: [members]
+      summary: Remove member (ADMIN+)
+      operationId: removeBusinessMember
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Removed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [ok]
+                    properties:
+                      ok:
+                        type: boolean
+                        enum: [true]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/invitations:
+    parameters:
+      - $ref: '#/components/parameters/businessId'
+    get:
+      tags: [members]
+      summary: List invitations (ADMIN+)
+      operationId: listBusinessInvitations
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Invitations
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PublicBusinessInvitation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ApiError'
+    post:
+      tags: [members]
+      summary: Invite by mobile (ADMIN+; OWNER for ADMIN role)
+      description: |
+        Reuses Identity OTP for accept. Token returned once on create.
+        Roles: ADMIN | EDITOR | VIEWER (never OWNER).
+      operationId: createBusinessInvitation
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mobile, role]
+              properties:
+                mobile:
+                  type: string
+                role:
+                  type: string
+                  enum: [ADMIN, EDITOR, VIEWER]
+      responses:
+        '200':
+          description: Invitation with token
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicBusinessInvitation'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '409':
+          $ref: '#/components/responses/ApiError'
+  /businesses/{businessId}/invitations/{invitationId}:
+    parameters:
+      - $ref: '#/components/parameters/businessId'
+      - name: invitationId
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      tags: [members]
+      summary: Revoke pending invitation (ADMIN+)
+      operationId: revokeBusinessInvitation
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [ok]
+                    properties:
+                      ok:
+                        type: boolean
+                        enum: [true]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /invitations/{token}:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [members]
+      summary: Preview invitation (public)
+      operationId: previewInvitation
+      responses:
+        '200':
+          description: Invitation preview
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicInvitationPreview'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /invitations/{token}/accept:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [members]
+      summary: Accept invitation (JWT; mobile must match)
+      operationId: acceptInvitation
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Membership created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicBusinessMember'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '404':
+          $ref: '#/components/responses/ApiError'
+        '409':
+          $ref: '#/components/responses/ApiError'
+        '410':
+          $ref: '#/components/responses/ApiError'
+  /me/invitations:
+    get:
+      tags: [members]
+      summary: Pending invitations for signed-in mobile
+      operationId: listMyInvitations
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Pending invitations
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PublicInvitationPreview'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /businesses/{businessId}/branding:
+    parameters:
+      - $ref: '#/components/parameters/businessId'
+    get:
+      tags: [branding]
+      summary: Get white-label branding + capabilities
+      operationId: getBusinessBranding
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Branding
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicBusinessBranding'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/ApiError'
+    patch:
+      tags: [branding]
+      summary: Update branding (ADMIN+ + white-label capability)
+      operationId: updateBusinessBranding
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName:
+                  type: string
+                  nullable: true
+                primaryColor:
+                  type: string
+                  nullable: true
+                customDomain:
+                  type: string
+                  nullable: true
+                hidePoweredBy:
+                  type: boolean
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicBusinessBranding'
+        '403':
+          $ref: '#/components/responses/ApiError'
+  /branding/resolve:
+    get:
+      tags: [branding]
+      summary: Resolve branding by custom domain (public)
+      operationId: resolveBrandingByHost
+      parameters:
+        - name: host
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Resolved brand
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicBrandingResolve'
         '404':
           $ref: '#/components/responses/ApiError'
   /businesses/{businessId}/subscription:
@@ -4415,13 +5470,195 @@ components:
           type: string
         role:
           type: string
-          enum: [OWNER, ADMIN, MEMBER]
+          enum: [OWNER, ADMIN, EDITOR, VIEWER]
         createdAt:
           type: string
           format: date-time
         updatedAt:
           type: string
           format: date-time
+    PublicBusinessMember:
+      type: object
+      required: [userId, mobile, role, createdAt, updatedAt]
+      properties:
+        userId:
+          type: string
+        mobile:
+          type: string
+        role:
+          type: string
+          enum: [OWNER, ADMIN, EDITOR, VIEWER]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PublicBusinessPermissions:
+      type: object
+      required: [businessId, role, permissions]
+      properties:
+        businessId:
+          type: string
+        role:
+          type: string
+          enum: [OWNER, ADMIN, EDITOR, VIEWER]
+        permissions:
+          type: array
+          items:
+            type: string
+            enum:
+              - manage.data
+              - manage.templates
+              - manage.assets
+              - manage.themes
+              - manage.documents
+              - rbac.export.pdf
+              - documents.publish
+              - manage.settings
+              - manage.members
+              - manage.billing
+              - manage.backup
+              - audit.read
+    PublicBusinessInvitation:
+      type: object
+      required: [id, businessId, mobile, role, status, expiresAt, createdAt]
+      properties:
+        id:
+          type: string
+        businessId:
+          type: string
+        mobile:
+          type: string
+        role:
+          type: string
+          enum: [ADMIN, EDITOR, VIEWER]
+        status:
+          type: string
+          enum: [pending, accepted, revoked, expired]
+        expiresAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        token:
+          type: string
+          description: Present only on create
+        acceptPath:
+          type: string
+    PublicInvitationPreview:
+      type: object
+      required: [token, businessId, businessName, role, mobile, status, expiresAt]
+      properties:
+        token:
+          type: string
+        businessId:
+          type: string
+        businessName:
+          type: string
+        role:
+          type: string
+          enum: [ADMIN, EDITOR, VIEWER]
+        mobile:
+          type: string
+        status:
+          type: string
+          enum: [pending, accepted, revoked, expired]
+        expiresAt:
+          type: string
+          format: date-time
+    PublicBusinessBrandingCapabilities:
+      type: object
+      required:
+        [canCustomize, canHidePoweredBy, canSetCustomDomain, requiresEntitlement]
+      properties:
+        canCustomize:
+          type: boolean
+        canHidePoweredBy:
+          type: boolean
+        canSetCustomDomain:
+          type: boolean
+        requiresEntitlement:
+          type: boolean
+          description: true on SAAS (needs branding.white_label); false on SELF_HOSTED
+    PublicBusinessBranding:
+      type: object
+      required:
+        [
+          businessId,
+          displayName,
+          primaryColor,
+          hasLogo,
+          logoUrl,
+          customDomain,
+          hidePoweredBy,
+          showPoweredByEffective,
+          capabilities,
+          updatedAt,
+        ]
+      properties:
+        businessId:
+          type: string
+        displayName:
+          type: string
+          nullable: true
+        primaryColor:
+          type: string
+          nullable: true
+          description: Hex #RGB or #RRGGBB
+        hasLogo:
+          type: boolean
+        logoUrl:
+          type: string
+          nullable: true
+        customDomain:
+          type: string
+          nullable: true
+        hidePoweredBy:
+          type: boolean
+        showPoweredByEffective:
+          type: boolean
+          description: Whether UI should show Powered-by after edition + hide flags
+        capabilities:
+          $ref: '#/components/schemas/PublicBusinessBrandingCapabilities'
+        updatedAt:
+          type: string
+          format: date-time
+    PublicBrandingResolve:
+      type: object
+      required:
+        [
+          businessId,
+          displayName,
+          primaryColor,
+          hasLogo,
+          logoUrl,
+          hidePoweredBy,
+          showPoweredByEffective,
+          customDomain,
+        ]
+      properties:
+        businessId:
+          type: string
+        displayName:
+          type: string
+          nullable: true
+        primaryColor:
+          type: string
+          nullable: true
+        hasLogo:
+          type: boolean
+        logoUrl:
+          type: string
+          nullable: true
+        hidePoweredBy:
+          type: boolean
+        showPoweredByEffective:
+          type: boolean
+        customDomain:
+          type: string
+          nullable: true
     PublicSubscription:
       type: object
       required:
@@ -4435,6 +5672,8 @@ components:
           writable,
           startsAt,
           endsAt,
+          graceEndsAt,
+          daysUntilEnd,
         ]
       properties:
         id:
@@ -4454,6 +5693,7 @@ components:
         effectiveStatus:
           type: string
           enum: [trial, active, grace, expired, pending_payment]
+          description: After endsAt → grace for BILLING_GRACE_DAYS, then expired
         writable:
           type: boolean
         startsAt:
@@ -4463,6 +5703,14 @@ components:
           type: string
           format: date-time
           nullable: true
+        graceEndsAt:
+          type: string
+          format: date-time
+          nullable: true
+        daysUntilEnd:
+          type: integer
+          nullable: true
+          description: Whole days until endsAt (negative if past)
     BillingCatalog:
       type: object
       required: [plans, modules]
@@ -4577,6 +5825,8 @@ components:
           platformCheckout,
           licenseActivation,
           licenseActive,
+          templateMarketplace,
+          platformAdminConsole,
         ]
       properties:
         edition:
@@ -4597,6 +5847,95 @@ components:
         licenseActive:
           type: boolean
           description: SAAS always true; SELF_HOSTED from installation_licenses
+        templateMarketplace:
+          type: boolean
+          description: SAAS template marketplace (ADR 029)
+        platformAdminConsole:
+          type: boolean
+          description: SAAS platform admin console hint (ADR 031)
+    PublicPluginBlock:
+      type: object
+      required: [type, labelKey, allowsChildren, moduleCode]
+      properties:
+        type:
+          type: string
+          description: Must match plugin.*
+        labelKey:
+          type: string
+        allowsChildren:
+          type: boolean
+        moduleCode:
+          type: string
+          nullable: true
+    PublicPluginManifest:
+      type: object
+      required:
+        [id, version, name, description, moduleCode, trust, blocks]
+      properties:
+        id:
+          type: string
+        version:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        moduleCode:
+          type: string
+          nullable: true
+        trust:
+          type: string
+          enum: [first-party]
+        blocks:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicPluginBlock'
+    PublicPluginList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicPluginManifest'
+    PublicPlatformAdminMe:
+      type: object
+      required: [isPlatformAdmin, edition]
+      properties:
+        isPlatformAdmin:
+          type: boolean
+        edition:
+          type: string
+          enum: [SELF_HOSTED, SAAS]
+    PublicPlatformAdminUserList:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    PublicPlatformAdminBusinessList:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
     PublicInstallationLicense:
       type: object
       required:
@@ -4958,7 +6297,20 @@ components:
     PublicDocument:
       type: object
       required:
-        [id, businessId, templateId, title, locale, status, latestVersionNumber, createdAt, updatedAt]
+        [
+          id,
+          businessId,
+          templateId,
+          title,
+          locale,
+          status,
+          latestVersionNumber,
+          webSlug,
+          webPublished,
+          webPublishedAt,
+          createdAt,
+          updatedAt,
+        ]
       properties:
         id:
           type: string
@@ -4980,12 +6332,245 @@ components:
           type: integer
           nullable: true
           description: Highest version_number if any snapshots exist (ADR 020)
+        webSlug:
+          type: string
+          nullable: true
+          description: Public web profile slug (ADR 026)
+        webPublished:
+          type: boolean
+        webPublishedAt:
+          type: string
+          format: date-time
+          nullable: true
         createdAt:
           type: string
           format: date-time
         updatedAt:
           type: string
           format: date-time
+    PublicDocumentWebPublish:
+      type: object
+      required:
+        [
+          documentId,
+          businessId,
+          webSlug,
+          webPublished,
+          webPublishedAt,
+          publicPath,
+          canPublishToWeb,
+        ]
+      properties:
+        documentId:
+          type: string
+        businessId:
+          type: string
+        webSlug:
+          type: string
+          nullable: true
+        webPublished:
+          type: boolean
+        webPublishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        publicPath:
+          type: string
+          nullable: true
+        canPublishToWeb:
+          type: boolean
+    PublicWebDocumentView:
+      type: object
+      required:
+        [businessId, documentId, slug, title, locale, dir, html, branding]
+      properties:
+        businessId:
+          type: string
+        documentId:
+          type: string
+        slug:
+          type: string
+        title:
+          type: string
+        locale:
+          type: string
+        dir:
+          type: string
+          enum: [rtl, ltr]
+        html:
+          type: string
+        branding:
+          type: object
+          required:
+            [
+              displayName,
+              primaryColor,
+              hasLogo,
+              logoUrl,
+              showPoweredByEffective,
+            ]
+          properties:
+            displayName:
+              type: string
+              nullable: true
+            primaryColor:
+              type: string
+              nullable: true
+            hasLogo:
+              type: boolean
+            logoUrl:
+              type: string
+              nullable: true
+            showPoweredByEffective:
+              type: boolean
+    PublicDocumentShareLink:
+      type: object
+      required:
+        [
+          id,
+          businessId,
+          documentId,
+          tokenHint,
+          scope,
+          hasPassword,
+          expiresAt,
+          revokedAt,
+          createdAt,
+        ]
+      properties:
+        id:
+          type: string
+        businessId:
+          type: string
+        documentId:
+          type: string
+        tokenHint:
+          type: string
+        scope:
+          type: string
+          enum: [web, pdf]
+        hasPassword:
+          type: boolean
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        revokedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        token:
+          type: string
+          description: Raw token — create response only
+        publicPath:
+          type: string
+    PublicDocumentShareLinkList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicDocumentShareLink'
+    PublicAnalyticsSummary:
+      type: object
+      required: [from, to, totals, byDay, byDevice, byCountry, byDocument]
+      properties:
+        from:
+          type: string
+          nullable: true
+        to:
+          type: string
+          nullable: true
+        totals:
+          type: object
+          required: [views, downloads]
+          properties:
+            views:
+              type: integer
+            downloads:
+              type: integer
+        byDay:
+          type: array
+          items:
+            type: object
+        byDevice:
+          type: array
+          items:
+            type: object
+        byCountry:
+          type: array
+          items:
+            type: object
+        byDocument:
+          type: array
+          items:
+            type: object
+    PublicMarketplaceTemplate:
+      type: object
+      required:
+        - id
+        - slug
+        - name
+        - description
+        - locale
+        - sortOrder
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        slug:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        locale:
+          type: string
+        sortOrder:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PublicMarketplaceTemplateDetail:
+      allOf:
+        - $ref: '#/components/schemas/PublicMarketplaceTemplate'
+        - type: object
+          required: [body]
+          properties:
+            body:
+              type: object
+              description: TemplateBody-shaped JSON from platform catalog
+    PublicMarketplaceTemplateList:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicMarketplaceTemplate'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    PublicMarketplaceInstallResult:
+      type: object
+      required: [template, marketplaceTemplateId]
+      properties:
+        template:
+          $ref: '#/components/schemas/PublicDocumentTemplateDetail'
+        marketplaceTemplateId:
+          type: string
     PublicDocumentVersion:
       type: object
       required:

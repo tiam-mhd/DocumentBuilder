@@ -42,7 +42,9 @@ Clients map `code` → i18n (`fa` / `en`).
 - One `subscriptions` row per Business (`business_id` unique)
 - Statuses: `trial` | `active` | `grace` | `expired` | `pending_payment`
 - Writable for EntitlementGuard prep: `trial` | `active` | `grace`
-- `effectiveStatus`: trial/active/grace with past `endsAt` → `expired` (read-time)
+- `effectiveStatus`: after `endsAt` → `grace` for `BILLING_GRACE_DAYS` (default 3), then `expired` (read-time + daily dunning job)
+- Daily BullMQ `billing.dunning` (SAAS): persist grace/expired + idempotent SMS to OWNER mobiles
+- Never delete tenant data on expiry; renew via existing checkout
 - **Trial (atomic on Business create):**
   - `UPDATE users SET trial_consumed=true WHERE id=? AND trial_consumed=false`
   - if claimed → `status=trial`, `ends_at=now+7d`
@@ -103,7 +105,20 @@ Clients map `code` → i18n (`fa` / `en`).
 | `GET` | `/api/auth/me` | Bearer |
 | `POST` | `/api/auth/logout` | Bearer |
 | `GET/POST` | `/api/businesses` | Bearer |
-| `GET/PATCH/DELETE` | `/api/businesses/:businessId` | Bearer + membership |
+| `GET/PATCH/DELETE` | `/api/businesses/:businessId` | Bearer + membership (PATCH ADMIN+; DELETE OWNER) |
+| `GET` | `/api/businesses/:businessId/permissions` | Bearer + membership (role RBAC codes) |
+| `GET` | `/api/businesses/:businessId/members` | Bearer + membership |
+| `PATCH/DELETE` | `/api/businesses/:businessId/members/:userId` | Bearer + ADMIN+ |
+| `GET/POST` | `/api/businesses/:businessId/invitations` | Bearer + ADMIN+ (invite ADMIN = OWNER) |
+| `DELETE` | `/api/businesses/:businessId/invitations/:invitationId` | Bearer + ADMIN+ |
+| `GET` | `/api/invitations/:token` | none (preview) |
+| `POST` | `/api/invitations/:token/accept` | Bearer (mobile must match) |
+| `GET` | `/api/me/invitations` | Bearer |
+| `GET` | `/api/businesses/:businessId/branding` | Bearer + membership |
+| `PATCH` | `/api/businesses/:businessId/branding` | Bearer + writable + `manage.settings` + white-label capability |
+| `POST/DELETE` | `/api/businesses/:businessId/branding/logo` | same as PATCH |
+| `GET` | `/api/businesses/:businessId/branding/logo/file` | Bearer + membership |
+| `GET` | `/api/branding/resolve?host=` | none (custom domain → brand) |
 | `GET` | `/api/businesses/:businessId/subscription` | Bearer + membership |
 | `GET` | `/api/businesses/:businessId/entitlements` | Bearer + membership |
 | `POST` | `/api/businesses/:businessId/gates/writable` | Bearer + EntitlementGuard (writable) |
@@ -112,7 +127,7 @@ Clients map `code` → i18n (`fa` / `en`).
 | `POST` | `/api/businesses/:businessId/gates/module-org-chart` | Bearer + `module.org_chart` |
 | `POST` | `/api/businesses/:businessId/gates/module-timeline` | Bearer + `module.timeline` |
 | `GET` | `/api/billing/catalog` | Bearer |
-| `POST` | `/api/businesses/:businessId/billing/checkout` | Bearer + membership (SAAS only) |
+| `POST` | `/api/businesses/:businessId/billing/checkout` | Bearer + **OWNER** (SAAS only) |
 | `GET` | `/api/billing/payments/callback` | Gateway return (no JWT) |
 | `POST` | `/api/billing/webhooks/payment` | Idempotent webhook (no JWT) |
 | `POST` | `/api/billing/payments/confirm` | Bearer + membership |
@@ -152,6 +167,30 @@ Clients map `code` → i18n (`fa` / `en`).
 | `POST` | `/api/businesses/:businessId/documents/:documentId/workflow/publish` | Bearer + writable + OWNER/ADMIN (+ version) |
 | `POST` | `/api/businesses/:businessId/documents/:documentId/workflow/unpublish` | Bearer + writable + OWNER/ADMIN |
 | `POST` | `/api/businesses/:businessId/documents/:documentId/workflow/reopen` | Bearer + writable + OWNER/ADMIN |
+| `GET` | `/api/businesses/:businessId/documents/:documentId/web-publish` | Bearer + membership |
+| `PATCH` | `/api/businesses/:businessId/documents/:documentId/web-publish` | Bearer + writable + `documents.publish` |
+| `GET` | `/api/public/documents/:businessId/:slug` | none (public HTML profile) |
+| `GET` | `/api/public/documents/by-host?host=&slug=` | none (custom domain + slug) |
+| `GET` | `/api/public/branding/:businessId/logo` | none (public logo bytes) |
+| `GET` | `/api/businesses/:businessId/documents/:documentId/share-links` | Bearer + membership |
+| `POST` | `/api/businesses/:businessId/documents/:documentId/share-links` | Bearer + writable + `documents.publish` |
+| `POST` | `/api/businesses/:businessId/documents/:documentId/share-links/:shareId/revoke` | Bearer + writable + `documents.publish` |
+| `GET` | `/api/public/share/:token` | none (meta + view when unlocked) |
+| `POST` | `/api/public/share/:token/unlock` | none (password; Redis rate-limit) |
+| `GET` | `/api/public/share/:token/file` | none (PDF bytes; session if password) |
+| `GET` | `/api/marketplace/templates?businessId=` | Bearer + SAAS + `marketplace.templates` |
+| `GET` | `/api/marketplace/templates/:id?businessId=` | Bearer + SAAS + `marketplace.templates` |
+| `POST` | `/api/businesses/:businessId/marketplace/templates/:id/install` | Bearer + writable + entitlement + `manage.templates` |
+| `GET` | `/api/plugins` | Bearer (first-party manifests; both editions) |
+| `GET` | `/api/platform-admin/me` | Bearer (SAAS; returns isPlatformAdmin) |
+| `GET` | `/api/platform-admin/users` | Bearer + platform_admin + SAAS |
+| `GET` | `/api/platform-admin/businesses` | Bearer + platform_admin + SAAS |
+| `POST` | `/api/platform-admin/businesses/:id/suspend` | Bearer + platform_admin + SAAS |
+| `POST` | `/api/platform-admin/businesses/:id/unsuspend` | Bearer + platform_admin + SAAS |
+| `GET` | `/api/platform-admin/subscriptions` | Bearer + platform_admin + SAAS |
+| `GET` | `/api/platform-admin/jobs/failed` | Bearer + platform_admin + SAAS |
+| `POST` | `/api/platform-admin/dunning/run` | Bearer + platform_admin + SAAS (optional `nowIso` fake clock) |
+| `GET` | `/api/businesses/:businessId/analytics/summary` | Bearer + `audit.read` (OWNER/ADMIN) |
 | `GET` | `/api/businesses/:businessId/documents/:documentId/comments` | Bearer + membership (`resolved=open\|resolved\|all`) |
 | `POST` | `/api/businesses/:businessId/documents/:documentId/comments` | Bearer + writable |
 | `PATCH` | `/api/businesses/:businessId/documents/:documentId/comments/:commentId` | Bearer + writable (author/OWNER/ADMIN) |
@@ -435,7 +474,8 @@ Clients map `code` → i18n (`fa` / `en`).
 - `PDF_RENDERER=fake|playwright` — fake for CI/dev; Playwright Chromium for production workers
 - Storage key: `{businessId}/exports/{jobId}/document.pdf`
 - Gate: `POST .../export/pdf` requires `export.pdf` (UI mirrors via entitlements)
-- See `docs/adr/007-pdf-export-pipeline.md` + `docs/deploy/README.md` (worker)
+- Cost controls (ADR 033 / pre-GA): `EXPORT_MAX_CONCURRENT_PER_BUSINESS`, Redis `EXPORT_RATE_*` → `429` codes `EXPORT_TOO_MANY_CONCURRENT` / `EXPORT_RATE_LIMITED`; worker `EXPORT_WORKER_CONCURRENCY`
+- See `docs/adr/007-pdf-export-pipeline.md`, `docs/adr/033-performance-security-hardening.md`, `docs/qa/pre-ga-hardening.md`
 
 ### Catalog
 
@@ -460,3 +500,11 @@ Clients map `code` → i18n (`fa` / `en`).
 - Runnable: `npm run test:e2e:self-hosted` (`scripts/e2e/self-hosted-funnel.mjs`)
 - Checklist: `docs/qa/phase-01-self-hosted-acceptance.md`
 - Asserts `LICENSE_REQUIRED` before activate, then document→PDF; blocks SAAS checkout
+
+### Phase 02–04 + GA
+
+- Corporate: `npm run test:e2e:corporate` · `docs/qa/phase-02-corporate-acceptance.md`
+- Professional: `npm run test:e2e:professional` · `docs/qa/phase-03-professional-acceptance.md`
+- Product surfaces (members, branding, web-publish, share, analytics, marketplace, plugins, platform-admin, dunning): routes in this README table + `docs/api/openapi.yaml`
+- Hardening: `docs/qa/pre-ga-hardening.md` · ADR 033
+- **GA catalog exit:** `docs/qa/GA-checklist.md`

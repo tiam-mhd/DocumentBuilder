@@ -49,5 +49,5 @@ External invitee reviewers, multi-step parallel approvals, email notifications, 
 
 ## Consequences
 
-- Creator businesses (OWNER) can self-approve; MEMBER authors submit and wait.
+- Creator businesses (OWNER) can self-approve; EDITOR authors submit and wait.
 - Editor UI shows workflow buttons by role + status; documents list mirrors status labels.
