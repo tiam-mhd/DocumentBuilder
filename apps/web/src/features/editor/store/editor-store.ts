@@ -16,6 +16,9 @@ const HISTORY_LIMIT = 50;
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error' | 'readonly';
 
+/** Workspace stage mode — session-only; not persisted (P05-T01-04). */
+export type EditorMode = 'edit' | 'htmlPreview' | 'pdfPreview';
+
 type EditorStore = {
   businessId: string | null;
   documentId: string | null;
@@ -24,8 +27,11 @@ type EditorStore = {
   status: 'draft' | 'review' | 'approved' | 'published';
   body: DocumentBody | null;
   selectedBlockId: string | null;
+  editorMode: EditorMode;
   dirty: boolean;
   saveStatus: SaveStatus;
+  /** Bumped by `retrySave` so autosave re-runs while still dirty. */
+  saveRetryNonce: number;
   past: DocumentBody[];
   future: DocumentBody[];
   loadDocument: (input: {
@@ -36,6 +42,7 @@ type EditorStore = {
     status?: 'draft' | 'review' | 'approved' | 'published';
   }) => void;
   setStatus: (status: 'draft' | 'review' | 'approved' | 'published') => void;
+  setEditorMode: (mode: EditorMode) => void;
   selectBlock: (id: string | null) => void;
   setTitle: (title: string) => void;
   setDocumentLocale: (locale: 'fa' | 'en') => void;
@@ -78,6 +85,8 @@ type EditorStore = {
   markSaveError: () => void;
   markSaveIdle: () => void;
   markReadonly: () => void;
+  /** Re-trigger autosave after an error while dirty stays true. */
+  retrySave: () => void;
   clearDirty: () => void;
   reset: () => void;
 };
@@ -266,8 +275,10 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   status: 'draft',
   body: null,
   selectedBlockId: null,
+  editorMode: 'edit',
   dirty: false,
   saveStatus: 'idle',
+  saveRetryNonce: 0,
   past: [],
   future: [],
 
@@ -294,14 +305,18 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
           : 'draft',
       body: parsed,
       selectedBlockId: null,
+      editorMode: 'edit',
       dirty: false,
       saveStatus: 'idle',
+      saveRetryNonce: 0,
       past: [],
       future: [],
     });
   },
 
   setStatus: (status) => set({ status }),
+
+  setEditorMode: (mode) => set({ editorMode: mode }),
 
   selectBlock: (id) => set({ selectedBlockId: id }),
 
@@ -513,6 +528,12 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   markSaveError: () => set({ saveStatus: 'error' }),
   markSaveIdle: () => set({ saveStatus: 'idle' }),
   markReadonly: () => set({ saveStatus: 'readonly', dirty: false }),
+  retrySave: () =>
+    set((s) => ({
+      saveStatus: 'idle',
+      dirty: true,
+      saveRetryNonce: s.saveRetryNonce + 1,
+    })),
   clearDirty: () => set({ dirty: false }),
   reset: () =>
     set({
@@ -522,8 +543,10 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       status: 'draft',
       body: null,
       selectedBlockId: null,
+      editorMode: 'edit',
       dirty: false,
       saveStatus: 'idle',
+      saveRetryNonce: 0,
       past: [],
       future: [],
     }),
