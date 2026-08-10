@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { createEmptyTemplateBody } from '@vdb/document-schema';
 import {
   EntitlementCodes,
   PlanCodes,
@@ -15,7 +16,10 @@ async function main() {
       descriptionKey: 'plans.core.description',
       priceMonthly: 990_000,
       currency: 'IRR',
-      baseEntitlements: [EntitlementCodes.ExportPdf],
+      baseEntitlements: [
+        EntitlementCodes.ExportPdf,
+        EntitlementCodes.MarketplaceTemplates,
+      ],
       isActive: true,
     },
     create: {
@@ -24,7 +28,10 @@ async function main() {
       descriptionKey: 'plans.core.description',
       priceMonthly: 990_000,
       currency: 'IRR',
-      baseEntitlements: [EntitlementCodes.ExportPdf],
+      baseEntitlements: [
+        EntitlementCodes.ExportPdf,
+        EntitlementCodes.MarketplaceTemplates,
+      ],
       isActive: true,
     },
   });
@@ -60,6 +67,18 @@ async function main() {
       descriptionKey: 'modules.gallery.description',
       priceMonthly: 150_000,
     },
+    {
+      code: EntitlementCodes.BrandingWhiteLabel,
+      nameKey: 'modules.whiteLabel.name',
+      descriptionKey: 'modules.whiteLabel.description',
+      priceMonthly: 390_000,
+    },
+    {
+      code: EntitlementCodes.MarketplaceTemplates,
+      nameKey: 'modules.marketplace.name',
+      descriptionKey: 'modules.marketplace.description',
+      priceMonthly: 0,
+    },
   ] as const;
 
   for (const def of moduleDefs) {
@@ -94,10 +113,82 @@ async function main() {
     throw new Error('Catalog module seed mismatch with shared-types');
   }
 
-  // eslint-disable-next-line no-console
-  console.log(
-    `Seeded plan ${core.code} + ${seeded.length} modules (export.pdf in base entitlements)`,
+  const companyProfileBodyFa = createEmptyTemplateBody(
+    '_marketplace',
+    'seed-company-profile-fa',
   );
+  const companyProfileBodyEn = createEmptyTemplateBody(
+    '_marketplace',
+    'seed-company-profile-en',
+  );
+
+  await prisma.marketplaceTemplate.upsert({
+    where: { slug: 'company-profile-fa' },
+    update: {
+      name: 'پروفایل شرکت',
+      description: 'قالب ساده معرفی کسب‌وکار (اسکلت مارکت‌پلیس)',
+      locale: 'fa',
+      body: companyProfileBodyFa,
+      isActive: true,
+      sortOrder: 10,
+    },
+    create: {
+      slug: 'company-profile-fa',
+      name: 'پروفایل شرکت',
+      description: 'قالب ساده معرفی کسب‌وکار (اسکلت مارکت‌پلیس)',
+      locale: 'fa',
+      body: companyProfileBodyFa,
+      isActive: true,
+      sortOrder: 10,
+    },
+  });
+
+  await prisma.marketplaceTemplate.upsert({
+    where: { slug: 'company-profile-en' },
+    update: {
+      name: 'Company profile',
+      description: 'Simple company intro template (marketplace skeleton)',
+      locale: 'en',
+      body: companyProfileBodyEn,
+      isActive: true,
+      sortOrder: 20,
+    },
+    create: {
+      slug: 'company-profile-en',
+      name: 'Company profile',
+      description: 'Simple company intro template (marketplace skeleton)',
+      locale: 'en',
+      body: companyProfileBodyEn,
+      isActive: true,
+      sortOrder: 20,
+    },
+  });
+
+  console.log(
+    `Seeded plan ${core.code} + ${seeded.length} modules + marketplace samples (export.pdf in base entitlements)`,
+  );
+
+  const adminMobiles = String(process.env.PLATFORM_ADMIN_MOBILES ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  let adminCount = 0;
+  for (const mobile of adminMobiles) {
+    const user = await prisma.user.findUnique({ where: { mobile } });
+    if (!user) continue;
+    await prisma.platformAdmin.upsert({
+      where: { userId: user.id },
+      create: { userId: user.id, note: 'seed PLATFORM_ADMIN_MOBILES' },
+      update: {},
+    });
+    adminCount += 1;
+  }
+  if (adminMobiles.length > 0) {
+    // eslint-disable-next-line no-console
+    console.log(
+      `Platform admins upserted for ${adminCount}/${adminMobiles.length} mobiles`,
+    );
+  }
 }
 
 main()

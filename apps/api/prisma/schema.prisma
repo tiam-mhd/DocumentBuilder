@@ -10,7 +10,15 @@ datasource db {
 enum MembershipRole {
   OWNER
   ADMIN
-  MEMBER
+  EDITOR
+  VIEWER
+}
+
+enum InvitationStatus {
+  pending
+  accepted
+  revoked
+  expired
 }
 
 enum SubscriptionStatus {
@@ -46,9 +54,24 @@ model User {
   createdAt     DateTime             @default(now()) @map("created_at")
   updatedAt     DateTime             @updatedAt @map("updated_at")
   memberships   BusinessMembership[]
+  invitationsSent BusinessInvitation[] @relation("InvitationInviter")
   auditEvents   AuditEvent[]
+  platformAdmin PlatformAdmin?
 
   @@map("users")
+}
+
+/**
+ * SAAS platform operators (ADR 031). Not a Business membership role.
+ */
+model PlatformAdmin {
+  id        String   @id @default(cuid())
+  userId    String   @unique @map("user_id")
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("platform_admins")
 }
 
 /** Append-only audit log — see `.cursor/rules/15-audit-events.mdc`. */
@@ -76,19 +99,27 @@ model Business {
   createdAt    DateTime             @default(now()) @map("created_at")
   updatedAt    DateTime             @updatedAt @map("updated_at")
   deletedAt    DateTime?            @map("deleted_at")
+  /** SAAS platform suspension (ADR 031) — blocks writable work. */
+  suspendedAt       DateTime? @map("suspended_at")
+  suspendedReason   String?   @map("suspended_reason")
+  suspendedByUserId String?   @map("suspended_by_user_id")
   memberships  BusinessMembership[]
+  invitations  BusinessInvitation[]
   subscription Subscription?
   invoices     Invoice[]
   payments     Payment[]
   mediaAssets  MediaAsset[]
   fontFaces    FontFace[]
   designThemes DesignTheme[]
+  branding     BusinessBranding?
   templates    DocumentTemplate[]
   documents    Document[]
   exportJobs   ExportJob[]
   importJobs   ImportJob[]
   documentVersions DocumentVersion[]
   documentComments DocumentComment[]
+  documentShareLinks DocumentShareLink[]
+  analyticsEvents AnalyticsEvent[]
   projectCategories ProjectCategory[]
   projects     Project[]
   teamMembers  TeamMember[]
@@ -104,6 +135,7 @@ model Business {
   workspaceBackupJobs WorkspaceBackupJob[]
   workspaceRestoreJobs WorkspaceRestoreJob[]
 
+  @@index([suspendedAt])
   @@map("businesses")
 }
 
@@ -111,7 +143,7 @@ model BusinessMembership {
   id         String         @id @default(cuid())
   businessId String         @map("business_id")
   userId     String         @map("user_id")
-  role       MembershipRole @default(MEMBER)
+  role       MembershipRole @default(EDITOR)
   createdAt  DateTime       @default(now()) @map("created_at")
   updatedAt  DateTime       @updatedAt @map("updated_at")
   business   Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
@@ -121,6 +153,27 @@ model BusinessMembership {
   @@index([userId])
   @@index([businessId])
   @@map("business_memberships")
+}
+
+model BusinessInvitation {
+  id              String           @id @default(cuid())
+  businessId      String           @map("business_id")
+  mobile          String
+  role            MembershipRole
+  token           String           @unique
+  status          InvitationStatus @default(pending)
+  invitedByUserId String           @map("invited_by_user_id")
+  expiresAt       DateTime         @map("expires_at")
+  acceptedAt      DateTime?        @map("accepted_at")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  business        Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  invitedBy       User             @relation("InvitationInviter", fields: [invitedByUserId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, status])
+  @@index([mobile, status])
+  @@index([businessId, mobile])
+  @@map("business_invitations")
 }
 
 model Plan {
@@ -179,9 +232,30 @@ model Subscription {
   plan       Plan?                @relation(fields: [planId], references: [id], onDelete: SetNull)
   modules    SubscriptionModule[]
   invoices   Invoice[]
+  dunningNotices SubscriptionDunningNotice[]
 
   @@index([status])
+  @@index([status, endsAt])
   @@map("subscriptions")
+}
+
+/**
+ * Idempotent dunning SMS ledger (ADR 032).
+ * periodKey = subscription endsAt date (UTC YYYY-MM-DD) for the billed period.
+ */
+model SubscriptionDunningNotice {
+  id             String       @id @default(cuid())
+  subscriptionId String       @map("subscription_id")
+  businessId     String       @map("business_id")
+  kind           String
+  periodKey      String       @map("period_key")
+  sentAt         DateTime     @default(now()) @map("sent_at")
+  meta           Json         @default("{}")
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, kind, periodKey])
+  @@index([businessId, sentAt])
+  @@map("subscription_dunning_notices")
 }
 
 model Invoice {
@@ -334,6 +408,48 @@ model DesignTheme {
 }
 
 /**
+ * White-label chrome brand per Business — see `.cursor/rules/18-white-label-branding.mdc`.
+ * Separate from design_themes (document PDF tokens).
+ */
+model BusinessBranding {
+  id              String   @id @default(cuid())
+  businessId      String   @unique @map("business_id")
+  displayName     String?  @map("display_name")
+  primaryColor    String?  @map("primary_color")
+  logoStorageKey  String?  @map("logo_storage_key")
+  logoMimeType    String?  @map("logo_mime_type")
+  logoByteSize    Int?     @map("logo_byte_size")
+  customDomain    String?  @unique @map("custom_domain")
+  hidePoweredBy   Boolean  @default(false) @map("hide_powered_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@map("business_branding")
+}
+
+/**
+ * SAAS global template catalog (ADR 029). Not business-owned.
+ * Install copies into document_templates + Mongo template_bodies.
+ */
+model MarketplaceTemplate {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String?
+  locale      String   @default("fa")
+  /** TemplateBody-shaped JSON (validated on write/install). */
+  body        Json
+  isActive    Boolean  @default(true) @map("is_active")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive, sortOrder])
+  @@map("marketplace_templates")
+}
+
+/**
  * Template metadata (layout only). Body lives in Mongo `template_bodies`.
  * See `.cursor/rules/13-templates-blocks.mdc`.
  */
@@ -367,25 +483,96 @@ enum DocumentStatus {
  * Data ≠ Template ≠ Document — see `.cursor/rules/13-templates-blocks.mdc`.
  */
 model Document {
-  id         String           @id @default(cuid())
-  businessId String           @map("business_id")
-  templateId String?          @map("template_id")
-  title      String
+  id              String           @id @default(cuid())
+  businessId      String           @map("business_id")
+  templateId      String?          @map("template_id")
+  title           String
   /** Content locale for preview/PDF (ADR 015). Columns default fa. */
-  locale     String           @default("fa")
-  status     DocumentStatus   @default(draft)
-  createdAt  DateTime         @default(now()) @map("created_at")
-  updatedAt  DateTime         @updatedAt @map("updated_at")
-  deletedAt  DateTime?        @map("deleted_at")
-  business   Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  template   DocumentTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
-  exportJobs ExportJob[]
-  versions   DocumentVersion[]
-  comments   DocumentComment[]
+  locale          String           @default("fa")
+  status          DocumentStatus   @default(draft)
+  /** Public web profile slug — unique per business when set (ADR 026). */
+  webSlug         String?          @map("web_slug")
+  webPublished    Boolean          @default(false) @map("web_published")
+  webPublishedAt  DateTime?        @map("web_published_at")
+  /** Denormalized analytics rollups (ADR 028). */
+  analyticsViewCount     Int @default(0) @map("analytics_view_count")
+  analyticsDownloadCount Int @default(0) @map("analytics_download_count")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  deletedAt       DateTime?        @map("deleted_at")
+  business        Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  template        DocumentTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  exportJobs      ExportJob[]
+  versions        DocumentVersion[]
+  comments        DocumentComment[]
+  shareLinks      DocumentShareLink[]
+  analyticsEvents AnalyticsEvent[]
 
+  @@unique([businessId, webSlug])
   @@index([businessId, deletedAt, createdAt])
   @@index([businessId, status, deletedAt])
+  @@index([businessId, webPublished, webSlug])
   @@map("documents")
+}
+
+enum ShareLinkScope {
+  web
+  pdf
+}
+
+/** Tokenized share access — ADR 027. Independent of web_published slug. */
+model DocumentShareLink {
+  id              String         @id @default(cuid())
+  businessId      String         @map("business_id")
+  documentId      String         @map("document_id")
+  tokenHash       String         @unique @map("token_hash")
+  tokenHint       String         @map("token_hint")
+  passwordHash    String?        @map("password_hash")
+  scope           ShareLinkScope
+  expiresAt       DateTime?      @map("expires_at")
+  revokedAt       DateTime?      @map("revoked_at")
+  createdByUserId String?        @map("created_by_user_id")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  business        Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  document        Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, documentId, createdAt])
+  @@index([businessId, revokedAt])
+  @@map("document_share_links")
+}
+
+enum AnalyticsEventKind {
+  view
+  download
+}
+
+enum AnalyticsEventSource {
+  web_publish
+  share_web
+  share_pdf
+  export_download
+}
+
+/** Product metrics — ADR 028. Not audit_events. */
+model AnalyticsEvent {
+  id         String               @id @default(cuid())
+  businessId String               @map("business_id")
+  documentId String               @map("document_id")
+  kind       AnalyticsEventKind
+  source     AnalyticsEventSource
+  /** ISO-3166-1 alpha-2 when known; never store IP. */
+  country    String?
+  /** Coarse device class — never raw User-Agent. */
+  device     String?
+  createdAt  DateTime             @default(now()) @map("created_at")
+  business   Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  document   Document             @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, createdAt])
+  @@index([businessId, documentId, kind, createdAt])
+  @@index([businessId, kind, createdAt])
+  @@map("analytics_events")
 }
 
 /** Review comments on a document — ADR 022. Mentions out of MVP. */
