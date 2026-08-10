@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type {
   PublicDocument,
-  PublicDocumentDetail,
   PublicDocumentTemplate,
 } from '@vdb/shared-types';
 import {
@@ -39,7 +38,6 @@ export function DocumentsPage() {
   const [templates, setTemplates] = useState<PublicDocumentTemplate[]>([]);
   const [title, setTitle] = useState('');
   const [templateId, setTemplateId] = useState('');
-  const [detail, setDetail] = useState<PublicDocumentDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -97,8 +95,8 @@ export function DocumentsPage() {
         templateId,
       });
       setTitle('');
-      setDetail(created);
       await refresh();
+      router.push(`/${locale}/app/documents/${created.id}`);
     } catch (err) {
       if (err instanceof ApiClientError) {
         setError(mapApiErrorCode(err.code, tErrors));
@@ -118,28 +116,26 @@ export function DocumentsPage() {
     setBusy(true);
     setError(null);
     try {
-      let updated: PublicDocumentDetail;
       switch (action) {
         case 'submit':
-          updated = await submitDocumentReview(activeBusiness.id, doc.id);
+          await submitDocumentReview(activeBusiness.id, doc.id);
           break;
         case 'approve':
-          updated = await approveDocument(activeBusiness.id, doc.id);
+          await approveDocument(activeBusiness.id, doc.id);
           break;
         case 'reject':
-          updated = await rejectDocument(activeBusiness.id, doc.id);
+          await rejectDocument(activeBusiness.id, doc.id);
           break;
         case 'publish':
-          updated = await publishDocument(activeBusiness.id, doc.id);
+          await publishDocument(activeBusiness.id, doc.id);
           break;
         case 'unpublish':
-          updated = await unpublishDocument(activeBusiness.id, doc.id);
+          await unpublishDocument(activeBusiness.id, doc.id);
           break;
         case 'reopen':
-          updated = await reopenDocument(activeBusiness.id, doc.id);
+          await reopenDocument(activeBusiness.id, doc.id);
           break;
       }
-      if (detail?.id === doc.id) setDetail(updated);
       await refresh();
     } catch (err) {
       if (err instanceof ApiClientError) {
@@ -159,7 +155,6 @@ export function DocumentsPage() {
     setError(null);
     try {
       await deleteDocument(activeBusiness.id, id);
-      if (detail?.id === id) setDetail(null);
       await refresh();
     } catch (err) {
       if (err instanceof ApiClientError) {
@@ -337,21 +332,6 @@ export function DocumentsPage() {
           ))}
         </ul>
       )}
-
-      {detail ? (
-        <aside className={styles.detail}>
-          <h2 className={styles.sub}>{t('detailTitle')}</h2>
-          <p className={styles.name}>{detail.title}</p>
-          <p className={styles.meta}>
-            <Link href={`/${locale}/app/documents/${detail.id}`}>
-              {t('openEditor')}
-            </Link>
-          </p>
-          <pre className={styles.pre}>
-            {JSON.stringify(detail.body, null, 2)}
-          </pre>
-        </aside>
-      ) : null}
     </section>
   );
 }

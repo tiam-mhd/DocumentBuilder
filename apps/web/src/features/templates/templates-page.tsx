@@ -3,14 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type {
-  PublicBlockRegistryEntry,
   PublicDocumentTemplate,
   PublicDocumentTemplateDetail,
 } from '@vdb/shared-types';
 import {
   createTemplate,
   deleteTemplate,
-  fetchBlockRegistry,
   getTemplate,
   listTemplates,
 } from '@/shared/api/templates';
@@ -22,8 +20,6 @@ import styles from './templates-page.module.css';
 
 function countBlocks(body: unknown): number {
   if (!body || typeof body !== 'object') return 0;
-  const blocks = (body as { blocks?: unknown }).blocks;
-  if (!Array.isArray(blocks)) return 0;
   let n = 0;
   const walk = (nodes: unknown[]) => {
     for (const node of nodes) {
@@ -34,18 +30,35 @@ function countBlocks(body: unknown): number {
       }
     }
   };
-  walk(blocks);
+  const raw = body as {
+    blocks?: unknown;
+    pages?: Array<{ blocks?: unknown }>;
+    masters?: Array<{
+      header?: { blocks?: unknown };
+      footer?: { blocks?: unknown };
+    }>;
+  };
+  if (Array.isArray(raw.blocks)) walk(raw.blocks);
+  if (Array.isArray(raw.pages)) {
+    for (const page of raw.pages) {
+      if (Array.isArray(page.blocks)) walk(page.blocks);
+    }
+  }
+  if (Array.isArray(raw.masters)) {
+    for (const master of raw.masters) {
+      if (Array.isArray(master.header?.blocks)) walk(master.header.blocks);
+      if (Array.isArray(master.footer?.blocks)) walk(master.footer.blocks);
+    }
+  }
   return n;
 }
 
 export function TemplatesPage() {
   const t = useTranslations('templates');
-  const tBlocks = useTranslations('blocks');
   const tErrors = useTranslations('errors');
   const { activeBusiness } = useBusinesses();
   const { writable, loading: entLoading } = useEntitlements();
   const [items, setItems] = useState<PublicDocumentTemplate[]>([]);
-  const [registry, setRegistry] = useState<PublicBlockRegistryEntry[]>([]);
   const [themes, setThemes] = useState<{ id: string; name: string }[]>([]);
   const [name, setName] = useState('');
   const [themeId, setThemeId] = useState('');
@@ -59,19 +72,16 @@ export function TemplatesPage() {
   async function refresh() {
     if (!activeBusiness) {
       setItems([]);
-      setRegistry([]);
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      const [list, reg, themeList] = await Promise.all([
+      const [list, themeList] = await Promise.all([
         listTemplates(activeBusiness.id, { page: 1, pageSize: 50 }),
-        fetchBlockRegistry(activeBusiness.id),
         listThemes(activeBusiness.id, { page: 1, pageSize: 50 }),
       ]);
       setItems(list.items);
-      setRegistry(reg.items);
       setThemes(themeList.items.map((th) => ({ id: th.id, name: th.name })));
       const def = themeList.items.find((th) => th.isDefault);
       if (def && !themeId) setThemeId(def.id);
@@ -154,6 +164,11 @@ export function TemplatesPage() {
     }
   }
 
+  const themeName =
+    detail?.themeId != null
+      ? themes.find((th) => th.id === detail.themeId)?.name
+      : null;
+
   if (!activeBusiness) {
     return (
       <section className={styles.section}>
@@ -167,17 +182,6 @@ export function TemplatesPage() {
     <section className={styles.section}>
       <h1 className={styles.title}>{t('title')}</h1>
       <p className={styles.hint}>{t('hint')}</p>
-
-      <div className={styles.registry}>
-        <h2 className={styles.sub}>{t('registryTitle')}</h2>
-        <ul className={styles.chipList}>
-          {registry.map((entry) => (
-            <li key={entry.type} className={styles.chip}>
-              {tBlocks(entry.labelKey as 'text')}
-            </li>
-          ))}
-        </ul>
-      </div>
 
       <div className={styles.create}>
         <label className={styles.field}>
@@ -260,10 +264,24 @@ export function TemplatesPage() {
         <aside className={styles.detail}>
           <h2 className={styles.sub}>{t('detailTitle')}</h2>
           <p className={styles.name}>{detail.name}</p>
+          {detail.description ? (
+            <p className={styles.meta}>{detail.description}</p>
+          ) : null}
           <p className={styles.meta}>
             {t('blockCount', { count: countBlocks(detail.body) })}
           </p>
-          <pre className={styles.pre}>{JSON.stringify(detail.body, null, 2)}</pre>
+          <p className={styles.meta}>
+            {themeName
+              ? t('detailTheme', { name: themeName })
+              : t('detailThemeNone')}
+          </p>
+          <button
+            type="button"
+            className={styles.secondary}
+            onClick={() => setDetail(null)}
+          >
+            {t('closeDetail')}
+          </button>
         </aside>
       ) : null}
     </section>
