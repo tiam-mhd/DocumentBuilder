@@ -33,11 +33,18 @@ export class EntitlementsService {
       );
     }
 
+    const business = await this.prisma.business.findFirst({
+      where: { id: businessId, deletedAt: null },
+      select: { suspendedAt: true },
+    });
+    const suspended = Boolean(business?.suspendedAt);
+
     const effectiveStatus = this.subscriptions.resolveEffectiveStatus(
       row.status,
       row.endsAt,
     );
-    const writable = isSubscriptionWritable(effectiveStatus);
+    const writable =
+      !suspended && isSubscriptionWritable(effectiveStatus);
     const base = Array.isArray(row.plan?.baseEntitlements)
       ? (row.plan!.baseEntitlements as string[])
       : [];

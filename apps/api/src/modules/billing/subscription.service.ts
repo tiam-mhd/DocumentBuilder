@@ -4,7 +4,11 @@ import {
   type Subscription,
 } from '@prisma/client';
 import {
+  daysUntilSubscriptionEnd,
   isSubscriptionWritable,
+  PlatformAdminErrorCodes,
+  resolveSubscriptionEffectiveStatus,
+  subscriptionGraceEndsAt,
   SubscriptionStatus,
   type PublicSubscription,
 } from '@vdb/shared-types';
@@ -32,13 +36,28 @@ export class SubscriptionService {
         HttpStatus.NOT_FOUND,
       );
     }
-    return this.toPublic(row);
+    const business = await this.prisma.business.findFirst({
+      where: { id: businessId, deletedAt: null },
+      select: { suspendedAt: true },
+    });
+    return this.toPublic(row, Boolean(business?.suspendedAt));
   }
 
   /**
    * Prep for EntitlementGuard — membership must be checked by caller/guard first.
    */
   async assertBusinessWritable(businessId: string): Promise<PublicSubscription> {
+    const business = await this.prisma.business.findFirst({
+      where: { id: businessId, deletedAt: null },
+      select: { suspendedAt: true },
+    });
+    if (business?.suspendedAt) {
+      throw new DomainException(
+        PlatformAdminErrorCodes.BusinessSuspended,
+        'Business is suspended by platform',
+        HttpStatus.FORBIDDEN,
+      );
+    }
     const sub = await this.getForBusiness(businessId);
     if (!sub.writable) {
       throw new DomainException(
@@ -59,24 +78,17 @@ export class SubscriptionService {
     endsAt: Date | null,
     now: Date = new Date(),
   ): SubscriptionStatus {
-    const mapped = status as SubscriptionStatus;
-    if (
-      endsAt &&
-      endsAt.getTime() < now.getTime() &&
-      (mapped === SubscriptionStatus.Trial ||
-        mapped === SubscriptionStatus.Active ||
-        mapped === SubscriptionStatus.Grace)
-    ) {
-      return SubscriptionStatus.Expired;
-    }
-    return mapped;
+    return resolveSubscriptionEffectiveStatus(status, endsAt, now);
   }
 
   private toPublic(
     row: Subscription & { plan?: { code: string } | null },
+    suspended = false,
+    now: Date = new Date(),
   ): PublicSubscription {
     const status = row.status as SubscriptionStatus;
-    const effectiveStatus = this.resolveEffectiveStatus(status, row.endsAt);
+    const effectiveStatus = this.resolveEffectiveStatus(status, row.endsAt, now);
+    const graceEnd = subscriptionGraceEndsAt(row.endsAt);
     return {
       id: row.id,
       businessId: row.businessId,
@@ -84,9 +96,11 @@ export class SubscriptionService {
       planCode: row.plan?.code ?? null,
       status,
       effectiveStatus,
-      writable: isSubscriptionWritable(effectiveStatus),
+      writable: !suspended && isSubscriptionWritable(effectiveStatus),
       startsAt: row.startsAt.toISOString(),
       endsAt: row.endsAt ? row.endsAt.toISOString() : null,
+      graceEndsAt: graceEnd ? graceEnd.toISOString() : null,
+      daysUntilEnd: daysUntilSubscriptionEnd(row.endsAt, now),
     };
   }
 }

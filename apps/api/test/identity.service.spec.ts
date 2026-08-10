@@ -83,7 +83,10 @@ describe('IdentityService', () => {
         return undefined;
       },
     };
-    const sms = { sendOtp: jest.fn().mockResolvedValue(undefined) };
+    const sms = {
+      sendOtp: jest.fn().mockResolvedValue(undefined),
+      sendTransactional: jest.fn().mockResolvedValue(undefined),
+    };
     const tokens = {
       issueAccessToken: jest.fn().mockResolvedValue({
         accessToken: 'test.jwt.token',

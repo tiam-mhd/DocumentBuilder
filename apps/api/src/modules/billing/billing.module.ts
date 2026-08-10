@@ -21,6 +21,9 @@ import { FakePaymentDriver } from './payment/fake-payment.driver';
 import { ZarinpalPaymentDriver } from './payment/zarinpal-payment.driver';
 import { PaymentIdempotencyLock } from './payment/payment-idempotency.lock';
 import { TrialFirstBusinessHook } from './trial-first-business.hook';
+import { DunningService } from './dunning.service';
+import { DunningQueueService } from './dunning-queue.service';
+import { DunningScheduler } from './dunning-scheduler';
 import { TenancyModule } from '../tenancy/tenancy.module';
 import { IdentityModule } from '../identity/identity.module';
 import { AuditModule } from '../audit/audit.module';
@@ -49,6 +52,9 @@ import { AuditModule } from '../audit/audit.module';
     EntitlementsService,
     EntitlementGuard,
     TrialFirstBusinessHook,
+    DunningService,
+    DunningQueueService,
+    DunningScheduler,
     FakePaymentDriver,
     ZarinpalPaymentDriver,
     PaymentIdempotencyLock,
@@ -83,6 +89,8 @@ import { AuditModule } from '../audit/audit.module';
     EntitlementGuard,
     LicenseService,
     TrialFirstBusinessHook,
+    DunningService,
+    DunningQueueService,
   ],
 })
 export class BillingModule {}

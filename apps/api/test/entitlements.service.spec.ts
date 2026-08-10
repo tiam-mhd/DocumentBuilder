@@ -30,16 +30,25 @@ describe('EntitlementsService', () => {
           })),
         }),
       },
+      business: {
+        findFirst: jest.fn().mockResolvedValue({ suspendedAt: null }),
+      },
     };
 
     const subscriptions = {
       resolveEffectiveStatus: jest.fn(
         (status: string, endsAt: Date | null) => {
+          if (!endsAt) return status;
+          const now = Date.now();
+          if (endsAt.getTime() > now) return status;
+          const graceEnd = endsAt.getTime() + 3 * 86_400_000;
           if (
-            endsAt &&
-            endsAt.getTime() < Date.now() &&
+            now < graceEnd &&
             (status === 'trial' || status === 'active' || status === 'grace')
           ) {
+            return 'grace';
+          }
+          if (status === 'trial' || status === 'active' || status === 'grace') {
             return 'expired';
           }
           return status;
@@ -106,7 +115,7 @@ describe('EntitlementsService', () => {
   it('deny assertCan when expired effective status', async () => {
     const { service } = buildService({
       status: 'active',
-      endsAt: new Date(Date.now() - 1000),
+      endsAt: new Date(Date.now() - 10 * 86_400_000),
       planCode: 'plan.core',
     });
 
@@ -115,6 +124,17 @@ describe('EntitlementsService', () => {
     ).rejects.toMatchObject({
       code: EntitlementErrorCodes.SubscriptionNotWritable,
     });
+  });
+
+  it('writable during grace window after endsAt', async () => {
+    const { service } = buildService({
+      status: 'active',
+      endsAt: new Date(Date.now() - 60_000),
+      planCode: 'plan.core',
+    });
+    const data = await service.getForBusiness('biz_1');
+    expect(data.effectiveStatus).toBe('grace');
+    expect(data.writable).toBe(true);
   });
 
   it('allow export.pdf on active with plan base entitlement', async () => {

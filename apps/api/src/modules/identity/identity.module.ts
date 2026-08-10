@@ -47,6 +47,12 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
       },
     },
   ],
-  exports: [IdentityService, JwtAuthGuard, AuthTokenService, FakeSmsSender],
+  exports: [
+    IdentityService,
+    JwtAuthGuard,
+    AuthTokenService,
+    FakeSmsSender,
+    SMS_SENDER,
+  ],
 })
 export class IdentityModule {}

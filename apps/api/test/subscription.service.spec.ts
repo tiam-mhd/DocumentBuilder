@@ -1,6 +1,9 @@
 import { SubscriptionStatus as PrismaStatus } from '@prisma/client';
+import {
+  resolveSubscriptionEffectiveStatus,
+  SubscriptionStatus,
+} from '@vdb/shared-types';
 import { SubscriptionService } from '../src/modules/billing/subscription.service';
-import { SubscriptionStatus } from '@vdb/shared-types';
 
 describe('SubscriptionService', () => {
   function build(row: {
@@ -20,6 +23,9 @@ describe('SubscriptionService', () => {
           updatedAt: new Date(),
           plan: row.planCode ? { code: row.planCode } : null,
         }),
+      },
+      business: {
+        findFirst: jest.fn().mockResolvedValue({ suspendedAt: null }),
       },
     };
     return {
@@ -44,7 +50,7 @@ describe('SubscriptionService', () => {
     expect(sub.writable).toBe(false);
   });
 
-  it('treats past endsAt trial as expired effective status', async () => {
+  it('treats far-past endsAt trial as expired effective status', async () => {
     const { service } = build({
       id: 's1',
       businessId: 'b1',
@@ -56,6 +62,23 @@ describe('SubscriptionService', () => {
     const sub = await service.getForBusiness('b1');
     expect(sub.effectiveStatus).toBe(SubscriptionStatus.Expired);
     expect(sub.writable).toBe(false);
+    expect(sub.graceEndsAt).toBeTruthy();
+  });
+
+  it('treats recent past endsAt as grace (writable)', async () => {
+    const endsAt = new Date(Date.now() - 60_000);
+    const { service } = build({
+      id: 's1',
+      businessId: 'b1',
+      planId: 'p1',
+      planCode: 'plan.core',
+      status: PrismaStatus.active,
+      startsAt: new Date(Date.now() - 30 * 86_400_000),
+      endsAt,
+    });
+    const sub = await service.getForBusiness('b1');
+    expect(sub.effectiveStatus).toBe(SubscriptionStatus.Grace);
+    expect(sub.writable).toBe(true);
   });
 
   it('assertBusinessWritable allows active', async () => {
@@ -85,5 +108,43 @@ describe('SubscriptionService', () => {
     await expect(service.assertBusinessWritable('b1')).rejects.toMatchObject({
       code: 'SUBSCRIPTION_NOT_WRITABLE',
     });
+  });
+});
+
+describe('resolveSubscriptionEffectiveStatus (shared)', () => {
+  it('keeps active before endsAt', () => {
+    const now = new Date('2026-08-01T12:00:00.000Z');
+    expect(
+      resolveSubscriptionEffectiveStatus(
+        'active',
+        new Date('2026-08-10T00:00:00.000Z'),
+        now,
+        3,
+      ),
+    ).toBe(SubscriptionStatus.Active);
+  });
+
+  it('enters grace after endsAt within grace days', () => {
+    const now = new Date('2026-08-02T12:00:00.000Z');
+    expect(
+      resolveSubscriptionEffectiveStatus(
+        'active',
+        new Date('2026-08-01T00:00:00.000Z'),
+        now,
+        3,
+      ),
+    ).toBe(SubscriptionStatus.Grace);
+  });
+
+  it('expires after grace window', () => {
+    const now = new Date('2026-08-05T12:00:00.000Z');
+    expect(
+      resolveSubscriptionEffectiveStatus(
+        'grace',
+        new Date('2026-08-01T00:00:00.000Z'),
+        now,
+        3,
+      ),
+    ).toBe(SubscriptionStatus.Expired);
   });
 });
