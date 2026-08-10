@@ -1,3 +1,4 @@
+import { MembershipPermissionCodes } from '@vdb/shared-types';
 import {
   Body,
   Controller,
@@ -26,7 +27,7 @@ import {
 } from 'class-validator';
 import { JwtAuthGuard } from '../identity/guards/jwt-auth.guard';
 import { EntitlementGuard } from '../billing/guards/entitlement.guard';
-import { RequireWritable } from '../billing/decorators/require-entitlement.decorator';
+import { RequireWritable, RequirePermission } from '../billing/decorators/require-entitlement.decorator';
 import { CurrentUser } from '../identity/decorators/current-user.decorator';
 import type { RequestUser } from '../identity/auth.types';
 import { TenancyService } from '../tenancy/tenancy.service';
@@ -270,6 +271,7 @@ export class ProfileContentController {
   @Post('services')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageData)
   @ApiOperation({ summary: 'Create service' })
   async createService(
     @CurrentUser() user: RequestUser,
@@ -292,6 +294,7 @@ export class ProfileContentController {
   @Patch('services/:serviceId')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageData)
   @ApiOperation({ summary: 'Update service' })
   async updateService(
     @CurrentUser() user: RequestUser,
@@ -316,6 +319,7 @@ export class ProfileContentController {
   @Delete('services/:serviceId')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageData)
   @ApiOperation({ summary: 'Soft-delete service' })
   async deleteService(
     @CurrentUser() user: RequestUser,
@@ -361,6 +365,7 @@ export class ProfileContentController {
   @Post('clients')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageData)
   @ApiOperation({ summary: 'Create client' })
   async createClient(
     @CurrentUser() user: RequestUser,
@@ -383,6 +388,7 @@ export class ProfileContentController {
   @Patch('clients/:clientId')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageData)
   @ApiOperation({ summary: 'Update client' })
   async updateClient(
     @CurrentUser() user: RequestUser,
@@ -407,6 +413,7 @@ export class ProfileContentController {
   @Delete('clients/:clientId')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageData)
   @ApiOperation({ summary: 'Soft-delete client' })
   async deleteClient(
     @CurrentUser() user: RequestUser,
@@ -452,6 +459,7 @@ export class ProfileContentController {
   @Post('certificates')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageData)
   @ApiOperation({ summary: 'Create certificate' })
   async createCertificate(
     @CurrentUser() user: RequestUser,
@@ -476,6 +484,7 @@ export class ProfileContentController {
   @Patch('certificates/:certificateId')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageData)
   @ApiOperation({ summary: 'Update certificate' })
   async updateCertificate(
     @CurrentUser() user: RequestUser,
@@ -502,6 +511,7 @@ export class ProfileContentController {
   @Delete('certificates/:certificateId')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageData)
   @ApiOperation({ summary: 'Soft-delete certificate' })
   async deleteCertificate(
     @CurrentUser() user: RequestUser,

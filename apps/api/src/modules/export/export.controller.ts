@@ -4,6 +4,7 @@ import {
   Param,
   Post,
   Query,
+  Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
@@ -13,14 +14,24 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import type { Response } from 'express';
-import { EntitlementCodes } from '@vdb/shared-types';
+import type { Response, Request } from 'express';
+import {
+  AnalyticsEventKind,
+  AnalyticsEventSource,
+  EntitlementCodes,
+  MembershipPermissionCodes,
+} from '@vdb/shared-types';
 import { JwtAuthGuard } from '../identity/guards/jwt-auth.guard';
 import { EntitlementGuard } from '../billing/guards/entitlement.guard';
-import { RequireEntitlement } from '../billing/decorators/require-entitlement.decorator';
+import {
+  RequireEntitlement,
+  RequirePermission,
+} from '../billing/decorators/require-entitlement.decorator';
 import { CurrentUser } from '../identity/decorators/current-user.decorator';
 import type { RequestUser } from '../identity/auth.types';
 import { TenancyService } from '../tenancy/tenancy.service';
+import { AnalyticsService } from '../analytics/analytics.service';
+import { analyticsHintsFromHeaders } from '../analytics/analytics-hints';
 import { ExportService } from './export.service';
 
 @ApiTags('export')
@@ -31,11 +42,13 @@ export class ExportController {
   constructor(
     private readonly exports: ExportService,
     private readonly tenancy: TenancyService,
+    private readonly analytics: AnalyticsService,
   ) {}
 
   @Post('documents/:documentId/export/pdf')
   @UseGuards(EntitlementGuard)
   @RequireEntitlement(EntitlementCodes.ExportPdf)
+  @RequirePermission(MembershipPermissionCodes.ExportPdf)
   @ApiOperation({
     summary: 'Enqueue PDF export (BullMQ) — never runs in editor keystroke path',
   })
@@ -90,10 +103,21 @@ export class ExportController {
     @CurrentUser() user: RequestUser,
     @Param('businessId') businessId: string,
     @Param('jobId') jobId: string,
+    @Req() req: Request,
     @Res() res: Response,
   ) {
     await this.tenancy.assertMembership(user.userId, businessId);
     const file = await this.exports.readFile(businessId, jobId);
+    const hints = analyticsHintsFromHeaders(
+      req.headers as Record<string, string | string[] | undefined>,
+    );
+    this.analytics.track({
+      businessId,
+      documentId: file.documentId,
+      kind: AnalyticsEventKind.Download,
+      source: AnalyticsEventSource.ExportDownload,
+      ...hints,
+    });
     res.setHeader('Content-Type', file.contentType);
     res.setHeader(
       'Content-Disposition',

@@ -20,12 +20,10 @@ import {
 } from '@nestjs/swagger';
 import { IsObject } from 'class-validator';
 import { memoryStorage } from 'multer';
-import { EntitlementCodes, type ImportColumnMapping } from '@vdb/shared-types';
+import { EntitlementCodes, type ImportColumnMapping, MembershipPermissionCodes } from '@vdb/shared-types';
 import { JwtAuthGuard } from '../identity/guards/jwt-auth.guard';
 import { EntitlementGuard } from '../billing/guards/entitlement.guard';
-import {
-  RequireModule,
-} from '../billing/decorators/require-entitlement.decorator';
+import { RequireModule, RequirePermission } from '../billing/decorators/require-entitlement.decorator';
 import { CurrentUser } from '../identity/decorators/current-user.decorator';
 import type { RequestUser } from '../identity/auth.types';
 import { TenancyService } from '../tenancy/tenancy.service';
@@ -40,6 +38,7 @@ class SetImportMappingDto {
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, EntitlementGuard)
 @RequireModule(EntitlementCodes.ModuleProjects)
+@RequirePermission(MembershipPermissionCodes.ManageData)
 @Controller('businesses/:businessId/imports')
 export class ImportController {
   constructor(

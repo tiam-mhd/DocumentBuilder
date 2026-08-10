@@ -1,3 +1,4 @@
+import { MembershipPermissionCodes } from '@vdb/shared-types';
 import {
   Body,
   Controller,
@@ -24,7 +25,7 @@ import {
 } from 'class-validator';
 import { JwtAuthGuard } from '../identity/guards/jwt-auth.guard';
 import { EntitlementGuard } from '../billing/guards/entitlement.guard';
-import { RequireWritable } from '../billing/decorators/require-entitlement.decorator';
+import { RequireWritable, RequirePermission } from '../billing/decorators/require-entitlement.decorator';
 import { CurrentUser } from '../identity/decorators/current-user.decorator';
 import type { RequestUser } from '../identity/auth.types';
 import { TenancyService } from '../tenancy/tenancy.service';
@@ -114,6 +115,7 @@ export class TemplateController {
   @Post('templates')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageTemplates)
   @ApiOperation({ summary: 'Create template (PG meta + Mongo body)' })
   async create(
     @CurrentUser() user: RequestUser,
@@ -146,6 +148,7 @@ export class TemplateController {
   @Patch('templates/:templateId')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageTemplates)
   @ApiOperation({ summary: 'Update template metadata and/or body' })
   async update(
     @CurrentUser() user: RequestUser,
@@ -168,6 +171,7 @@ export class TemplateController {
   @Delete('templates/:templateId')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageTemplates)
   @ApiOperation({ summary: 'Soft-delete template + remove Mongo body' })
   async remove(
     @CurrentUser() user: RequestUser,

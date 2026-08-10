@@ -57,15 +57,28 @@ export class TenancyController {
     return { data };
   }
 
+  @Get(':businessId/permissions')
+  @ApiOperation({
+    summary: 'List membership RBAC permissions for current user on this business',
+  })
+  @ApiOkResponse({ description: 'Role + permission codes' })
+  async permissions(
+    @CurrentUser() user: RequestUser,
+    @Param('businessId') businessId: string,
+  ) {
+    const data = await this.tenancy.getPermissions(user.userId, businessId);
+    return { data };
+  }
+
   @Patch(':businessId')
-  @ApiOperation({ summary: 'Update business (OWNER only)' })
+  @ApiOperation({ summary: 'Update business name (ADMIN+)' })
   @ApiOkResponse({ description: 'Updated business' })
   async update(
     @CurrentUser() user: RequestUser,
     @Param('businessId') businessId: string,
     @Body() dto: UpdateBusinessDto,
   ) {
-    const data = await this.tenancy.updateForOwner(
+    const data = await this.tenancy.updateForAdmin(
       user.userId,
       businessId,
       dto.name,

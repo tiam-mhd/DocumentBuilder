@@ -36,7 +36,10 @@ describe('EntitlementGuard', () => {
     const reflector = {
       getAllAndOverride: jest.fn().mockReturnValue({ requireWritable: true }),
     };
-    const tenancy = { assertMembership: jest.fn().mockResolvedValue({}) };
+    const tenancy = {
+      assertMembership: jest.fn().mockResolvedValue({}),
+      assertContentWriter: jest.fn().mockResolvedValue(undefined),
+    };
     const entitlements = {
       assertBusinessWritable: jest.fn().mockResolvedValue({}),
       assertCan: jest.fn(),
@@ -56,6 +59,7 @@ describe('EntitlementGuard', () => {
       guard.canActivate(createContext() as never),
     ).resolves.toBe(true);
     expect(tenancy.assertMembership).toHaveBeenCalledWith('user_1', 'biz_1');
+    expect(tenancy.assertContentWriter).toHaveBeenCalledWith('user_1', 'biz_1');
     expect(entitlements.assertBusinessWritable).toHaveBeenCalledWith('biz_1');
     expect(billing.assertInstallationLicensed).not.toHaveBeenCalled();
     expect(reflector.getAllAndOverride).toHaveBeenCalledWith(
@@ -68,7 +72,10 @@ describe('EntitlementGuard', () => {
     const reflector = {
       getAllAndOverride: jest.fn().mockReturnValue({ requireWritable: true }),
     };
-    const tenancy = { assertMembership: jest.fn().mockResolvedValue({}) };
+    const tenancy = {
+      assertMembership: jest.fn().mockResolvedValue({}),
+      assertContentWriter: jest.fn().mockResolvedValue(undefined),
+    };
     const entitlements = {
       assertBusinessWritable: jest.fn(),
       assertCan: jest.fn(),
@@ -103,7 +110,10 @@ describe('EntitlementGuard', () => {
         requireAll: [EntitlementCodes.ModuleMap],
       }),
     };
-    const tenancy = { assertMembership: jest.fn().mockResolvedValue({}) };
+    const tenancy = {
+      assertMembership: jest.fn().mockResolvedValue({}),
+      assertContentWriter: jest.fn().mockResolvedValue(undefined),
+    };
     const entitlements = {
       assertBusinessWritable: jest.fn(),
       assertCan: jest.fn().mockRejectedValue(

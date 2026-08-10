@@ -91,7 +91,7 @@ describe('TenancyService', () => {
   it('allows member to read business', async () => {
     const { service } = build({
       findUnique: {
-        role: MembershipRole.MEMBER,
+        role: MembershipRole.EDITOR,
         business: {
           id: 'biz_2',
           name: 'Owned',
@@ -103,13 +103,13 @@ describe('TenancyService', () => {
     });
     const result = await service.getForUser(userId, 'biz_2');
     expect(result.name).toBe('Owned');
-    expect(result.role).toBe('MEMBER');
+    expect(result.role).toBe('EDITOR');
   });
 
-  it('forbids non-owner update', async () => {
+  it('forbids editor update of business name', async () => {
     const { service } = build({
       findUnique: {
-        role: MembershipRole.MEMBER,
+        role: MembershipRole.EDITOR,
         business: {
           id: 'biz_2',
           name: 'Owned',

@@ -5,10 +5,10 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { EntitlementCodes } from '@vdb/shared-types';
+import { EntitlementCodes, MembershipPermissionCodes } from '@vdb/shared-types';
 import { JwtAuthGuard } from '../identity/guards/jwt-auth.guard';
 import { EntitlementGuard } from '../billing/guards/entitlement.guard';
-import { RequireModule } from '../billing/decorators/require-entitlement.decorator';
+import { RequireModule, RequirePermission } from '../billing/decorators/require-entitlement.decorator';
 import { CurrentUser } from '../identity/decorators/current-user.decorator';
 import type { RequestUser } from '../identity/auth.types';
 import { OrgChartService } from './org-chart.service';
@@ -17,6 +17,7 @@ import { OrgChartService } from './org-chart.service';
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, EntitlementGuard)
 @RequireModule(EntitlementCodes.ModuleOrgChart)
+@RequirePermission(MembershipPermissionCodes.ManageData)
 @Controller('businesses/:businessId/org-chart')
 export class OrgChartController {
   constructor(private readonly orgChart: OrgChartService) {}

@@ -7,6 +7,7 @@ import {
 } from '@nestjs/swagger';
 import { IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { Type } from 'class-transformer';
+import { MembershipPermissionCodes } from '@vdb/shared-types';
 import { JwtAuthGuard } from '../identity/guards/jwt-auth.guard';
 import { CurrentUser } from '../identity/decorators/current-user.decorator';
 import type { RequestUser } from '../identity/auth.types';
@@ -69,7 +70,11 @@ export class AuditController {
     @Param('businessId') businessId: string,
     @Query() query: ListAuditEventsQueryDto,
   ) {
-    await this.tenancy.assertApprover(user.userId, businessId);
+    await this.tenancy.assertPermission(
+      user.userId,
+      businessId,
+      MembershipPermissionCodes.AuditRead,
+    );
     const data = await this.audit.listForBusiness({
       businessId,
       page: query.page,

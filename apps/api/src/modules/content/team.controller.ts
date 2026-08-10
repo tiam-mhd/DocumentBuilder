@@ -1,3 +1,4 @@
+import { MembershipPermissionCodes } from '@vdb/shared-types';
 import {
   Body,
   Controller,
@@ -26,7 +27,7 @@ import {
 } from 'class-validator';
 import { JwtAuthGuard } from '../identity/guards/jwt-auth.guard';
 import { EntitlementGuard } from '../billing/guards/entitlement.guard';
-import { RequireWritable } from '../billing/decorators/require-entitlement.decorator';
+import { RequireWritable, RequirePermission } from '../billing/decorators/require-entitlement.decorator';
 import { CurrentUser } from '../identity/decorators/current-user.decorator';
 import type { RequestUser } from '../identity/auth.types';
 import { TenancyService } from '../tenancy/tenancy.service';
@@ -283,6 +284,7 @@ export class TeamController {
   @Post('team-members')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageData)
   @ApiOperation({ summary: 'Create team member' })
   async createMember(
     @CurrentUser() user: RequestUser,
@@ -308,6 +310,7 @@ export class TeamController {
   @Patch('team-members/:memberId')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageData)
   @ApiOperation({ summary: 'Update team member' })
   async updateMember(
     @CurrentUser() user: RequestUser,
@@ -335,6 +338,7 @@ export class TeamController {
   @Delete('team-members/:memberId')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageData)
   @ApiOperation({ summary: 'Soft-delete team member' })
   async deleteMember(
     @CurrentUser() user: RequestUser,
@@ -380,6 +384,7 @@ export class TeamController {
   @Post('branches')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageData)
   @ApiOperation({ summary: 'Create branch' })
   async createBranch(
     @CurrentUser() user: RequestUser,
@@ -408,6 +413,7 @@ export class TeamController {
   @Patch('branches/:branchId')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageData)
   @ApiOperation({ summary: 'Update branch' })
   async updateBranch(
     @CurrentUser() user: RequestUser,
@@ -438,6 +444,7 @@ export class TeamController {
   @Delete('branches/:branchId')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageData)
   @ApiOperation({ summary: 'Soft-delete branch' })
   async deleteBranch(
     @CurrentUser() user: RequestUser,

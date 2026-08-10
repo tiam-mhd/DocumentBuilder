@@ -1,3 +1,4 @@
+import { MembershipPermissionCodes } from '@vdb/shared-types';
 import {
   Controller,
   Delete,
@@ -27,7 +28,7 @@ import { IsIn, IsInt, IsOptional, IsString, Max, Min, MinLength } from 'class-va
 import { Type } from 'class-transformer';
 import { JwtAuthGuard } from '../identity/guards/jwt-auth.guard';
 import { EntitlementGuard } from '../billing/guards/entitlement.guard';
-import { RequireWritable } from '../billing/decorators/require-entitlement.decorator';
+import { RequireWritable, RequirePermission } from '../billing/decorators/require-entitlement.decorator';
 import { CurrentUser } from '../identity/decorators/current-user.decorator';
 import type { RequestUser } from '../identity/auth.types';
 import { TenancyService } from '../tenancy/tenancy.service';
@@ -83,6 +84,7 @@ export class FontController {
   @Post('upload')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageAssets)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -159,6 +161,7 @@ export class FontController {
   @Delete(':fontId')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageAssets)
   @ApiOperation({ summary: 'Soft-delete font face + remove storage object' })
   async remove(
     @Param('businessId') businessId: string,

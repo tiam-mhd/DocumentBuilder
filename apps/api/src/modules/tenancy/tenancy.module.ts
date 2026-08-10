@@ -9,6 +9,12 @@ import {
   BUSINESS_CREATED_HOOK,
   type BusinessCreatedHook,
 } from './business-created.hook';
+import {
+  InvitationController,
+  MyInvitationsController,
+} from './invitation.controller';
+import { MembershipController } from './membership.controller';
+import { MembershipService } from './membership.service';
 import { TenancyController } from './tenancy.controller';
 import { TenancyService } from './tenancy.service';
 
@@ -19,9 +25,15 @@ import { TenancyService } from './tenancy.service';
     forwardRef(() => BillingModule),
     forwardRef(() => DesignModule),
   ],
-  controllers: [TenancyController],
+  controllers: [
+    TenancyController,
+    MembershipController,
+    InvitationController,
+    MyInvitationsController,
+  ],
   providers: [
     TenancyService,
+    MembershipService,
     {
       provide: BUSINESS_CREATED_HOOK,
       inject: [TrialFirstBusinessHook, DesignThemeSeedHook],
@@ -36,6 +48,6 @@ import { TenancyService } from './tenancy.service';
       }),
     },
   ],
-  exports: [TenancyService],
+  exports: [TenancyService, MembershipService],
 })
 export class TenancyModule {}

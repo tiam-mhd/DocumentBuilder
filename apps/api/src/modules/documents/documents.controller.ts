@@ -16,6 +16,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import {
+  IsBoolean,
   IsIn,
   IsObject,
   IsOptional,
@@ -23,9 +24,13 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { MembershipPermissionCodes } from '@vdb/shared-types';
 import { JwtAuthGuard } from '../identity/guards/jwt-auth.guard';
 import { EntitlementGuard } from '../billing/guards/entitlement.guard';
-import { RequireWritable } from '../billing/decorators/require-entitlement.decorator';
+import {
+  RequirePermission,
+  RequireWritable,
+} from '../billing/decorators/require-entitlement.decorator';
 import { CurrentUser } from '../identity/decorators/current-user.decorator';
 import type { RequestUser } from '../identity/auth.types';
 import { TenancyService } from '../tenancy/tenancy.service';
@@ -33,6 +38,8 @@ import { DocumentsService } from './documents.service';
 import { DocumentVersionsService } from './document-versions.service';
 import { DocumentWorkflowService } from './document-workflow.service';
 import { DocumentCommentsService } from './document-comments.service';
+import { DocumentWebPublishService } from './document-web-publish.service';
+import { DocumentShareLinksService } from './document-share-links.service';
 
 class CreateDocumentDto {
   @IsString()
@@ -111,6 +118,31 @@ class CloneVersionDto {
   title?: string;
 }
 
+class UpdateWebPublishDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  webSlug?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  webPublished?: boolean;
+}
+
+class CreateShareLinkDto {
+  @IsIn(['web', 'pdf'])
+  scope!: 'web' | 'pdf';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  password?: string | null;
+
+  @IsOptional()
+  @IsString()
+  expiresAt?: string | null;
+}
+
 @ApiTags('documents')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
@@ -121,6 +153,8 @@ export class DocumentsController {
     private readonly versions: DocumentVersionsService,
     private readonly workflow: DocumentWorkflowService,
     private readonly comments: DocumentCommentsService,
+    private readonly webPublish: DocumentWebPublishService,
+    private readonly shareLinks: DocumentShareLinksService,
     private readonly tenancy: TenancyService,
   ) {}
 
@@ -149,6 +183,7 @@ export class DocumentsController {
   @Post()
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageDocuments)
   @ApiOperation({
     summary: 'Create document from template (copies block snapshot)',
   })
@@ -182,6 +217,7 @@ export class DocumentsController {
   @Post(':documentId/versions')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageDocuments)
   @ApiOperation({ summary: 'Create manual version snapshot of current body' })
   async createVersion(
     @CurrentUser() user: RequestUser,
@@ -233,6 +269,7 @@ export class DocumentsController {
   @Post(':documentId/versions/:versionId/restore')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageDocuments)
   @ApiOperation({
     summary: 'Restore version body into current document (sets draft)',
   })
@@ -254,6 +291,7 @@ export class DocumentsController {
   @Post(':documentId/versions/:versionId/clone')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageDocuments)
   @ApiOperation({ summary: 'Clone version into a new draft document' })
   async cloneVersion(
     @CurrentUser() user: RequestUser,
@@ -296,6 +334,7 @@ export class DocumentsController {
   @Post(':documentId/comments')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageDocuments)
   @ApiOperation({ summary: 'Create document comment' })
   async createComment(
     @CurrentUser() user: RequestUser,
@@ -317,6 +356,7 @@ export class DocumentsController {
   @Patch(':documentId/comments/:commentId')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageDocuments)
   @ApiOperation({ summary: 'Update comment body (author or OWNER/ADMIN)' })
   async updateComment(
     @CurrentUser() user: RequestUser,
@@ -338,6 +378,7 @@ export class DocumentsController {
   @Post(':documentId/comments/:commentId/resolve')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageDocuments)
   @ApiOperation({ summary: 'Mark comment resolved' })
   async resolveComment(
     @CurrentUser() user: RequestUser,
@@ -357,6 +398,7 @@ export class DocumentsController {
   @Post(':documentId/comments/:commentId/unresolve')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageDocuments)
   @ApiOperation({ summary: 'Reopen resolved comment' })
   async unresolveComment(
     @CurrentUser() user: RequestUser,
@@ -376,6 +418,7 @@ export class DocumentsController {
   @Delete(':documentId/comments/:commentId')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageDocuments)
   @ApiOperation({ summary: 'Soft-delete comment (author or OWNER/ADMIN)' })
   async deleteComment(
     @CurrentUser() user: RequestUser,
@@ -395,6 +438,7 @@ export class DocumentsController {
   @Post(':documentId/workflow/submit')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageDocuments)
   @ApiOperation({ summary: 'Submit draft for review (draft → review)' })
   async workflowSubmit(
     @CurrentUser() user: RequestUser,
@@ -412,6 +456,7 @@ export class DocumentsController {
   @Post(':documentId/workflow/approve')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.DocumentsPublish)
   @ApiOperation({
     summary: 'Approve review (review → approved; OWNER/ADMIN)',
   })
@@ -431,6 +476,7 @@ export class DocumentsController {
   @Post(':documentId/workflow/reject')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.DocumentsPublish)
   @ApiOperation({ summary: 'Reject review (review → draft; OWNER/ADMIN)' })
   async workflowReject(
     @CurrentUser() user: RequestUser,
@@ -450,6 +496,7 @@ export class DocumentsController {
   @Post(':documentId/workflow/publish')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.DocumentsPublish)
   @ApiOperation({
     summary:
       'Publish approved document (approved → published + version snapshot)',
@@ -470,6 +517,7 @@ export class DocumentsController {
   @Post(':documentId/workflow/unpublish')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.DocumentsPublish)
   @ApiOperation({ summary: 'Unpublish (published → draft; OWNER/ADMIN)' })
   async workflowUnpublish(
     @CurrentUser() user: RequestUser,
@@ -487,6 +535,7 @@ export class DocumentsController {
   @Post(':documentId/workflow/reopen')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.DocumentsPublish)
   @ApiOperation({ summary: 'Reopen approved (approved → draft; OWNER/ADMIN)' })
   async workflowReopen(
     @CurrentUser() user: RequestUser,
@@ -496,6 +545,97 @@ export class DocumentsController {
     const data = await this.workflow.reopen({
       businessId,
       documentId,
+      userId: user.userId,
+    });
+    return { data };
+  }
+
+  @Get(':documentId/web-publish')
+  @ApiOperation({ summary: 'Get web-publish settings (ADR 026)' })
+  async getWebPublish(
+    @CurrentUser() user: RequestUser,
+    @Param('businessId') businessId: string,
+    @Param('documentId') documentId: string,
+  ) {
+    await this.tenancy.assertMembership(user.userId, businessId);
+    const data = await this.webPublish.getSettings(businessId, documentId);
+    return { data };
+  }
+
+  @Patch(':documentId/web-publish')
+  @UseGuards(EntitlementGuard)
+  @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.DocumentsPublish)
+  @ApiOperation({
+    summary: 'Update web slug / publish to public HTML (OWNER/ADMIN)',
+  })
+  async patchWebPublish(
+    @CurrentUser() user: RequestUser,
+    @Param('businessId') businessId: string,
+    @Param('documentId') documentId: string,
+    @Body() body: UpdateWebPublishDto,
+  ) {
+    const data = await this.webPublish.updateSettings({
+      businessId,
+      documentId,
+      userId: user.userId,
+      webSlug: body.webSlug,
+      webPublished: body.webPublished,
+    });
+    return { data };
+  }
+
+  @Get(':documentId/share-links')
+  @ApiOperation({ summary: 'List share links for document (ADR 027)' })
+  async listShareLinks(
+    @CurrentUser() user: RequestUser,
+    @Param('businessId') businessId: string,
+    @Param('documentId') documentId: string,
+  ) {
+    await this.tenancy.assertMembership(user.userId, businessId);
+    const data = await this.shareLinks.list(businessId, documentId);
+    return { data };
+  }
+
+  @Post(':documentId/share-links')
+  @UseGuards(EntitlementGuard)
+  @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.DocumentsPublish)
+  @ApiOperation({
+    summary: 'Create share link (raw token returned once)',
+  })
+  async createShareLink(
+    @CurrentUser() user: RequestUser,
+    @Param('businessId') businessId: string,
+    @Param('documentId') documentId: string,
+    @Body() body: CreateShareLinkDto,
+  ) {
+    const data = await this.shareLinks.create({
+      businessId,
+      documentId,
+      userId: user.userId,
+      scope: body.scope,
+      password: body.password,
+      expiresAt: body.expiresAt,
+    });
+    return { data };
+  }
+
+  @Post(':documentId/share-links/:shareId/revoke')
+  @UseGuards(EntitlementGuard)
+  @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.DocumentsPublish)
+  @ApiOperation({ summary: 'Revoke a share link' })
+  async revokeShareLink(
+    @CurrentUser() user: RequestUser,
+    @Param('businessId') businessId: string,
+    @Param('documentId') documentId: string,
+    @Param('shareId') shareId: string,
+  ) {
+    const data = await this.shareLinks.revoke({
+      businessId,
+      documentId,
+      shareId,
       userId: user.userId,
     });
     return { data };
@@ -516,6 +656,7 @@ export class DocumentsController {
   @Patch(':documentId')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageDocuments)
   @ApiOperation({
     summary:
       'Update document title, status, and/or body (published body locked)',
@@ -540,6 +681,7 @@ export class DocumentsController {
   @Delete(':documentId')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageDocuments)
   @ApiOperation({ summary: 'Soft-delete document + remove Mongo body' })
   async remove(
     @CurrentUser() user: RequestUser,

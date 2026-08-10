@@ -1,3 +1,4 @@
+import { MembershipPermissionCodes } from '@vdb/shared-types';
 import {
   Body,
   Controller,
@@ -27,7 +28,7 @@ import {
 import { Type } from 'class-transformer';
 import { JwtAuthGuard } from '../identity/guards/jwt-auth.guard';
 import { EntitlementGuard } from '../billing/guards/entitlement.guard';
-import { RequireWritable } from '../billing/decorators/require-entitlement.decorator';
+import { RequireWritable, RequirePermission } from '../billing/decorators/require-entitlement.decorator';
 import { CurrentUser } from '../identity/decorators/current-user.decorator';
 import type { RequestUser } from '../identity/auth.types';
 import { TenancyService } from '../tenancy/tenancy.service';
@@ -159,6 +160,7 @@ export class LocationController {
   @Post()
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageData)
   @ApiOperation({ summary: 'Create location' })
   async create(
     @CurrentUser() user: RequestUser,
@@ -182,6 +184,7 @@ export class LocationController {
   @Patch(':locationId')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageData)
   @ApiOperation({ summary: 'Update location' })
   async update(
     @CurrentUser() user: RequestUser,
@@ -207,6 +210,7 @@ export class LocationController {
   @Delete(':locationId')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageData)
   @ApiOperation({ summary: 'Soft-delete location' })
   async remove(
     @CurrentUser() user: RequestUser,

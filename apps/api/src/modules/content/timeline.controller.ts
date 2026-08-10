@@ -24,10 +24,10 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { EntitlementCodes } from '@vdb/shared-types';
+import { EntitlementCodes, MembershipPermissionCodes } from '@vdb/shared-types';
 import { JwtAuthGuard } from '../identity/guards/jwt-auth.guard';
 import { EntitlementGuard } from '../billing/guards/entitlement.guard';
-import { RequireModule } from '../billing/decorators/require-entitlement.decorator';
+import { RequireModule, RequirePermission } from '../billing/decorators/require-entitlement.decorator';
 import { CurrentUser } from '../identity/decorators/current-user.decorator';
 import type { RequestUser } from '../identity/auth.types';
 import { TimelineService } from './timeline.service';
@@ -104,6 +104,7 @@ class UpdateTimelineEventDto {
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, EntitlementGuard)
 @RequireModule(EntitlementCodes.ModuleTimeline)
+@RequirePermission(MembershipPermissionCodes.ManageData)
 @Controller('businesses/:businessId/timeline-events')
 export class TimelineController {
   constructor(private readonly timeline: TimelineService) {}

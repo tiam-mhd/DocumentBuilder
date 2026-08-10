@@ -23,9 +23,10 @@ import { ConfigService } from '@nestjs/config';
 import type { Response } from 'express';
 import { memoryStorage } from 'multer';
 import type { MediaVariant } from '@vdb/shared-types';
+import { MembershipPermissionCodes } from '@vdb/shared-types';
 import { JwtAuthGuard } from '../identity/guards/jwt-auth.guard';
 import { EntitlementGuard } from '../billing/guards/entitlement.guard';
-import { RequireWritable } from '../billing/decorators/require-entitlement.decorator';
+import { RequireWritable, RequirePermission } from '../billing/decorators/require-entitlement.decorator';
 import { CurrentUser } from '../identity/decorators/current-user.decorator';
 import type { RequestUser } from '../identity/auth.types';
 import { TenancyService } from '../tenancy/tenancy.service';
@@ -65,6 +66,7 @@ export class MediaController {
   @Post('upload')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageAssets)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -129,6 +131,7 @@ export class MediaController {
   @Delete(':assetId')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageAssets)
   @ApiOperation({ summary: 'Soft-delete media + remove storage objects' })
   async remove(
     @Param('businessId') businessId: string,

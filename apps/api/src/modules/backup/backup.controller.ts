@@ -22,11 +22,15 @@ import {
 import { IsBoolean, IsOptional } from 'class-validator';
 import type { Response } from 'express';
 import { memoryStorage } from 'multer';
+import { MembershipPermissionCodes } from '@vdb/shared-types';
 import { JwtAuthGuard } from '../identity/guards/jwt-auth.guard';
 import { CurrentUser } from '../identity/decorators/current-user.decorator';
 import type { RequestUser } from '../identity/auth.types';
 import { EntitlementGuard } from '../billing/guards/entitlement.guard';
-import { RequireWritable } from '../billing/decorators/require-entitlement.decorator';
+import {
+  RequirePermission,
+  RequireWritable,
+} from '../billing/decorators/require-entitlement.decorator';
 import { TenancyService } from '../tenancy/tenancy.service';
 import { BackupService } from './backup.service';
 
@@ -39,6 +43,7 @@ class CommitRestoreDto {
 @ApiTags('backup')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, EntitlementGuard)
+@RequirePermission(MembershipPermissionCodes.ManageBackup)
 @Controller('businesses/:businessId')
 export class BackupController {
   constructor(

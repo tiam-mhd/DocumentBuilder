@@ -16,13 +16,14 @@ import {
 } from '../adapters/billing-adapter.token';
 import {
   ENTITLEMENT_META_KEY,
+  MEMBERSHIP_PERMISSION_META_KEY,
   type EntitlementRouteMeta,
 } from '../decorators/require-entitlement.decorator';
 import { EntitlementsService } from '../entitlements.service';
 
 /**
- * JWT must already run. Resolves `:businessId`, membership, install license
- * (SELF_HOSTED), then entitlements.
+ * JWT must already run. Resolves `:businessId`, membership, membership RBAC,
+ * install license (SELF_HOSTED), then subscription entitlements.
  */
 @Injectable()
 export class EntitlementGuard implements CanActivate {
@@ -34,11 +35,16 @@ export class EntitlementGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const meta = this.reflector.getAllAndOverride<EntitlementRouteMeta | undefined>(
-      ENTITLEMENT_META_KEY,
+    const meta = this.reflector.getAllAndOverride<
+      EntitlementRouteMeta | undefined
+    >(ENTITLEMENT_META_KEY, [context.getHandler(), context.getClass()]);
+
+    const permissions = this.reflector.getAllAndOverride<string[] | undefined>(
+      MEMBERSHIP_PERMISSION_META_KEY,
       [context.getHandler(), context.getClass()],
     );
-    if (!meta) {
+
+    if (!meta && (!permissions || permissions.length === 0)) {
       return true;
     }
 
@@ -65,6 +71,24 @@ export class EntitlementGuard implements CanActivate {
     }
 
     await this.tenancy.assertMembership(user.userId, businessId);
+
+    if (permissions && permissions.length > 0) {
+      await this.tenancy.assertPermissions(
+        user.userId,
+        businessId,
+        permissions,
+      );
+    } else if (
+      meta?.requireWritable ||
+      (meta?.requireAll && meta.requireAll.length > 0)
+    ) {
+      // Legacy writable routes without explicit RBAC → EDITOR+.
+      await this.tenancy.assertContentWriter(user.userId, businessId);
+    }
+
+    if (!meta) {
+      return true;
+    }
 
     // Sensitive mutate/export: SELF_HOSTED must have an active install license.
     if (this.billing.requiresInstallationLicense()) {

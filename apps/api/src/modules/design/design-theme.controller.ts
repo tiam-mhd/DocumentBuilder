@@ -23,9 +23,10 @@ import {
   MinLength,
 } from 'class-validator';
 import type { DesignThemeTokens } from '@vdb/shared-types';
+import { MembershipPermissionCodes } from '@vdb/shared-types';
 import { JwtAuthGuard } from '../identity/guards/jwt-auth.guard';
 import { EntitlementGuard } from '../billing/guards/entitlement.guard';
-import { RequireWritable } from '../billing/decorators/require-entitlement.decorator';
+import { RequireWritable, RequirePermission } from '../billing/decorators/require-entitlement.decorator';
 import { CurrentUser } from '../identity/decorators/current-user.decorator';
 import type { RequestUser } from '../identity/auth.types';
 import { TenancyService } from '../tenancy/tenancy.service';
@@ -111,6 +112,7 @@ export class DesignThemeController {
   @Post()
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageThemes)
   @ApiOperation({ summary: 'Create a document brand theme' })
   async create(
     @CurrentUser() user: RequestUser,
@@ -130,6 +132,7 @@ export class DesignThemeController {
   @Patch(':themeId')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageThemes)
   @ApiOperation({ summary: 'Update theme name and/or tokens' })
   async update(
     @CurrentUser() user: RequestUser,
@@ -150,6 +153,7 @@ export class DesignThemeController {
   @Post(':themeId/default')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageThemes)
   @ApiOperation({ summary: 'Mark theme as Business default' })
   async setDefault(
     @CurrentUser() user: RequestUser,
@@ -164,6 +168,7 @@ export class DesignThemeController {
   @Delete(':themeId')
   @UseGuards(EntitlementGuard)
   @RequireWritable()
+  @RequirePermission(MembershipPermissionCodes.ManageThemes)
   @ApiOperation({ summary: 'Soft-delete a non-default theme' })
   async remove(
     @CurrentUser() user: RequestUser,

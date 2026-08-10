@@ -2,9 +2,17 @@ import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { MembershipRole } from '@prisma/client';
 import {
   AuditActions,
+  MembershipPermissionCodes,
   MembershipRole as PublicMembershipRole,
   TenancyErrorCodes,
+  membershipCanManageSettings,
+  membershipCanWriteContent,
+  membershipRoleAtLeast,
+  permissionsForRole,
+  roleHasPermission,
+  type MembershipPermissionCode,
   type PublicBusiness,
+  type PublicBusinessPermissions,
 } from '@vdb/shared-types';
 import { DomainException } from '../../common/errors/domain.exception';
 import { PrismaService } from '../../config/prisma/prisma.service';
@@ -88,16 +96,17 @@ export class TenancyService {
     return this.toPublic(membership.business, membership.role);
   }
 
-  async updateForOwner(
+  /** Rename — ADMIN+ (settings). */
+  async updateForAdmin(
     userId: string,
     businessId: string,
     name: string,
   ): Promise<PublicBusiness> {
     const membership = await this.requireMembership(userId, businessId);
-    if (membership.role !== MembershipRole.OWNER) {
+    if (!membershipCanManageSettings(membership.role)) {
       throw new DomainException(
         TenancyErrorCodes.BusinessForbidden,
-        'Only the owner can update this business',
+        'Admin or owner role required',
         HttpStatus.FORBIDDEN,
       );
     }
@@ -117,6 +126,15 @@ export class TenancyService {
     });
 
     return this.toPublic(business, membership.role);
+  }
+
+  /** Alias kept for older call sites / tests. */
+  async updateForOwner(
+    userId: string,
+    businessId: string,
+    name: string,
+  ): Promise<PublicBusiness> {
+    return this.updateForAdmin(userId, businessId, name);
   }
 
   async softDeleteForOwner(userId: string, businessId: string): Promise<void> {
@@ -148,7 +166,6 @@ export class TenancyService {
     await this.requireMembership(userId, businessId);
   }
 
-  /** Returns membership role for an existing member. */
   async getMembershipRole(
     userId: string,
     businessId: string,
@@ -157,19 +174,90 @@ export class TenancyService {
     return membership.role;
   }
 
-  /** OWNER or ADMIN — document approvers / publishers (ADR 021). */
-  async assertApprover(userId: string, businessId: string): Promise<void> {
+  async assertMinRole(
+    userId: string,
+    businessId: string,
+    minimum: PublicMembershipRole,
+  ): Promise<MembershipRole> {
     const role = await this.getMembershipRole(userId, businessId);
-    if (role !== MembershipRole.OWNER && role !== MembershipRole.ADMIN) {
+    if (!membershipRoleAtLeast(role, minimum)) {
       throw new DomainException(
         TenancyErrorCodes.BusinessForbidden,
-        'Approver role required (OWNER or ADMIN)',
+        `Role ${minimum} or higher required`,
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    return role;
+  }
+
+  /** EDITOR+ — content writes behind EntitlementGuard (legacy fallback). */
+  async assertContentWriter(userId: string, businessId: string): Promise<void> {
+    const role = await this.getMembershipRole(userId, businessId);
+    if (!membershipCanWriteContent(role)) {
+      throw new DomainException(
+        TenancyErrorCodes.MembershipPermissionDenied,
+        'Editor role or higher required to write',
         HttpStatus.FORBIDDEN,
       );
     }
   }
 
-  /** OWNER only — backup/restore and destructive business ops. */
+  async assertPermission(
+    userId: string,
+    businessId: string,
+    permission: MembershipPermissionCode | string,
+  ): Promise<void> {
+    const role = await this.getMembershipRole(userId, businessId);
+    if (!roleHasPermission(role, permission)) {
+      throw new DomainException(
+        TenancyErrorCodes.MembershipPermissionDenied,
+        `Permission required: ${permission}`,
+        HttpStatus.FORBIDDEN,
+      );
+    }
+  }
+
+  async assertPermissions(
+    userId: string,
+    businessId: string,
+    permissions: readonly string[],
+  ): Promise<void> {
+    for (const permission of permissions) {
+      await this.assertPermission(userId, businessId, permission);
+    }
+  }
+
+  async getPermissions(
+    userId: string,
+    businessId: string,
+  ): Promise<PublicBusinessPermissions> {
+    const role = await this.getMembershipRole(userId, businessId);
+    return {
+      businessId,
+      role: role as unknown as PublicMembershipRole,
+      permissions: permissionsForRole(role),
+    };
+  }
+
+  /** ADMIN+ — settings / members / audit. */
+  async assertAdmin(userId: string, businessId: string): Promise<void> {
+    await this.assertPermission(
+      userId,
+      businessId,
+      MembershipPermissionCodes.ManageMembers,
+    );
+  }
+
+  /** OWNER or ADMIN — document approvers / publishers (ADR 021). */
+  async assertApprover(userId: string, businessId: string): Promise<void> {
+    await this.assertPermission(
+      userId,
+      businessId,
+      MembershipPermissionCodes.DocumentsPublish,
+    );
+  }
+
+  /** OWNER only — billing mutate, backup/restore, delete. */
   async assertOwner(userId: string, businessId: string): Promise<void> {
     const role = await this.getMembershipRole(userId, businessId);
     if (role !== MembershipRole.OWNER) {
@@ -190,7 +278,6 @@ export class TenancyService {
     });
 
     if (!membership || membership.business.deletedAt) {
-      // Same error for missing vs non-member to reduce IDOR leakage.
       throw new DomainException(
         TenancyErrorCodes.BusinessNotFound,
         'Business not found',
@@ -202,7 +289,13 @@ export class TenancyService {
   }
 
   private toPublic(
-    business: { id: string; name: string; createdAt: Date; updatedAt: Date },
+    business: {
+      id: string;
+      name: string;
+      createdAt: Date;
+      updatedAt: Date;
+      suspendedAt?: Date | null;
+    },
     role: MembershipRole,
   ): PublicBusiness {
     return {
@@ -211,6 +304,7 @@ export class TenancyService {
       role: role as unknown as PublicMembershipRole,
       createdAt: business.createdAt.toISOString(),
       updatedAt: business.updatedAt.toISOString(),
+      suspended: Boolean(business.suspendedAt),
     };
   }
 }
