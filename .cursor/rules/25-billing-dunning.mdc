@@ -1,0 +1,42 @@
+---
+description: Subscription renewal, grace, and dunning notifications (SAAS)
+alwaysApply: true
+---
+
+# Billing Renewal & Dunning (Permanent)
+
+## Law
+
+**Expire locks work; never deletes tenant data.**
+
+| State | Writable | Meaning |
+| --- | --- | --- |
+| `trial` / `active` | yes | Paid or trial period (`endsAt` in future) |
+| `grace` | yes | Past `endsAt`, within `GRACE_DURATION_DAYS` — renew CTA |
+| `expired` | no | Past grace — read-only; data retained |
+| `pending_payment` | no | Never activated / unpaid Business #2+ |
+
+## Clock rules
+
+- Effective status must honor **grace** before **expired** (read-time + persisted job).
+- Daily BullMQ job (`billing.dunning`) on **SAAS** only: persist `grace` / `expired`, send SMS reminders.
+- SELF_HOSTED: skip subscription dunning (license path).
+
+## Notifications
+
+- Channels: **SMS** via `SmsSender` transactional API (same provider as OTP).
+- Email: **non-goal** for this slice (document if adding later).
+- Idempotent rows in `subscription_dunning_notices` keyed by `(subscriptionId, kind, periodKey)`.
+- Kinds: `reminder_7d`, `reminder_1d`, `entered_grace`, `entered_expired`.
+- Never log OTP/payment secrets in notice meta or SMS bodies beyond business name + status.
+
+## Renewal
+
+- User renews via existing SAAS checkout → `active` + new `endsAt`.
+- No silent auto-charge / stored card retry in MVP.
+
+## Forbidden
+
+- Deleting Business/documents because subscription expired.
+- Skipping grace by jumping straight to expired at read-time without the grace window.
+- Running cross-tenant dunning SMS on SELF_HOSTED.

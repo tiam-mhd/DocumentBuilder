@@ -16,11 +16,13 @@ alwaysApply: true
 - A User may create **unlimited** Businesses.
 - All domain data (media, fonts, themes, templates, documents, projects, …) is scoped by `business_id`.
 - Switching context = switching active Business. Never mix data across businesses in one query without explicit admin tooling.
+- Membership roles: `OWNER` | `ADMIN` | `EDITOR` | `VIEWER` + invitations — see `17-membership-roles.mdc`.
 
 ## Subscription (per Business)
 
 - Working on a Business (edit data, editor, export) requires a valid Subscription for **that** Business.
-- Statuses: `trial` | `active` | `grace` (optional) | `expired` | `pending_payment`.
+- Statuses: `trial` | `active` | `grace` | `expired` | `pending_payment`.
+- After `endsAt`, **grace** (writable, default 3 days) then **expired** (read-only) — see `25-billing-dunning.mdc`.
 - **Trial**: exactly **7 days**, only for the **first** Business of a User, once per account (`user.trial_consumed = true` after grant).
 - Business #2+: creatable, but work locked until paid (`pending_payment`).
 - Expired: read-only / CTA renew; **do not delete data**.

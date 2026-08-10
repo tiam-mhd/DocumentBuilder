@@ -1,0 +1,40 @@
+# Web Publish (Permanent)
+
+## Law
+
+**Approval `published` ≠ public web profile.**
+
+| Concern | Mechanism |
+| --- | --- |
+| Approval workflow | `documents.status` (`draft`→`review`→`approved`→`published`) — ADR 021 |
+| **Web Publish** | `web_published` + `web_slug` on `documents` — public HTML profile |
+
+Do not overload workflow `POST .../workflow/publish` for public URLs.
+
+## Source of truth
+
+Public HTML and PDF share **`DocumentHtmlRenderer`** (via `ExportService.buildDocumentHtml`):
+
+- Same Mongo body + design theme tokens + bindings / modules / visibility
+- `lang` / `dir` from document content locale (ADR 015)
+- White-label chrome (logo, display name, Powered-by) from `business_branding` — never a second brand store
+
+## Gates
+
+- Enable / update slug / take offline: `EntitlementGuard` + writable + `@RequirePermission(documents.publish)`
+- `web_published=true` only when `status ∈ {approved, published}` (same bar as final PDF)
+- Leaving approved/published (workflow unpublish / reopen / reject) **must** clear `web_published`
+
+## Public routes
+
+- Member: `GET|PATCH /api/businesses/:businessId/documents/:documentId/web-publish`
+- Public: `GET /api/public/documents/:businessId/:slug` → HTML + meta (no JWT)
+- Optional host: `GET /api/public/documents/by-host?host=&slug=` via branding `custom_domain`
+- Public logo: `GET /api/public/branding/:businessId/logo` (no JWT; bytes only if logo exists)
+
+Web UI: `/[locale]/p/[businessId]/[slug]` with basic SEO metadata.
+
+## Slug
+
+- Lowercase `[a-z0-9]+(?:-[a-z0-9]+)*`, length 3–64
+- Unique per `businessId` (`@@unique([businessId, webSlug])`)

@@ -23,6 +23,9 @@ apps/api/
       design/
       documents/
       export/
+      marketplace/
+      plugins/
+      platform-admin/   # SAAS-only operator console (ADR 031)
       audit/
       system/
     prisma/                 # if Prisma — schema + migrations (or ../prisma)

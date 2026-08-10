@@ -23,6 +23,15 @@ Security- and workflow-sensitive actions append an **`audit_events`** row (Postg
 | `document.workflow.reopen` | approved → draft | set |
 | `workspace.backup.completed` | Backup ZIP built | set |
 | `workspace.restore.completed` | Restore applied | set |
+| `membership.invite` | Invitation created | set |
+| `membership.accept` | Invitation accepted → membership | set |
+| `membership.role_change` | Member role patched | set |
+| `membership.remove` | Member removed | set |
+| `platform.business.suspend` | SAAS platform admin suspends Business | set |
+| `platform.business.unsuspend` | SAAS platform admin unsuspends Business | set |
+| `billing.subscription.grace` | Dunning tick persists grace | set |
+| `billing.subscription.expired` | Dunning tick persists expired | set |
+| `billing.dunning.notice` | Dunning SMS notice recorded | set |
 
 Canonical codes: `AuditActions` in `@vdb/shared-types`.
 

@@ -35,7 +35,17 @@ You are working in **Visual Document Builder** (VDB).
 | `14-content-entities.mdc` | Corporate content (Projects…) + `module.*` gates |
 | `15-audit-events.mdc` | Append-only audit_events for workflow/security |
 | `16-backup-restore.mdc` | Business ZIP backup/restore (OWNER, no silent overwrite) |
+| `17-membership-roles.mdc` | OWNER/ADMIN/EDITOR/VIEWER + invitations + fine-grained RBAC (P04-T01/T02) |
+| `18-white-label-branding.mdc` | Business white-label (logo, domain, Powered-by) |
+| `19-web-publish.mdc` | Public HTML profile (`web_slug` / `web_published`; same HTML as PDF) |
+| `20-share-links.mdc` | Tokenized share links (hash, password, expiry, web\|pdf) |
+| `21-analytics.mdc` | Product analytics events (views/downloads; not audit) |
+| `22-template-marketplace.mdc` | SAAS template catalog + install copy; payments non-goal |
+| `23-plugin-system.mdc` | First-party plugin manifests + registry; no user eval |
+| `24-saas-platform-admin.mdc` | SAAS platform admin (≠ Business roles); suspend tenants |
+| `25-billing-dunning.mdc` | Renewal, grace window, dunning SMS; no data delete |
+| `26-performance-security-hardening.mdc` | Helmet/CORS, export caps, Redis rate limits, indexes |
 
-Phase exit QA: `docs/qa/` + `scripts/e2e/` (phase-01 edition funnels + `phase-02-corporate-acceptance` / `npm run test:e2e:corporate` + `phase-03-professional-acceptance` / `npm run test:e2e:professional`).
+Phase exit QA: `docs/qa/` + `scripts/e2e/` (phase-01 edition funnels + `phase-02-corporate-acceptance` / `npm run test:e2e:corporate` + `phase-03-professional-acceptance` / `npm run test:e2e:professional` + pre-GA `pre-ga-hardening.md` + catalog exit [`GA-checklist.md`](docs/qa/GA-checklist.md)).
 
 If a user request conflicts with these rules, refuse the conflicting part and propose a compliant design.

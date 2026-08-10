@@ -30,6 +30,7 @@ Monorepo layout (required):
   packages/
     document-schema/     # shared Document JSON types/schema (TS)
     shared-types/        # DTOs, entitlement codes, constants
+    plugins/             # first-party plugin manifests (@vdb/plugins)
   docs/                  # PRD, ADRs, api, deploy
   .cursor/rules/
 ```

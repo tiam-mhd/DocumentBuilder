@@ -1,0 +1,54 @@
+# White-label Branding (Permanent)
+
+## Law
+
+**Three brand layers — never conflate:**
+
+| Layer | Store | Purpose |
+| --- | --- | --- |
+| App chrome dark/light | Cookie `vdb-theme` | Product UI only |
+| Document brand | `design_themes` | PDF / editor document tokens |
+| **White-label** | `business_branding` | Customer logo, shell name/colors, hide Powered-by, custom domain |
+
+## Capability (Edition × entitlement)
+
+| Capability | `SELF_HOSTED` | `SAAS` without `branding.white_label` | `SAAS` with entitlement |
+| --- | --- | --- | --- |
+| Edit branding (name, colors, logo) | ✓ | ✗ (upgrade CTA) | ✓ |
+| Hide “Powered by” | ✓ (default on) | ✗ | ✓ |
+| Custom domain (DNS → install) | ✓ | ✗ | ✓ |
+
+Canonical entitlement: `branding.white_label` (`EntitlementCodes.BrandingWhiteLabel`) — SAAS paid add-on; **SELF_HOSTED treats as always allowed** (no catalog purchase required).
+
+## Data model
+
+Table `business_branding` (1:1 `business_id`):
+
+- `display_name`, `primary_color` (hex), `logo_storage_key` / mime / size
+- `custom_domain` (hostname, unique when set), `hide_powered_by`
+- Soft-delete not required; row upserted on first save
+
+Logo storage key:
+
+```text
+{businessId}/branding/logo.{png|jpg|webp|svg-forbidden}
+```
+
+Same `STORAGE_DRIVER` as media — never Mongo for bytes. SVG upload forbidden (XSS).
+
+## API / gates
+
+- `GET .../branding` — membership (includes `capabilities` flags)
+- `PATCH .../branding`, logo upload/delete — `EntitlementGuard` + writable + `@RequirePermission(manage.settings)` + white-label capability assert
+- `GET .../branding/logo/file` — membership
+- `GET /api/branding/resolve?host=` — public (for future Web Publish / custom domain)
+
+## UI
+
+- Settings page `/app/branding`
+- App shell consumes branding: display name, accent, logo, footer Powered-by when `showPoweredByEffective`
+- Web Publish must reuse the same `business_branding` resolve — do not invent a second brand store (see `19-web-publish.mdc`)
+
+## Custom domain
+
+Document DNS in `docs/deploy/` (CNAME/A → reverse proxy, TLS). App stores hostname only; TLS/proxy is ops — API validates hostname shape and uniqueness.

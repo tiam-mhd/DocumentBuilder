@@ -80,7 +80,7 @@ Unknown block types must **fail safely** at validate/render (reject or skip with
 | Evaluate | Preview + PDF render; TOC skips hidden |
 | Non-goal | AND/OR trees, formulas, entitlement conditions |
 
-Sellable modules (Map, OrgChart, Gallery, …) register **additional** types with `moduleCode`; Core types have `moduleCode: null`. Full registry: `BLOCK_REGISTRY` in `@vdb/document-schema`.
+Sellable modules (Map, OrgChart, Gallery, …) register **additional** types with `moduleCode`; Core types have `moduleCode: null`. Built-in registry: `BLOCK_REGISTRY`; effective registry including first-party plugins: `getBlockRegistry()` — see `23-plugin-system.mdc`.
 
 ## API
 

@@ -41,7 +41,7 @@ Same Core: Identity, Business tenancy, Entitlements, Document Engine, PDF, modul
 - Billing adapters: `PlatformBilling` vs `LicenseGate` behind one Entitlement interface where possible.
 - Installer path for on-prem: `.env.example`, migrations, queue worker, storage, docs in `docs/deploy/`.
 - SaaS path: same artifact; different env + domain + backup strategy.
-- Features that only make sense on SaaS (public marketplace, cross-customer admin) must be edition-gated — never break self-hosted builds.
+- Features that only make sense on SaaS (public marketplace, cross-customer **platform admin**) must be edition-gated — never break self-hosted builds. See `24-saas-platform-admin.mdc`.
 
 ## Forbidden
 

@@ -1,0 +1,38 @@
+---
+description: SAAS platform admin console — separate from Business roles
+alwaysApply: true
+---
+
+# SAAS Platform Admin Console (Permanent)
+
+## Law
+
+**Platform admin ≠ Business `OWNER` / `ADMIN`.**
+
+| Concern | Rule |
+| --- | --- |
+| Edition | **`SAAS` only** — SELF_HOSTED routes 403 / UI hidden |
+| Identity | Row in PG `platform_admins` (FK `user_id`) — not a membership role |
+| Scope | Cross-Business read of **minimal** tenant metadata + suspend/unsuspend |
+| Audit | Every suspend/unsuspend → `audit_events` (`platform.business.suspend` / `unsuspend`) |
+
+## Allowed surfaces (skeleton)
+
+- List users (id, mobile, createdAt, membership counts) — no OTP / payment secrets
+- List businesses (id, name, suspended, createdAt)
+- List subscriptions (businessId, plan, status, endsAt)
+- List failed export jobs (id, businessId, documentId, errorCode, timestamps)
+- Suspend / unsuspend Business (blocks writable entitlements)
+
+## Security
+
+- Guard: JWT + SAAS edition + `platform_admins` membership
+- Optional `PLATFORM_ADMIN_IP_ALLOWLIST` (comma-separated IPs); empty = no IP filter (document in deploy)
+- Bootstrap mobiles via `PLATFORM_ADMIN_MOBILES` (seed / boot upsert) — never commit real prod numbers
+- Do not expose Mongo document bodies or media binaries in admin list APIs
+
+## Forbidden
+
+- Using Business `OWNER` as platform superuser
+- Leaving admin routes live on `SELF_HOSTED`
+- Logging secrets in audit `meta`

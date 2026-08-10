@@ -1,0 +1,44 @@
+# Template Marketplace Skeleton (Permanent)
+
+## Law
+
+**Global SAAS catalog ≠ Business `document_templates`.**
+
+| Layer | Store | Ownership |
+| --- | --- | --- |
+| Marketplace listing | PG `marketplace_templates` (+ JSON body) | Platform (no `businessId`) |
+| Installed copy | PG `document_templates` + Mongo `template_bodies` | Target Business |
+
+Install is always a **snapshot copy**. Later catalog edits do not mutate installed templates.
+
+## Edition gate
+
+| Edition | Marketplace |
+| --- | --- |
+| `SAAS` | Enabled (`templateMarketplace: true` on system config) |
+| `SELF_HOSTED` | **Disabled** — routes return edition error; UI hidden |
+
+Never leave public cross-customer catalog live on self-hosted builds (`08-dual-deployment.mdc`).
+
+## Entitlement
+
+Canonical code: `marketplace.templates` (`EntitlementCodes.MarketplaceTemplates`).
+
+- Browse / install on SAAS: require this entitlement (catalog add-on).
+- Mutate install: also `manage.templates` + writable.
+
+## Payments (Non-goal — locked for this skeleton)
+
+- **No** per-template checkout, Stripe/Zarinpal SKUs for templates, seller payouts, or marketplace invoices.
+- Catalog module price for `marketplace.templates` is the **access gate only** (unlock browse/install), not a cart of individual templates.
+- Do not add half-built template payment routes without a funded product track + ADR reverse.
+
+## API (skeleton)
+
+- `GET /api/marketplace/templates` — JWT + SAAS + entitlement
+- `GET /api/marketplace/templates/:id` — same
+- `POST /api/businesses/:businessId/marketplace/templates/:id/install` — SAAS + entitlement + writable + `manage.templates`
+
+## Seller publish
+
+Out of MVP skeleton — no “publish my Business template to marketplace” yet.

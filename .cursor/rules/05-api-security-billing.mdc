@@ -50,7 +50,8 @@ Editor + Corporate modules wire-up:
 - XSS: escape in PDF HTML pipeline; sanitize rich text.
 - IDOR: authorize `businessId` on every show/update/delete (PostgreSQL and MongoDB).
 - CSRF as applicable; CORS locked to known web origins.
-- Rate-limit export and OTP endpoints.
+- Rate-limit export and OTP endpoints (Redis; see `26-performance-security-hardening.mdc`).
+- Cap concurrent PDF export jobs per Business; Helmet + locked CORS on API.
 - Audit log for: login, business create, plan change, payment, export, delete.
 
 ## API shape

@@ -1,0 +1,40 @@
+---
+description: First-party plugin/extension skeleton — manifests, registry, no user eval
+alwaysApply: true
+---
+
+# Plugin / Extension System Skeleton (Permanent)
+
+## Law
+
+**Core block registry stays authoritative.** Plugins only **extend** it via compiled first-party manifests — never by evaluating tenant-uploaded code.
+
+| Concern | Rule |
+| --- | --- |
+| Manifest | `id`, `version`, `blocks[]`, optional `moduleCode` (plugin-level gate) |
+| Block types | Must match `plugin.[a-z][a-z0-9_]*` — never collide with core/module types |
+| Load path | `packages/plugins` (`@vdb/plugins`) — allowlisted first-party only |
+| Trust | `trust: first-party` only in MVP |
+| Unknown blocks | Renderer **fail-safe** (skip / placeholder) — never crash PDF/preview workers |
+
+## Security (locked)
+
+- **No** `eval` / `Function` / dynamic `import()` of user- or Business-supplied JS.
+- **No** remote plugin marketplace download / unsigned packages in this skeleton.
+- Third-party / signed plugins require a **new ADR** reversing this non-goal.
+
+## Runtime
+
+1. Boot loads `loadFirstPartyPlugins()` → `registerPluginBlocks` in `@vdb/document-schema`.
+2. `getBlockRegistry()` = built-in `BLOCK_REGISTRY` + registered plugin entries.
+3. Validate / collect module codes against `getBlockRegistry()`.
+4. API: `GET /api/plugins` lists manifests (JWT). Editor palette uses effective registry.
+
+## Editions
+
+Available on **both** `SAAS` and `SELF_HOSTED` (first-party extensions ship in the artifact).
+
+## Non-goals (skeleton)
+
+- Seller-published plugins, WASM sandboxes, per-Business custom script upload.
+- Per-plugin billing SKUs beyond existing `module.*` / entitlement on declared `moduleCode`.

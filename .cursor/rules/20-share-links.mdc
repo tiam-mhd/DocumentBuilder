@@ -1,0 +1,42 @@
+# Share Links (Permanent)
+
+## Law
+
+**Tokenized access ≠ Web Publish slug profile.**
+
+| Concern | Mechanism |
+| --- | --- |
+| Public SEO profile | `web_slug` / `web_published` — ADR 026 |
+| **Share link** | `document_share_links` — opaque token, optional password, expiry, scope |
+
+Do not overload web-publish slug routes for password/expiry links.
+
+## Data model
+
+Table `document_share_links` (always `business_id` + `document_id`):
+
+- `token_hash` (unique) + `token_hint` — raw token returned **once** on create
+- `password_hash` optional
+- `scope` — `web` (HTML) \| `pdf` (download)
+- `expires_at` nullable; `revoked_at` nullable (soft revoke)
+
+Hash tokens/passwords with pepper (`SHARE_LINK_PEPPER`); never store raw secrets.
+
+## Gates
+
+- Create / list / revoke: writable + `@RequirePermission(documents.publish)`
+- Create only when document status ∈ `{approved, published}`
+- Public resolve: no JWT; check revoked / expiry / password
+- Password attempts: Redis rate-limit (brute-force)
+
+## Public routes
+
+- `GET /api/public/share/:token` — meta (+ content if unlocked / no password)
+- `POST /api/public/share/:token/unlock` — password gate → session + payload
+- `GET /api/public/share/:token/file` — PDF bytes when `scope=pdf`
+
+Web UI: `/[locale]/s/[token]`
+
+## Render
+
+Same source of truth as export: `ExportService.buildDocumentHtml` / PDF renderer — never a second layout engine.

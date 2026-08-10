@@ -1,0 +1,33 @@
+# Analytics (Permanent)
+
+## Law
+
+Product metrics (page views, PDF downloads) live in **`analytics_events`**, not `audit_events`.
+
+| Store | Role |
+| --- | --- |
+| PostgreSQL `analytics_events` | Durable event rows (+ optional rollups on `documents`) |
+| Redis / BullMQ `analytics.ingest` | Async ingest — never block public HTML/PDF paths |
+| Audit log | Security/workflow only — see `15-audit-events.mdc` |
+
+## Privacy
+
+- Do **not** store raw IP, full User-Agent, emails, or share tokens.
+- Optional coarse fields only: `country` (ISO-3166-1 alpha-2 from trusted proxy header), `device` (`desktop`\|`mobile`\|`tablet`\|`bot`\|`unknown`).
+- Install opt-out: `ANALYTICS_ENABLED=false` disables enqueue (document in `docs/deploy/`).
+
+## Event kinds / sources
+
+| `kind` | `source` |
+| --- | --- |
+| `view` | `web_publish`, `share_web` |
+| `download` | `share_pdf`, `export_download` |
+
+## Gates
+
+- Dashboard: JWT + membership + `@RequirePermission(audit.read)` (OWNER/ADMIN)
+- Public/export writers: fire-and-forget enqueue only
+
+## API
+
+- `GET /api/businesses/:businessId/analytics/summary`

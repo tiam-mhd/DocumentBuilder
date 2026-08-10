@@ -1,0 +1,77 @@
+# Business Membership Roles (Permanent)
+
+## Law
+
+Every Business has **members** with exactly one role. Cross-business access is forbidden — always authorize via path `:businessId` + `business_memberships`.
+
+## Locked roles
+
+| Role | Code | Purpose |
+| --- | --- | --- |
+| Owner | `OWNER` | Billing, backup/restore, delete business, invite any non-owner role, manage all members |
+| Admin | `ADMIN` | Settings, members (Editor/Viewer), audit, document approve/publish |
+| Editor | `EDITOR` | Manage data / templates / assets / themes / documents + enqueue PDF |
+| Viewer | `VIEWER` | Read-only membership |
+
+Canonical enum: `MembershipRole` in `@vdb/shared-types` **and** Prisma (values must match).
+
+**Removed:** `MEMBER` — migrate historical rows to `EDITOR`.
+
+## Fine-grained permissions (P04-T02)
+
+Membership RBAC is **separate** from subscription **module entitlements** (`module.map`, `export.pdf`, …). Both must pass when a route needs both.
+
+Stable codes (`MembershipPermissionCodes`):
+
+| Code | Meaning |
+| --- | --- |
+| `manage.data` | Corporate content mutate (projects, team, …) + import |
+| `manage.templates` | Template CRUD |
+| `manage.assets` | Media + fonts upload/delete |
+| `manage.themes` | Design themes mutate |
+| `manage.documents` | Document/version/comment mutate + submit-review |
+| `rbac.export.pdf` | Enqueue PDF (still needs entitlement `export.pdf`) |
+| `documents.publish` | Approve / reject / publish / unpublish / reopen |
+| `manage.settings` | Rename business |
+| `manage.members` | Invite / role change / remove |
+| `manage.billing` | Platform checkout |
+| `manage.backup` | Workspace backup/restore |
+| `audit.read` | Audit log list |
+
+### Role × permission matrix
+
+| Permission | OWNER | ADMIN | EDITOR | VIEWER |
+| --- | --- | --- | --- | --- |
+| `manage.data` | ✓ | ✓ | ✓ | ✗ |
+| `manage.templates` | ✓ | ✓ | ✓ | ✗ |
+| `manage.assets` | ✓ | ✓ | ✓ | ✗ |
+| `manage.themes` | ✓ | ✓ | ✓ | ✗ |
+| `manage.documents` | ✓ | ✓ | ✓ | ✗ |
+| `rbac.export.pdf` | ✓ | ✓ | ✓ | ✗ |
+| `documents.publish` | ✓ | ✓ | ✗ | ✗ |
+| `manage.settings` | ✓ | ✓ | ✗ | ✗ |
+| `manage.members` | ✓ | ✓ | ✗ | ✗ |
+| `audit.read` | ✓ | ✓ | ✗ | ✗ |
+| `manage.billing` | ✓ | ✗ | ✗ | ✗ |
+| `manage.backup` | ✓ | ✗ | ✗ | ✗ |
+
+Helpers: `permissionsForRole`, `roleHasPermission`, `membershipCan*` (coarse wrappers) in `@vdb/shared-types`.
+
+## Invitations
+
+- Table `business_invitations`: `business_id`, normalized `mobile`, `role` ∈ `{ADMIN,EDITOR,VIEWER}`, opaque `token`, `status`, `expires_at`, `invited_by_user_id`.
+- Accept only after **OTP login** as that mobile (reuse Identity OTP — no separate invite OTP).
+- Token links must not leak other businesses; accept checks mobile match + pending + not expired.
+- One pending invite per `(businessId, mobile)`; revoke before re-invite with different role.
+
+## Enforcement
+
+- Nest: `@RequirePermission(...codes)` metadata + `EntitlementGuard` (membership permissions) **and** `@RequireWritable` / `@RequireModule` / `@RequireEntitlement` (subscription).
+- `TenancyService.assertPermissions` / `assertPermission`.
+- Fallback: writable routes without `@RequirePermission` still require EDITOR+ (`assertContentWriter`).
+- UI mirrors `permissionsForRole(activeBusiness.role)`; API remains source of truth.
+- `GET /api/businesses/:businessId/permissions` returns role + permission list.
+
+## Audit
+
+Append: `membership.invite`, `membership.accept`, `membership.role_change`, `membership.remove` (see `AuditActions`).
