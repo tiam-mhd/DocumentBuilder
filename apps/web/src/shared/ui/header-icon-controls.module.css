@@ -1,0 +1,74 @@
+.wrap {
+  position: relative;
+}
+
+.iconBtn {
+  width: 2.35rem;
+  height: 2.35rem;
+  display: grid;
+  place-items: center;
+  border-radius: calc(var(--radius) - 4px);
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-elevated) 90%, transparent);
+  color: var(--fg);
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.iconBtn:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  color: var(--accent);
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  inset-inline-end: 0;
+  z-index: 50;
+  min-width: 8.5rem;
+  padding: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 4px);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 0.15rem;
+  animation: menuIn 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes menuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-0.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.menuItem {
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  text-align: start;
+  padding: 0.45rem 0.55rem;
+  border-radius: calc(var(--radius) - 8px);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.86rem;
+}
+
+.menuItem:hover,
+.menuItem[data-active='true'] {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu {
+    animation: none;
+  }
+}

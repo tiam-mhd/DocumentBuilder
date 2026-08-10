@@ -1,18 +1,29 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { useRouter } from 'next/navigation';
 import { fetchHealth, type HealthReport } from '@/shared/api/system';
 import { useEdition } from '@/shared/lib/edition-context';
+import { useAuth } from '@/shared/lib/auth-context';
 import { mapApiErrorCode } from '@/shared/api/client';
 import styles from './home-page.module.css';
 
 export function HomePage() {
   const t = useTranslations('home');
   const tErrors = useTranslations('errors');
+  const locale = useLocale();
+  const router = useRouter();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const { config, loading: editionLoading, error: editionError } = useEdition();
   const [health, setHealth] = useState<HealthReport | null>(null);
   const [healthError, setHealthError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      router.replace(`/${locale}/app`);
+    }
+  }, [authLoading, isAuthenticated, locale, router]);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,6 +48,10 @@ export function HomePage() {
       cancelled = true;
     };
   }, [tErrors]);
+
+  if (authLoading || isAuthenticated) {
+    return <p className={styles.description}>{t('loading')}</p>;
+  }
 
   return (
     <section className={styles.section}>

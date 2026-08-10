@@ -1,24 +1,196 @@
 .root {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
+  position: relative;
+  width: 100%;
 }
 
-.label {
-  color: var(--fg-muted);
-  font-size: 0.85rem;
+.sidebar {
+  margin-bottom: 0.35rem;
 }
 
-.select {
-  background: var(--bg-elevated);
-  color: var(--fg);
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) - 4px);
-  padding: 0.35rem 0.6rem;
-  max-width: 12rem;
+.inline {
+  width: auto;
+  min-width: 12rem;
 }
 
 .muted {
   color: var(--fg-muted);
+  font-size: 0.82rem;
+}
+
+.emptyTitle {
+  margin: 0 0 0.35rem;
   font-size: 0.85rem;
+  color: var(--fg-muted);
+}
+
+.trigger {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.55rem 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+  border-radius: calc(var(--radius) - 2px);
+  background: color-mix(in srgb, var(--bg) 55%, var(--bg-elevated));
+  color: inherit;
+  cursor: pointer;
+  text-align: start;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    transform 160ms ease;
+}
+
+.trigger:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-elevated));
+}
+
+.root[data-open='true'] .trigger {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+
+.avatar {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.55rem;
+  display: grid;
+  place-items: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--accent) 18%, var(--bg));
+  color: var(--accent);
+}
+
+.triggerText {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.triggerLabel {
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+.triggerName {
+  font-size: 0.92rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chevron {
+  color: var(--fg-muted);
+  font-size: 0.75rem;
+  transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.root[data-open='true'] .chevron {
+  transform: rotate(180deg);
+}
+
+.popover {
+  position: absolute;
+  z-index: 40;
+  inset-inline: 0;
+  top: calc(100% + 0.4rem);
+  padding: 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow);
+  animation: popIn 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: translateY(-0.35rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.15rem;
+  max-height: 14rem;
+  overflow: auto;
+}
+
+.option {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.5rem;
+  border: none;
+  border-radius: calc(var(--radius) - 6px);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: start;
+}
+
+.option:hover {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.option[data-active='true'] {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.optionMark {
+  font-size: 0.65rem;
+  color: var(--accent);
+}
+
+.optionName {
+  font-size: 0.88rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.optionRole {
+  font-size: 0.68rem;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.manageLink {
+  display: block;
+  margin-top: 0.35rem;
+  padding: 0.45rem 0.5rem;
+  border-top: 1px solid var(--border);
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.manageLink:hover {
+  text-decoration: underline;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .popover,
+  .trigger,
+  .chevron {
+    animation: none !important;
+    transition: none !important;
+  }
 }

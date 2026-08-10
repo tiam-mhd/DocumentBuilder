@@ -9,8 +9,10 @@
   --accent-fg: #f5fffb;
   --danger: #9b2c2c;
   --shadow: 0 12px 40px rgba(28, 25, 21, 0.08);
-  --font-sans: "Vazirmatn", "Segoe UI", Tahoma, sans-serif;
-  --font-display: "Fraunces", "Georgia", serif;
+  /* Vazirmatn covers FA + EN + digits; Fraunces for display headings only */
+  --font-sans: "Vazirmatn", "Segoe UI", Tahoma, system-ui, sans-serif;
+  --font-display: "Fraunces", "Vazirmatn", Georgia, serif;
+  --font-mono: "Vazirmatn", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --radius: 12px;
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -38,6 +40,14 @@ html[data-theme='dark'] {
   box-sizing: border-box;
 }
 
+html {
+  margin: 0;
+  min-height: 100%;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
 html,
 body {
   margin: 0;
@@ -53,11 +63,53 @@ body {
   line-height: 1.6;
 }
 
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-display);
+}
+
 a {
   color: inherit;
 }
 
 button,
+input,
+textarea,
+select,
+option,
+label,
+p,
+span,
+li,
+td,
+th,
+dt,
+dd,
+small,
+strong,
+em,
+code,
+pre,
+kbd,
+samp {
+  font-family: inherit;
+}
+
+button,
+input,
+textarea,
 select {
   font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+code,
+pre,
+kbd,
+samp,
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
