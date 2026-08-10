@@ -1,5 +1,5 @@
 import { setRequestLocale } from 'next-intl/server';
-import { LoginForm } from '@/features/auth/login-form';
+import { LoginWizard } from '@/features/auth/login-form';
 
 type Props = {
   params: Promise<{ locale: string }>;
@@ -8,5 +8,5 @@ type Props = {
 export default async function LoginPage({ params }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
-  return <LoginForm locale={locale} />;
+  return <LoginWizard locale={locale} />;
 }
