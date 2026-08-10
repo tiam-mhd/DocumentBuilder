@@ -47,3 +47,7 @@ docker-compose.override.yml
 
 # Scratch / personal notes (not product source)
 ChatgptAnswer.txt
+DocumentBuilder-Tokens.txt
+
+# Accidental local object-storage dumps under API cwd
+apps/api/*/media/
