@@ -284,6 +284,10 @@ h1,h2,h3{font-family:${JSON.stringify(tokens.typography.headingFamily)},serif;co
 .toc-label{flex:1}
 .toc-dots{flex:1;border-bottom:1px dotted ${tokens.colors.secondary};margin:0 6px;min-width:1rem;height:0.6em}
 .toc-page{font-variant-numeric:tabular-nums;color:${tokens.colors.secondary}}
+.notice{border:1px solid ${tokens.colors.secondary};border-inline-start:4px solid ${tokens.colors.primary};border-radius:4px;padding:10px 12px;margin:8px 0;background:${tokens.colors.background}}
+.notice strong{display:block;margin-bottom:4px;color:${tokens.colors.primary}}
+.notice p{margin:0}
+.plugin-unknown{color:${tokens.colors.secondary};font-size:0.85rem;font-style:italic;margin:4px 0}
 .heading{margin:0 0 8px;color:${tokens.colors.primary}}
 .keep-together{break-inside:avoid;page-break-inside:avoid}
 .break-before{break-before:page;page-break-before:always}
@@ -540,8 +544,17 @@ ${footerNum}
       case 'headerSlot':
       case 'footerSlot':
         return '';
+      case 'plugin.notice': {
+        const title = escapeHtml(String(block.props.title ?? '').trim());
+        const body = escapeHtml(String(block.props.body ?? '').trim());
+        const titleHtml = title ? `<strong>${title}</strong>` : '';
+        const bodyHtml = body ? `<p>${body}</p>` : '';
+        return wrap(`<aside class="notice">${titleHtml}${bodyHtml}</aside>`);
+      }
       default:
-        return '';
+        return wrap(
+          `<aside class="plugin-unknown" data-block-type="${escapeHtml(String(block.type))}">Unsupported block</aside>`,
+        );
     }
   }
 

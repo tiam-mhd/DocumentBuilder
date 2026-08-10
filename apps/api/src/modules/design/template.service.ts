@@ -4,7 +4,7 @@ import type { DocumentTemplate } from '@prisma/client';
 import {
   createEmptyTemplateBody,
   parseTemplateBody,
-  BLOCK_REGISTRY,
+  getBlockRegistry,
   documentCollectRequiredModuleCodes,
   TEMPLATE_SCHEMA_VERSION,
   type TemplateBody,
@@ -41,11 +41,12 @@ export class TemplateService implements OnModuleInit {
   getRegistry(): PublicBlockRegistry {
     return {
       schemaVersion: TEMPLATE_SCHEMA_VERSION,
-      items: BLOCK_REGISTRY.map((e) => ({
+      items: getBlockRegistry().map((e) => ({
         type: e.type,
         labelKey: e.labelKey,
         allowsChildren: e.allowsChildren,
         moduleCode: e.moduleCode,
+        ...(e.pluginId ? { pluginId: e.pluginId } : {}),
       })),
     };
   }

@@ -1,14 +1,20 @@
 import {
   ALL_BLOCK_TYPES,
   BLOCK_REGISTRY,
+  getBlockRegistry,
   TEMPLATE_SCHEMA_VERSION,
   createEmptyTemplateBody,
   parseTemplateBody,
 } from '@vdb/document-schema';
+import { resetFirstPartyPluginsForTests } from '@vdb/plugins';
 import { TemplateErrorCodes } from '@vdb/shared-types';
 import { TemplateService } from '../src/modules/design/template.service';
 
 describe('TemplateService', () => {
+  afterEach(() => {
+    resetFirstPartyPluginsForTests();
+  });
+
   function build() {
     const bodies = {
       ensureIndexes: jest.fn().mockResolvedValue(undefined),
@@ -54,11 +60,18 @@ describe('TemplateService', () => {
     const reg = service.getRegistry();
     expect(reg.schemaVersion).toBe(TEMPLATE_SCHEMA_VERSION);
     expect(reg.items.map((i) => i.type).sort()).toEqual(
-      [...ALL_BLOCK_TYPES].sort(),
+      getBlockRegistry()
+        .map((e) => e.type)
+        .sort(),
     );
-    expect(reg.items).toHaveLength(BLOCK_REGISTRY.length);
+    expect(reg.items).toHaveLength(getBlockRegistry().length);
     expect(reg.items.find((i) => i.type === 'gallery')?.moduleCode).toBe(
       'module.gallery',
+    );
+    // Built-ins still present even when plugins unloaded.
+    expect(reg.items.length).toBe(BLOCK_REGISTRY.length);
+    expect([...ALL_BLOCK_TYPES].every((t) => reg.items.some((i) => i.type === t))).toBe(
+      true,
     );
   });
 
