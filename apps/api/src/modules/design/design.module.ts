@@ -12,7 +12,7 @@ import { TemplateBodyRepository } from './template-body.repository';
 /** Design — document brand themes, templates, master pages. */
 @Module({
   imports: [
-    IdentityModule,
+    forwardRef(() => IdentityModule),
     forwardRef(() => TenancyModule),
     forwardRef(() => BillingModule),
   ],

@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { createEmptyTemplateBody } from '@vdb/document-schema';
 import {
   EntitlementCodes,
@@ -113,14 +113,16 @@ async function main() {
     throw new Error('Catalog module seed mismatch with shared-types');
   }
 
-  const companyProfileBodyFa = createEmptyTemplateBody(
-    '_marketplace',
-    'seed-company-profile-fa',
-  );
-  const companyProfileBodyEn = createEmptyTemplateBody(
-    '_marketplace',
-    'seed-company-profile-en',
-  );
+  const companyProfileBodyFa = JSON.parse(
+    JSON.stringify(
+      createEmptyTemplateBody('_marketplace', 'seed-company-profile-fa'),
+    ),
+  ) as Prisma.InputJsonValue;
+  const companyProfileBodyEn = JSON.parse(
+    JSON.stringify(
+      createEmptyTemplateBody('_marketplace', 'seed-company-profile-en'),
+    ),
+  ) as Prisma.InputJsonValue;
 
   await prisma.marketplaceTemplate.upsert({
     where: { slug: 'company-profile-fa' },

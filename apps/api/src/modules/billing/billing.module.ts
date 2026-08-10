@@ -30,7 +30,7 @@ import { AuditModule } from '../audit/audit.module';
 
 @Module({
   imports: [
-    IdentityModule,
+    forwardRef(() => IdentityModule),
     forwardRef(() => TenancyModule),
     forwardRef(() => AuditModule),
   ],

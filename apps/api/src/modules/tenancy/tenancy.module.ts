@@ -20,7 +20,7 @@ import { TenancyService } from './tenancy.service';
 
 @Module({
   imports: [
-    IdentityModule,
+    forwardRef(() => IdentityModule),
     forwardRef(() => AuditModule),
     forwardRef(() => BillingModule),
     forwardRef(() => DesignModule),
