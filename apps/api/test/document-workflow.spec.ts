@@ -70,6 +70,7 @@ describe('document approval workflow (ADR 021)', () => {
   it('treats OWNER and ADMIN as approvers', () => {
     expect(isApproverRole(MembershipRole.OWNER)).toBe(true);
     expect(isApproverRole(MembershipRole.ADMIN)).toBe(true);
-    expect(isApproverRole(MembershipRole.MEMBER)).toBe(false);
+    expect(isApproverRole(MembershipRole.EDITOR)).toBe(false);
+    expect(isApproverRole(MembershipRole.VIEWER)).toBe(false);
   });
 });

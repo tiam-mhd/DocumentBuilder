@@ -410,6 +410,9 @@ export class DocumentsService implements OnModuleInit {
       locale: parseContentLocale(row.locale),
       status: row.status,
       latestVersionNumber: latest,
+      webSlug: row.webSlug,
+      webPublished: row.webPublished,
+      webPublishedAt: row.webPublishedAt?.toISOString() ?? null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };

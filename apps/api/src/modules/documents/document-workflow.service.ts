@@ -165,7 +165,12 @@ export class DocumentWorkflowService {
 
     const updated = await this.prisma.document.update({
       where: { id: row.id },
-      data: { status: input.to as PrismaDocumentStatus },
+      data: {
+        status: input.to as PrismaDocumentStatus,
+        ...(input.to === DocumentStatus.Draft
+          ? { webPublished: false, webPublishedAt: null }
+          : {}),
+      },
     });
 
     let body =
