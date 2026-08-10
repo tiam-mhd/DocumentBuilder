@@ -11,7 +11,11 @@ export type AppEnv = {
   REDIS_URL: string;
   MONGODB_URI: string;
   OTP_PEPPER: string;
-  SMS_PROVIDER: 'fake' | 'http';
+  SMS_PROVIDER: 'fake' | 'parsgreen';
+  /** Parsgreen Apiv2 token (Authorization: basic apikey:{token}). May be empty until deploy. */
+  PARSGREEN_API_TOKEN: string;
+  PARSGREEN_BASE_URL: string;
+  PARSGREEN_ADD_NAME: boolean;
   OTP_TTL_SECONDS: number;
   OTP_COOLDOWN_SECONDS: number;
   OTP_MAX_ATTEMPTS: number;
@@ -84,9 +88,15 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
     config.JWT_SECRET ?? 'dev-only-jwt-secret-change-me',
   );
   const smsProviderRaw = String(config.SMS_PROVIDER ?? 'fake');
-  if (smsProviderRaw !== 'fake' && smsProviderRaw !== 'http') {
-    throw new Error(`SMS_PROVIDER must be fake|http (got: ${smsProviderRaw})`);
+  if (smsProviderRaw !== 'fake' && smsProviderRaw !== 'parsgreen') {
+    throw new Error(
+      `SMS_PROVIDER must be fake|parsgreen (got: ${smsProviderRaw})`,
+    );
   }
+
+  const parsgreenAddRaw = String(config.PARSGREEN_ADD_NAME ?? 'true');
+  const parsgreenAddName =
+    parsgreenAddRaw === '1' || parsgreenAddRaw.toLowerCase() === 'true';
 
   const paymentProviderRaw = String(config.PAYMENT_PROVIDER ?? 'fake');
   if (paymentProviderRaw !== 'fake' && paymentProviderRaw !== 'zarinpal') {
@@ -168,7 +178,12 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
     REDIS_URL: redisUrl,
     MONGODB_URI: mongoUri,
     OTP_PEPPER: otpPepper,
-    SMS_PROVIDER: smsProviderRaw,
+    SMS_PROVIDER: smsProviderRaw as 'fake' | 'parsgreen',
+    PARSGREEN_API_TOKEN: String(config.PARSGREEN_API_TOKEN ?? ''),
+    PARSGREEN_BASE_URL: String(
+      config.PARSGREEN_BASE_URL ?? 'https://sms.parsgreen.ir',
+    ).replace(/\/$/, ''),
+    PARSGREEN_ADD_NAME: parsgreenAddName,
     OTP_TTL_SECONDS: Number(config.OTP_TTL_SECONDS ?? 300),
     OTP_COOLDOWN_SECONDS: Number(config.OTP_COOLDOWN_SECONDS ?? 60),
     OTP_MAX_ATTEMPTS: Number(config.OTP_MAX_ATTEMPTS ?? 5),

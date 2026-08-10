@@ -7,7 +7,9 @@ import { IdentityController } from './identity.controller';
 import { AuthController } from './auth.controller';
 import { IdentityService } from './identity.service';
 import { OtpChallengeStore } from './otp-challenge.store';
+import { TwoFactorChallengeStore } from './two-factor-challenge.store';
 import { FakeSmsSender } from './sms/fake-sms.sender';
+import { ParsgreenSmsSender } from './sms/parsgreen-sms.sender';
 import { SMS_SENDER } from './sms/sms-sender';
 import { AuthTokenService } from './auth-token.service';
 import { TokenBlacklistStore } from './token-blacklist.store';
@@ -30,18 +32,24 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
   providers: [
     IdentityService,
     OtpChallengeStore,
+    TwoFactorChallengeStore,
     FakeSmsSender,
+    ParsgreenSmsSender,
     AuthTokenService,
     TokenBlacklistStore,
     JwtStrategy,
     JwtAuthGuard,
     {
       provide: SMS_SENDER,
-      inject: [ConfigService, FakeSmsSender],
-      useFactory: (config: ConfigService, fake: FakeSmsSender) => {
+      inject: [ConfigService, FakeSmsSender, ParsgreenSmsSender],
+      useFactory: (
+        config: ConfigService,
+        fake: FakeSmsSender,
+        parsgreen: ParsgreenSmsSender,
+      ) => {
         const provider = config.get<string>('SMS_PROVIDER', 'fake');
-        if (provider === 'fake') {
-          return fake;
+        if (provider === 'parsgreen') {
+          return parsgreen;
         }
         return fake;
       },

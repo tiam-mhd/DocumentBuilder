@@ -41,6 +41,8 @@ describe('IdentityService', () => {
     findUnique?: () => Promise<null | {
       id: string;
       mobile: string;
+      passwordHash: string | null;
+      twoFactorEnabled: boolean;
       trialConsumed: boolean;
       createdAt: Date;
     }>;
@@ -61,6 +63,12 @@ describe('IdentityService', () => {
         create: jest.fn().mockImplementation(async ({ data }: { data: { mobile: string } }) => ({
           id: 'user_1',
           mobile: data.mobile,
+          displayName: null,
+          email: null,
+          jobTitle: null,
+          bio: null,
+          passwordHash: null,
+          twoFactorEnabled: false,
           trialConsumed: false,
           createdAt: new Date('2026-01-01T00:00:00.000Z'),
         })),
@@ -99,6 +107,11 @@ describe('IdentityService', () => {
       service: new IdentityService(
         prisma as never,
         challenges as never,
+        {
+          create: jest.fn(),
+          get: jest.fn(),
+          consume: jest.fn(),
+        } as never,
         config as never,
         sms,
         tokens as never,

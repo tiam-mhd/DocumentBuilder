@@ -25,7 +25,13 @@ describe('AuthTokenService', () => {
     const tokens = await service.issueAccessToken({
       id: 'u1',
       mobile: '+989121234567',
+      displayName: null,
+      email: null,
+      jobTitle: null,
+      bio: null,
       trialConsumed: false,
+      hasPassword: false,
+      twoFactorEnabled: false,
       createdAt: new Date().toISOString(),
     });
 

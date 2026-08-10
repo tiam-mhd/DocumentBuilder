@@ -369,7 +369,7 @@ export type ApiEnvelope<T> = {
   errors?: ApiErrorBody[];
 };
 
-/** Machine codes for Identity / OTP (client maps → i18n). */
+/** Machine codes for Identity / OTP / password / 2FA (client maps → i18n). */
 export const AuthErrorCodes = {
   MobileInvalid: 'MOBILE_INVALID',
   OtpCooldown: 'OTP_COOLDOWN',
@@ -379,6 +379,15 @@ export const AuthErrorCodes = {
   RedisUnavailable: 'REDIS_UNAVAILABLE',
   AuthRequired: 'AUTH_REQUIRED',
   AuthInvalid: 'AUTH_INVALID',
+  PasswordInvalid: 'PASSWORD_INVALID',
+  PasswordRequired: 'PASSWORD_REQUIRED',
+  PasswordTooWeak: 'PASSWORD_TOO_WEAK',
+  PasswordNotSet: 'PASSWORD_NOT_SET',
+  PasswordMismatch: 'PASSWORD_MISMATCH',
+  TwoFactorRequired: 'TWO_FACTOR_REQUIRED',
+  TwoFactorChallengeInvalid: 'TWO_FACTOR_CHALLENGE_INVALID',
+  SmsMisconfigured: 'SMS_MISCONFIGURED',
+  SmsSendFailed: 'SMS_SEND_FAILED',
 } as const;
 
 export type AuthErrorCode =
@@ -387,8 +396,32 @@ export type AuthErrorCode =
 export type PublicUser = {
   id: string;
   mobile: string;
+  /** Display name (editable profile). */
+  displayName: string | null;
+  email: string | null;
+  jobTitle: string | null;
+  bio: string | null;
   trialConsumed: boolean;
+  /** Whether a password is set (never expose hash). */
+  hasPassword: boolean;
+  twoFactorEnabled: boolean;
   createdAt: string;
+};
+
+export type UpdateUserProfileInput = {
+  displayName?: string | null;
+  email?: string | null;
+  jobTitle?: string | null;
+  bio?: string | null;
+};
+
+/** Discover available login methods for a mobile (no secrets). */
+export type LoginOptions = {
+  mobile: string;
+  hasPassword: boolean;
+  twoFactorEnabled: boolean;
+  /** Always includes `otp`; includes `password` when hasPassword. */
+  methods: Array<'otp' | 'password'>;
 };
 
 export type AuthTokens = {

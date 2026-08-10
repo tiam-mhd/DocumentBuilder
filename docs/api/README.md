@@ -28,7 +28,8 @@ Clients map `code` → i18n (`fa` / `en`).
 
 ### Auth
 
-- Mobile OTP → Bearer access JWT
+- Mobile OTP / password / optional 2FA → Bearer access JWT
+- SMS: `fake` (dev) or `parsgreen` (`PARSGREEN_API_TOKEN`)
 - Protected: `Authorization: Bearer <accessToken>`
 
 ### Business context (locked)
@@ -100,9 +101,15 @@ Clients map `code` → i18n (`fa` / `en`).
 | --- | --- | --- |
 | `GET` | `/api/health` | none |
 | `GET` | `/api/system/config` | none |
+| `POST` | `/api/auth/login/options` | none |
 | `POST` | `/api/auth/otp/request` | none |
 | `POST` | `/api/auth/otp/verify` | none → access token |
+| `POST` | `/api/auth/password/login` | none → token or 2FA challenge |
+| `POST` | `/api/auth/2fa/verify` | none → access token |
+| `POST` | `/api/auth/password` | Bearer (set/change password) |
+| `POST` | `/api/auth/2fa` | Bearer (enable/disable 2FA) |
 | `GET` | `/api/auth/me` | Bearer |
+| `PATCH` | `/api/auth/me` | Bearer (profile fields) |
 | `POST` | `/api/auth/logout` | Bearer |
 | `GET/POST` | `/api/businesses` | Bearer |
 | `GET/PATCH/DELETE` | `/api/businesses/:businessId` | Bearer + membership (PATCH ADMIN+; DELETE OWNER) |

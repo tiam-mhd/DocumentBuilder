@@ -4518,6 +4518,138 @@ paths:
           $ref: '#/components/responses/ApiError'
         '401':
           $ref: '#/components/responses/ApiError'
+  /auth/login/options:
+    post:
+      tags: [auth]
+      summary: Discover OTP / password / 2FA options for a mobile
+      operationId: loginOptions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestOtpBody'
+      responses:
+        '200':
+          description: Available login methods (no secrets)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/LoginOptions'
+        '400':
+          $ref: '#/components/responses/ApiError'
+  /auth/password/login:
+    post:
+      tags: [auth]
+      summary: Password login (or 2FA challenge when enabled)
+      operationId: passwordLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordLoginBody'
+      responses:
+        '200':
+          description: Access token or requiresOtp challenge
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    oneOf:
+                      - $ref: '#/components/schemas/VerifyOtpResult'
+                      - $ref: '#/components/schemas/TwoFactorChallenge'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '401':
+          $ref: '#/components/responses/ApiError'
+  /auth/2fa/verify:
+    post:
+      tags: [auth]
+      summary: Complete password + OTP two-factor login
+      operationId: verifyTwoFactor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TwoFactorVerifyBody'
+      responses:
+        '200':
+          description: Access token after 2FA
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/VerifyOtpResult'
+        '401':
+          $ref: '#/components/responses/ApiError'
+  /auth/password:
+    post:
+      tags: [auth]
+      summary: Set or change account password
+      operationId: setPassword
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetPasswordBody'
+      responses:
+        '200':
+          description: Updated public user
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicUser'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/2fa:
+    post:
+      tags: [auth]
+      summary: Enable or disable password+OTP two-factor
+      operationId: setTwoFactor
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TwoFactorToggleBody'
+      responses:
+        '200':
+          description: Updated public user
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicUser'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /auth/me:
     get:
       tags: [auth]
@@ -4536,6 +4668,33 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/PublicUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags: [auth]
+      summary: Update personal profile
+      operationId: updateMe
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileBody'
+      responses:
+        '200':
+          description: Updated public user
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicUser'
+        '400':
+          $ref: '#/components/responses/ApiError'
         '401':
           $ref: '#/components/responses/Unauthorized'
   /auth/logout:
@@ -5449,18 +5608,130 @@ components:
           description: Present only when SMS_PROVIDER=fake and NODE_ENV=development
     PublicUser:
       type: object
-      required: [id, mobile, trialConsumed, createdAt]
+      required:
+        [
+          id,
+          mobile,
+          displayName,
+          email,
+          jobTitle,
+          bio,
+          trialConsumed,
+          hasPassword,
+          twoFactorEnabled,
+          createdAt,
+        ]
       properties:
         id:
           type: string
         mobile:
           type: string
+        displayName:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        jobTitle:
+          type: string
+          nullable: true
+        bio:
+          type: string
+          nullable: true
         trialConsumed:
+          type: boolean
+        hasPassword:
+          type: boolean
+          description: Whether a password is set (hash never exposed)
+        twoFactorEnabled:
           type: boolean
         createdAt:
           type: string
           format: date-time
-    PublicBusiness:
+    UpdateProfileBody:
+      type: object
+      properties:
+        displayName:
+          type: string
+          nullable: true
+          maxLength: 120
+        email:
+          type: string
+          nullable: true
+          maxLength: 160
+        jobTitle:
+          type: string
+          nullable: true
+          maxLength: 120
+        bio:
+          type: string
+          nullable: true
+          maxLength: 1000
+    LoginOptions:
+      type: object
+      required: [mobile, hasPassword, twoFactorEnabled, methods]
+      properties:
+        mobile:
+          type: string
+        hasPassword:
+          type: boolean
+        twoFactorEnabled:
+          type: boolean
+        methods:
+          type: array
+          items:
+            type: string
+            enum: [otp, password]
+    PasswordLoginBody:
+      type: object
+      required: [mobile, password]
+      properties:
+        mobile:
+          type: string
+        password:
+          type: string
+          minLength: 8
+    TwoFactorChallenge:
+      type: object
+      required: [requiresOtp, challengeToken, mobile, expiresInSeconds, cooldownSeconds]
+      properties:
+        requiresOtp:
+          type: boolean
+          enum: [true]
+        challengeToken:
+          type: string
+        mobile:
+          type: string
+        expiresInSeconds:
+          type: integer
+        cooldownSeconds:
+          type: integer
+        devCode:
+          type: string
+    SetPasswordBody:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+          minLength: 8
+        currentPassword:
+          type: string
+    TwoFactorToggleBody:
+      type: object
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
+    TwoFactorVerifyBody:
+      type: object
+      required: [challengeToken, code]
+      properties:
+        challengeToken:
+          type: string
+        code:
+          type: string
+          pattern: '^\d{4,8}$'
       type: object
       required: [id, name, role, createdAt, updatedAt]
       properties:

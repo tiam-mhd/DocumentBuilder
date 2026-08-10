@@ -48,15 +48,22 @@ enum PaymentProvider {
 }
 
 model User {
-  id            String               @id @default(cuid())
-  mobile        String               @unique
-  trialConsumed Boolean              @default(false) @map("trial_consumed")
-  createdAt     DateTime             @default(now()) @map("created_at")
-  updatedAt     DateTime             @updatedAt @map("updated_at")
-  memberships   BusinessMembership[]
-  invitationsSent BusinessInvitation[] @relation("InvitationInviter")
-  auditEvents   AuditEvent[]
-  platformAdmin PlatformAdmin?
+  id               String               @id @default(cuid())
+  mobile           String               @unique
+  displayName      String?              @map("display_name")
+  email            String?
+  jobTitle         String?              @map("job_title")
+  bio              String?
+  /** scrypt hash; null = OTP-only until user sets a password. */
+  passwordHash     String?              @map("password_hash")
+  twoFactorEnabled Boolean              @default(false) @map("two_factor_enabled")
+  trialConsumed    Boolean              @default(false) @map("trial_consumed")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+  memberships      BusinessMembership[]
+  invitationsSent  BusinessInvitation[] @relation("InvitationInviter")
+  auditEvents      AuditEvent[]
+  platformAdmin    PlatformAdmin?
 
   @@map("users")
 }
