@@ -161,7 +161,7 @@ npm run docker:up
 
 Ports (see root `.env.example`):
 
-- PostgreSQL `5432`
+- PostgreSQL `5432` (if busy, copy `docker-compose.override.example.yml` → `docker-compose.override.yml` for host `5434` and update `DATABASE_URL`)
 - Redis `6379`
 - MongoDB `27017`
 
