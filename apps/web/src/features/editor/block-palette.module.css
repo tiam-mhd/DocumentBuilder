@@ -3,9 +3,48 @@
   gap: var(--space-2);
 }
 
-.title {
+.searchField {
+  display: grid;
+}
+
+.search {
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 6px);
+  background: var(--bg);
+  color: var(--fg);
+  padding: 0.45rem 0.65rem;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.search:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.group {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.groupTitle {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
 }
 
 .grid {
@@ -17,7 +56,7 @@
 .btn {
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) - 6px);
-  background: var(--bg-elevated);
+  background: var(--bg);
   color: var(--fg);
   padding: 0.4rem 0.7rem;
   cursor: pointer;
@@ -25,9 +64,19 @@
   font-weight: 600;
 }
 
+.btn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.empty {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--fg-muted);
 }
 
 .locked {
@@ -55,12 +104,15 @@
   display: flex;
   justify-content: space-between;
   gap: 0.5rem;
+  align-items: center;
   font-size: 0.85rem;
-  opacity: 0.75;
+  opacity: 0.8;
 }
 
-.lockedCode {
-  font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 0.75rem;
+.lockedBadge {
+  font-size: 0.72rem;
   color: var(--fg-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
 }
