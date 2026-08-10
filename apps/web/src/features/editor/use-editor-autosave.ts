@@ -17,6 +17,7 @@ export function useEditorAutosave(writable: boolean) {
   const markSaveError = useEditorStore((s) => s.markSaveError);
   const markSaveIdle = useEditorStore((s) => s.markSaveIdle);
   const markReadonly = useEditorStore((s) => s.markReadonly);
+  const saveRetryNonce = useEditorStore((s) => s.saveRetryNonce);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bodyRef = useRef(body);
   bodyRef.current = body;
@@ -61,6 +62,7 @@ export function useEditorAutosave(writable: boolean) {
     businessId,
     documentId,
     writable,
+    saveRetryNonce,
     markSaving,
     markSaved,
     markSaveError,

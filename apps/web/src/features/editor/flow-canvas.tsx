@@ -31,6 +31,8 @@ type Props = {
   blocks: BlockNode[];
   selectedBlockId: string | null;
   disabled: boolean;
+  /** Empty-page CTA — e.g. expand palette. */
+  onRequestAddBlock?: () => void;
 };
 
 function SortableRow({
@@ -110,7 +112,12 @@ function SortableRow({
   );
 }
 
-export function FlowCanvas({ blocks, selectedBlockId, disabled }: Props) {
+export function FlowCanvas({
+  blocks,
+  selectedBlockId,
+  disabled,
+  onRequestAddBlock,
+}: Props) {
   const tBlocks = useTranslations('blocks');
   const t = useTranslations('editor');
   const reorderTopLevel = useEditorStore((s) => s.reorderTopLevel);
@@ -128,7 +135,23 @@ export function FlowCanvas({ blocks, selectedBlockId, disabled }: Props) {
   }
 
   if (blocks.length === 0) {
-    return <p className={styles.empty}>{t('emptyFlow')}</p>;
+    return (
+      <div className={styles.emptyState}>
+        <p className={styles.emptyTitle}>{t('emptyFlowTitle')}</p>
+        <p className={styles.empty}>{t('emptyFlow')}</p>
+        {onRequestAddBlock ? (
+          <button
+            type="button"
+            className={styles.emptyCta}
+            disabled={disabled}
+            title={disabled ? t('mutationLockedGeneric') : undefined}
+            onClick={onRequestAddBlock}
+          >
+            {t('emptyFlowCta')}
+          </button>
+        ) : null}
+      </div>
+    );
   }
 
   return (

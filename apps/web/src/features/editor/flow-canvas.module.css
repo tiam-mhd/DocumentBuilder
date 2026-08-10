@@ -92,3 +92,40 @@
   color: var(--fg-muted);
   font-size: 0.92rem;
 }
+
+.emptyState {
+  display: grid;
+  gap: 0.55rem;
+  justify-items: start;
+  padding: 1.25rem 0.35rem 1rem;
+  min-height: 10rem;
+  align-content: center;
+}
+
+.emptyTitle {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.emptyCta {
+  margin-top: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 6px);
+  background: var(--bg);
+  color: var(--fg);
+  padding: 0.5rem 0.9rem;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.emptyCta:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+
+.emptyCta:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
