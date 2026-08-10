@@ -15,6 +15,11 @@ import { DocumentsModule } from './modules/documents/documents.module';
 import { ExportModule } from './modules/export/export.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { BackupModule } from './modules/backup/backup.module';
+import { BrandingModule } from './modules/branding/branding.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { MarketplaceModule } from './modules/marketplace/marketplace.module';
+import { PluginsModule } from './modules/plugins/plugins.module';
+import { PlatformAdminModule } from './modules/platform-admin/platform-admin.module';
 import { SystemModule } from './modules/system/system.module';
 
 @Module({
@@ -31,13 +36,19 @@ import { SystemModule } from './modules/system/system.module';
     IdentityModule,
     TenancyModule,
     BillingModule,
-    ContentModule,
     AssetsModule,
+    /** First-party plugin blocks before design/documents consumers. */
+    PluginsModule,
+    ContentModule,
     DesignModule,
     DocumentsModule,
     ExportModule,
     AuditModule,
     BackupModule,
+    BrandingModule,
+    AnalyticsModule,
+    MarketplaceModule,
+    PlatformAdminModule,
     SystemModule,
   ],
 })
