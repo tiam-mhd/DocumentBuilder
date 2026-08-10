@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue, Worker, type Job } from 'bullmq';
 import Redis from 'ioredis';
+import type { AppEnv } from '../../config/env.validation';
 
 export const EXPORT_PDF_QUEUE = 'export.pdf';
 
@@ -17,9 +18,13 @@ export class ExportQueueService implements OnModuleDestroy {
   private readonly connection: Redis;
   private readonly queue: Queue<ExportPdfJobPayload>;
   private worker: Worker<ExportPdfJobPayload> | null = null;
+  private readonly workerConcurrency: number;
 
-  constructor(config: ConfigService) {
-    const url = config.getOrThrow<string>('REDIS_URL');
+  constructor(config: ConfigService<AppEnv, true>) {
+    const url = config.getOrThrow('REDIS_URL', { infer: true });
+    this.workerConcurrency = config.get('EXPORT_WORKER_CONCURRENCY', {
+      infer: true,
+    });
     // BullMQ requires maxRetriesPerRequest: null
     this.connection = new Redis(url, {
       maxRetriesPerRequest: null,
@@ -46,6 +51,24 @@ export class ExportQueueService implements OnModuleDestroy {
     });
   }
 
+  /** Approximate waiting+active depth (for smoke/load checks). */
+  async getQueueCounts(): Promise<{
+    waiting: number;
+    active: number;
+    delayed: number;
+  }> {
+    const counts = await this.queue.getJobCounts(
+      'waiting',
+      'active',
+      'delayed',
+    );
+    return {
+      waiting: counts.waiting ?? 0,
+      active: counts.active ?? 0,
+      delayed: counts.delayed ?? 0,
+    };
+  }
+
   startWorker(
     processor: (job: Job<ExportPdfJobPayload>) => Promise<void>,
   ): void {
@@ -55,7 +78,7 @@ export class ExportQueueService implements OnModuleDestroy {
       async (job) => processor(job),
       {
         connection: this.connection.duplicate(),
-        concurrency: 1,
+        concurrency: this.workerConcurrency,
       },
     );
     this.worker.on('failed', (job, err) => {
@@ -64,7 +87,9 @@ export class ExportQueueService implements OnModuleDestroy {
         err.stack,
       );
     });
-    this.logger.log(`BullMQ worker listening on ${EXPORT_PDF_QUEUE}`);
+    this.logger.log(
+      `BullMQ worker listening on ${EXPORT_PDF_QUEUE} (concurrency=${this.workerConcurrency})`,
+    );
   }
 
   async onModuleDestroy(): Promise<void> {

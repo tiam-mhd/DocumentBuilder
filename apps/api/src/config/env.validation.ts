@@ -26,6 +26,11 @@ export type AppEnv = {
   API_PUBLIC_URL: string;
   LICENSE_PEPPER: string;
   LICENSE_ISSUER_SECRET: string;
+  SHARE_LINK_PEPPER: string;
+  SHARE_LINK_PASSWORD_MAX_ATTEMPTS: number;
+  SHARE_LINK_PASSWORD_WINDOW_SECONDS: number;
+  SHARE_LINK_SESSION_SECONDS: number;
+  ANALYTICS_ENABLED: boolean;
   STORAGE_DRIVER: 'local' | 's3';
   STORAGE_LOCAL_ROOT: string;
   MEDIA_MAX_BYTES: number;
@@ -43,6 +48,21 @@ export type AppEnv = {
   S3_ACCESS_KEY: string;
   S3_SECRET_KEY: string;
   S3_FORCE_PATH_STYLE: boolean;
+  /** Comma-separated mobiles granted platform_admin on seed (SAAS). */
+  PLATFORM_ADMIN_MOBILES: string;
+  /** Comma-separated client IPs allowed for platform-admin routes; empty = all. */
+  PLATFORM_ADMIN_IP_ALLOWLIST: string;
+  /** Days of writable grace after endsAt (SAAS dunning). */
+  BILLING_GRACE_DAYS: number;
+  /** Trust X-Forwarded-* when behind a reverse proxy. */
+  TRUST_PROXY: boolean;
+  /** Max queued+processing PDF jobs per Business. */
+  EXPORT_MAX_CONCURRENT_PER_BUSINESS: number;
+  /** Redis rate limit: max PDF enqueues per business per window. */
+  EXPORT_RATE_MAX: number;
+  EXPORT_RATE_WINDOW_SECONDS: number;
+  /** BullMQ export worker concurrency. */
+  EXPORT_WORKER_CONCURRENCY: number;
 };
 
 export function validateEnv(config: Record<string, unknown>): AppEnv {
@@ -120,6 +140,11 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
     throw new Error('LICENSE_PEPPER must be at least 16 characters');
   }
 
+  const sharePepper = String(config.SHARE_LINK_PEPPER || otpPepper);
+  if (sharePepper.length < 16) {
+    throw new Error('SHARE_LINK_PEPPER must be at least 16 characters');
+  }
+
   if (storageDriverRaw === 's3') {
     for (const key of ['S3_BUCKET', 'S3_ACCESS_KEY', 'S3_SECRET_KEY'] as const) {
       if (!String(config[key] ?? '').trim()) {
@@ -163,6 +188,19 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
     ).replace(/\/$/, ''),
     LICENSE_PEPPER: licensePepper,
     LICENSE_ISSUER_SECRET: String(config.LICENSE_ISSUER_SECRET ?? ''),
+    SHARE_LINK_PEPPER: sharePepper,
+    SHARE_LINK_PASSWORD_MAX_ATTEMPTS: Number(
+      config.SHARE_LINK_PASSWORD_MAX_ATTEMPTS ?? 10,
+    ),
+    SHARE_LINK_PASSWORD_WINDOW_SECONDS: Number(
+      config.SHARE_LINK_PASSWORD_WINDOW_SECONDS ?? 900,
+    ),
+    SHARE_LINK_SESSION_SECONDS: Number(
+      config.SHARE_LINK_SESSION_SECONDS ?? 900,
+    ),
+    ANALYTICS_ENABLED: !['0', 'false', 'no', 'off'].includes(
+      String(config.ANALYTICS_ENABLED ?? 'true').toLowerCase(),
+    ),
     STORAGE_DRIVER: storageDriverRaw,
     STORAGE_LOCAL_ROOT: localRoot,
     MEDIA_MAX_BYTES: Number(config.MEDIA_MAX_BYTES ?? 10 * 1024 * 1024),
@@ -182,5 +220,24 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
     S3_ACCESS_KEY: String(config.S3_ACCESS_KEY ?? ''),
     S3_SECRET_KEY: String(config.S3_SECRET_KEY ?? ''),
     S3_FORCE_PATH_STYLE: s3ForcePathStyle,
+    PLATFORM_ADMIN_MOBILES: String(config.PLATFORM_ADMIN_MOBILES ?? ''),
+    PLATFORM_ADMIN_IP_ALLOWLIST: String(
+      config.PLATFORM_ADMIN_IP_ALLOWLIST ?? '',
+    ),
+    BILLING_GRACE_DAYS: Number(config.BILLING_GRACE_DAYS ?? 3),
+    TRUST_PROXY: ['1', 'true', 'yes', 'on'].includes(
+      String(config.TRUST_PROXY ?? 'false').toLowerCase(),
+    ),
+    EXPORT_MAX_CONCURRENT_PER_BUSINESS: Number(
+      config.EXPORT_MAX_CONCURRENT_PER_BUSINESS ?? 2,
+    ),
+    EXPORT_RATE_MAX: Number(config.EXPORT_RATE_MAX ?? 10),
+    EXPORT_RATE_WINDOW_SECONDS: Number(
+      config.EXPORT_RATE_WINDOW_SECONDS ?? 60,
+    ),
+    EXPORT_WORKER_CONCURRENCY: Math.max(
+      1,
+      Number(config.EXPORT_WORKER_CONCURRENCY ?? 1),
+    ),
   };
 }

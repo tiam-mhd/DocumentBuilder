@@ -1,4 +1,5 @@
 import { HttpStatus, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   ExportJobStatus as PrismaExportStatus,
   type ExportJob,
@@ -20,6 +21,7 @@ import {
   type VisibilityContext,
 } from '@vdb/document-schema';
 import { DomainException } from '../../common/errors/domain.exception';
+import type { AppEnv } from '../../config/env.validation';
 import { PrismaService } from '../../config/prisma/prisma.service';
 import { EntitlementsService } from '../billing/entitlements.service';
 import {
@@ -39,13 +41,14 @@ import {
   type QrRenderData,
   type TimelineRenderData,
 } from './document-html.renderer';
-import type { EntitlementCode, PublicCollectionItem } from '@vdb/shared-types';
+import type { PublicCollectionItem } from '@vdb/shared-types';
 import {
   AuditActions,
   contentLocaleDir,
   DEFAULT_DESIGN_THEME_TOKENS,
   DOCUMENT_EXPORT_ALLOWED_STATUSES,
   DocumentErrorCodes,
+  EntitlementErrorCodes,
   ExportErrorCodes,
   parseContentLocale,
   type DesignThemeTokens,
@@ -55,6 +58,7 @@ import {
   ExportQueueService,
   type ExportPdfJobPayload,
 } from './export-queue.service';
+import { ExportRateStore } from './export-rate.store';
 import { PDF_RENDERER, type PdfRenderer } from './pdf/pdf-renderer.port';
 import { AuditService } from '../audit/audit.service';
 
@@ -66,6 +70,7 @@ export class ExportService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly bodies: DocumentBodyRepository,
     private readonly queue: ExportQueueService,
+    private readonly rate: ExportRateStore,
     private readonly html: DocumentHtmlRenderer,
     private readonly maps: MapService,
     private readonly orgChart: OrgChartService,
@@ -74,12 +79,130 @@ export class ExportService implements OnModuleInit {
     private readonly collections: CollectionService,
     private readonly entitlements: EntitlementsService,
     private readonly audit: AuditService,
+    private readonly config: ConfigService<AppEnv, true>,
     @Inject(PDF_RENDERER) private readonly pdf: PdfRenderer,
     @Inject(OBJECT_STORAGE) private readonly storage: ObjectStorage,
   ) {}
 
   onModuleInit(): void {
     this.queue.startWorker((job) => this.processJob(job));
+  }
+
+  /**
+   * Canonical HTML for PDF and Web Publish — same Data/Template resolution.
+   * @see ADR 007 / ADR 026
+   */
+  async buildDocumentHtml(input: {
+    businessId: string;
+    documentId: string;
+  }): Promise<{
+    html: string;
+    title: string;
+    locale: string;
+    dir: 'rtl' | 'ltr';
+    pageSize: 'A4' | 'A3';
+    landscape: boolean;
+  }> {
+    const doc = await this.prisma.document.findFirst({
+      where: {
+        id: input.documentId,
+        businessId: input.businessId,
+        deletedAt: null,
+      },
+    });
+    if (!doc) {
+      throw new DomainException(
+        ExportErrorCodes.DocumentNotFound,
+        'Document not found',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    let body = await this.bodies.find(input.businessId, input.documentId);
+    if (!body) {
+      throw new DomainException(
+        ExportErrorCodes.DocumentNotFound,
+        'Document body not found',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    body = parseDocumentBody(body);
+
+    const theme = await this.resolveTheme(input.businessId, doc.templateId);
+    const fonts = await this.loadFonts(input.businessId, theme);
+    const locale = parseContentLocale(body.locale ?? doc.locale);
+    const mapMarkersByBlockId = await this.resolveMapMarkers(
+      input.businessId,
+      body,
+      locale,
+    );
+    const orgChartByBlockId = await this.resolveOrgCharts(
+      input.businessId,
+      body,
+      locale,
+    );
+    const timelineByBlockId = await this.resolveTimelines(
+      input.businessId,
+      body,
+      locale,
+    );
+    const qrByBlockId = await this.resolveQrCodes(body);
+    const repeaterItemsByBlockId = await this.resolveRepeaters(
+      input.businessId,
+      body,
+      locale,
+    );
+    const visibility = await this.resolveVisibility(input.businessId, body);
+    const binding = await this.resolveBindingContext(
+      input.businessId,
+      body,
+      locale,
+    );
+
+    const paginated = paginateDocumentBody(body, {
+      visibility,
+      repeaterItemsByBlockId,
+      binding,
+    });
+
+    const html = this.html.build({
+      title: doc.title,
+      body: paginated,
+      tokens: theme,
+      fonts,
+      dir: contentLocaleDir(locale),
+      lang: locale,
+      mapMarkersByBlockId,
+      orgChartByBlockId,
+      timelineByBlockId,
+      qrByBlockId,
+      repeaterItemsByBlockId: {},
+      visibility,
+      binding,
+    });
+
+    return {
+      html,
+      title: doc.title,
+      locale,
+      dir: contentLocaleDir(locale),
+      pageSize: body.page.size === 'A3' ? 'A3' : 'A4',
+      landscape: body.page.orientation === 'landscape',
+    };
+  }
+
+  /** Sync PDF bytes for share-link downloads (same HTML pipeline as queue jobs). */
+  async renderPdfBuffer(input: {
+    businessId: string;
+    documentId: string;
+  }): Promise<Buffer> {
+    const built = await this.buildDocumentHtml(input);
+    return this.pdf.render({
+      html: built.html,
+      format: built.pageSize,
+      landscape: built.landscape,
+      outline: true,
+    });
   }
 
   async createPdfJob(input: {
@@ -117,12 +240,41 @@ export class ExportService implements OnModuleInit {
     const rawBody = await this.bodies.find(input.businessId, input.documentId);
     if (rawBody) {
       const parsed = parseDocumentBody(rawBody);
-      for (const code of documentCollectRequiredModuleCodes(parsed)) {
-        await this.entitlements.assertModule(
-          input.businessId,
-          code as EntitlementCode,
-        );
+      const required = documentCollectRequiredModuleCodes(parsed);
+      if (required.length > 0) {
+        const ents = await this.entitlements.getForBusiness(input.businessId);
+        for (const code of required) {
+          if (!ents.codes.includes(code)) {
+            throw new DomainException(
+              EntitlementErrorCodes.ModuleRequired,
+              `Module ${code} required for export`,
+              HttpStatus.FORBIDDEN,
+            );
+          }
+        }
       }
+    }
+
+    await this.rate.assertCanEnqueue(input.businessId);
+
+    const maxConcurrent = this.config.get(
+      'EXPORT_MAX_CONCURRENT_PER_BUSINESS',
+      { infer: true },
+    );
+    const inFlight = await this.prisma.exportJob.count({
+      where: {
+        businessId: input.businessId,
+        status: {
+          in: [PrismaExportStatus.queued, PrismaExportStatus.processing],
+        },
+      },
+    });
+    if (inFlight >= maxConcurrent) {
+      throw new DomainException(
+        ExportErrorCodes.TooManyConcurrent,
+        `Too many concurrent exports for this business (max ${maxConcurrent})`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
 
     const row = await this.prisma.exportJob.create({
@@ -208,7 +360,12 @@ export class ExportService implements OnModuleInit {
   async readFile(
     businessId: string,
     jobId: string,
-  ): Promise<{ body: Buffer; contentType: string; filename: string }> {
+  ): Promise<{
+    body: Buffer;
+    contentType: string;
+    filename: string;
+    documentId: string;
+  }> {
     const row = await this.requireJob(businessId, jobId);
     if (row.status !== PrismaExportStatus.completed || !row.storageKey) {
       throw new DomainException(
@@ -229,6 +386,7 @@ export class ExportService implements OnModuleInit {
       body: file.body,
       contentType: row.mimeType || file.contentType,
       filename: `document-${row.documentId}.pdf`,
+      documentId: row.documentId,
     };
   }
 
@@ -243,77 +401,11 @@ export class ExportService implements OnModuleInit {
     });
 
     try {
-      const doc = await this.prisma.document.findFirst({
-        where: { id: documentId, businessId, deletedAt: null },
-      });
-      if (!doc) {
-        throw new Error('Document not found');
-      }
-
-      let body = await this.bodies.find(businessId, documentId);
-      if (!body) {
-        throw new Error('Document body not found');
-      }
-      body = parseDocumentBody(body);
-
-      const theme = await this.resolveTheme(businessId, doc.templateId);
-      const fonts = await this.loadFonts(businessId, theme);
-      const locale = parseContentLocale(body.locale ?? doc.locale);
-      const mapMarkersByBlockId = await this.resolveMapMarkers(
-        businessId,
-        body,
-        locale,
-      );
-      const orgChartByBlockId = await this.resolveOrgCharts(
-        businessId,
-        body,
-        locale,
-      );
-      const timelineByBlockId = await this.resolveTimelines(
-        businessId,
-        body,
-        locale,
-      );
-      const qrByBlockId = await this.resolveQrCodes(body);
-      const repeaterItemsByBlockId = await this.resolveRepeaters(
-        businessId,
-        body,
-        locale,
-      );
-      const visibility = await this.resolveVisibility(businessId, body);
-      const binding = await this.resolveBindingContext(
-        businessId,
-        body,
-        locale,
-      );
-
-      const paginated = paginateDocumentBody(body, {
-        visibility,
-        repeaterItemsByBlockId,
-        binding,
-      });
-
-      const html = this.html.build({
-        title: doc.title,
-        body: paginated,
-        tokens: theme,
-        fonts,
-        dir: contentLocaleDir(locale),
-        lang: locale,
-        mapMarkersByBlockId,
-        orgChartByBlockId,
-        timelineByBlockId,
-        qrByBlockId,
-        // Repeaters already expanded into page cards by paginateDocumentBody
-        repeaterItemsByBlockId: {},
-        visibility,
-        binding,
-      });
-
+      const built = await this.buildDocumentHtml({ businessId, documentId });
       const pdf = await this.pdf.render({
-        html,
-        format: body.page.size === 'A3' ? 'A3' : 'A4',
-        landscape: body.page.orientation === 'landscape',
+        html: built.html,
+        format: built.pageSize,
+        landscape: built.landscape,
         outline: true,
       });
 

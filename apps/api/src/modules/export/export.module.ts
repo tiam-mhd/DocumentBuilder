@@ -7,29 +7,35 @@ import { TenancyModule } from '../tenancy/tenancy.module';
 import { AssetsModule } from '../assets/assets.module';
 import { ContentModule } from '../content/content.module';
 import { DocumentsModule } from '../documents/documents.module';
+import { AnalyticsModule } from '../analytics/analytics.module';
 import { DocumentHtmlRenderer } from './document-html.renderer';
 import { ExportController } from './export.controller';
 import { ExportQueueService } from './export-queue.service';
+import { ExportRateStore } from './export-rate.store';
 import { ExportService } from './export.service';
 import { PDF_RENDERER } from './pdf/pdf-renderer.port';
 import { FakePdfRenderer } from './pdf/fake-pdf.renderer';
 import { PlaywrightPdfRenderer } from './pdf/playwright-pdf.renderer';
+import { RedisModule } from '../../config/redis/redis.module';
 
 /** Export — PDF queue (BullMQ) + HTML→PDF renderer. */
 @Module({
   imports: [
     IdentityModule,
+    RedisModule,
     forwardRef(() => TenancyModule),
     forwardRef(() => BillingModule),
     AssetsModule,
     forwardRef(() => DocumentsModule),
     forwardRef(() => ContentModule),
     forwardRef(() => AuditModule),
+    AnalyticsModule,
   ],
   controllers: [ExportController],
   providers: [
     ExportService,
     ExportQueueService,
+    ExportRateStore,
     DocumentHtmlRenderer,
     FakePdfRenderer,
     PlaywrightPdfRenderer,
