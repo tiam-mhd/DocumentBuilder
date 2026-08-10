@@ -1,6 +1,7 @@
 .wrap {
   display: grid;
   gap: var(--space-2);
+  min-height: 0;
 }
 
 .title {
@@ -12,6 +13,69 @@
   margin: 0;
   color: var(--fg-muted);
   font-size: 0.9rem;
+}
+
+.docSummary {
+  margin: 0;
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 6px);
+  background: var(--bg);
+}
+
+.docSummaryLabel {
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.docSummaryValue {
+  font-size: 0.92rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.15rem;
+  border-radius: calc(var(--radius) - 4px);
+  background: color-mix(in srgb, var(--fg) 5%, var(--bg));
+}
+
+.tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--fg-muted);
+  padding: 0.4rem 0.35rem;
+  border-radius: calc(var(--radius) - 6px);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.tab[data-active='true'] {
+  background: var(--bg-elevated);
+  color: var(--fg);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--fg) 10%, transparent);
+}
+
+.tabPanel {
+  min-height: 0;
+  overflow: auto;
+}
+
+.panelStack {
+  display: grid;
+  gap: var(--space-2);
 }
 
 .field {
@@ -71,4 +135,10 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.9rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab {
+    transition: none;
+  }
 }
