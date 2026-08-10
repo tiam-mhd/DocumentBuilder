@@ -18,6 +18,7 @@ alwaysApply: true
 
 - MVP layout model: **flow + sections/blocks + constraints** (keep-together, page break rules).
 - Absolute free-canvas positioning is out of MVP unless product explicitly unlocks it later.
+- **Page-builder product UX** (workspace chrome, modes `edit` \| `htmlPreview` \| `pdfPreview`, inspector tabs, paper frame, PDF preview vs final export): see `29-editor-pagebuilder-ux.mdc` — complements this file; does not replace tenancy/schema/PDF-on-keystroke bans here.
 - Autosave with debounce (~800ms) to Documents PATCH; never call PDF/export on keystroke.
 - Undo/redo history required for editor mutations (client store; past/future stacks).
 - Live preview = DOM/HTML with **document brand** theme tokens; Export = queued Final Renderer.

@@ -47,6 +47,7 @@ You are working in **Visual Document Builder** (VDB).
 | `26-performance-security-hardening.mdc` | Helmet/CORS, export caps, Redis rate limits, indexes |
 | `27-auth-login-ux.mdc` | Login wizard motion + OTP/password/2FA + Parsgreen SMS |
 | `28-panel-shell-ux.mdc` | App sidebar/header chrome + business switcher + page motion |
+| `29-editor-pagebuilder-ux.mdc` | Document editor page-builder UX (modes, rails, paper, PDF preview law) |
 
 Phase exit QA: `docs/qa/` + `scripts/e2e/` (phase-01 edition funnels + `phase-02-corporate-acceptance` / `npm run test:e2e:corporate` + `phase-03-professional-acceptance` / `npm run test:e2e:professional` + pre-GA `pre-ga-hardening.md` + catalog exit [`GA-checklist.md`](docs/qa/GA-checklist.md)).
 

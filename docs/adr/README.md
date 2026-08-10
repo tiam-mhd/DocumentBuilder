@@ -35,3 +35,5 @@ Locked at Foundation:
 - Billing renewal / grace / dunning — `032-billing-dunning-renewal.md`
 - Pre-GA performance & security hardening — `033-performance-security-hardening.md`
 - Auth password / 2FA + Parsgreen SMS — `034-auth-password-2fa-parsgreen.md`
+- Editor flow columns (`row` / `column`) — `035-editor-flow-columns.md`
+- Editor PDF preview (queued, distinct from final export) — `036-editor-pdf-preview.md`

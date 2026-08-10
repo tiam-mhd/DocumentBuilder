@@ -1,0 +1,107 @@
+---
+description: Document editor page-builder UX (Elementor-grade flow workspace)
+alwaysApply: true
+---
+
+# Editor Page-Builder UX (Permanent)
+
+Companion to `07-document-editor.mdc`. That file locks engine/data rules; **this file locks the product UX** of `/app/documents/[documentId]` as a professional **page builder** (Elementor-like feel: delightful, fluid, flexible) — not a coding IDE and not a free absolute Canva.
+
+Catalog: `implementation-prompts/05-editor-pagebuilder/`.
+
+## Product feel (law)
+
+- User must enjoy building: clear chrome, fast feedback, obvious controls, guided empty/lock states.
+- Flexibility comes from **flow structure** (sections, row/columns per ADR), rich inspectors, and page setup — **not** free x/y placement.
+- End users never see raw Document JSON, schema dumps, Mongo ids as primary labels, or Zod stack traces in the main editor UI.
+
+## Layout model
+
+| Allowed | Forbidden (unless new ADR unlocks) |
+| --- | --- |
+| Flow + sections/blocks + constraints | Absolute free-canvas / arbitrary x/y |
+| Nested flow DnD (palette → canvas, section children) | Overlap/free transform handles like pure Canva |
+| **Row/columns** via core blocks `row` + `column` — **ADR 035 Accepted** (`docs/adr/035-editor-flow-columns.md`) | Per-element absolute positioning |
+| Keep-together / break rules (ADR 017) | Client-only layout that PDF cannot reproduce |
+
+If implementing multi-column layout, follow **ADR 035** exactly (`row` / `column`, fraction widths, nesting limits). Do not invent absolute positioning or nested rows in MVP.
+
+## Workspace information architecture
+
+Desktop editor chrome (both themes, `fa`/`en`):
+
+1. **Top bar** — document title/status summary, undo/redo, page setup entry, **mode switch**, save status, overflow for secondary panels (workflow, versions, comments, share, web publish, final export).
+2. **Left rail** — **Palette** (searchable blocks; module locks + upgrade CTA) + **Layers** (pages → blocks tree; selection sync).
+3. **Center** — **paper-framed** canvas / preview stage (page size & margins visible).
+4. **Right rail** — **Inspector** with tabs: **Content | Design | Advanced**.
+
+Secondary surfaces (comments, versions, workflow, share, export, masters) must not permanently crowd the three rails; use overflow / slide-over / modal per IA (`docs/ux/editor-pagebuilder-ia.md` when present).
+
+Collapse rails on narrow widths (drawer pattern); desktop-first is OK, but do not ship an unusable squeezed layout.
+
+## Editor modes
+
+Stable mode union: `edit` | `htmlPreview` | `pdfPreview`.
+
+| Mode | Editable body? | Primary stage | Notes |
+| --- | --- | --- | --- |
+| `edit` | Yes if writable and not body-locked | Flow canvas on paper | Autosave debounce (~800ms); never PDF |
+| `htmlPreview` | No (view) | Live HTML with brand tokens | Approximate pagination (ADR 017); selection sync when possible |
+| `pdfPreview` | No (view) | Queued PDF job viewer | **ADR 036** preview pipeline; explicit user action to enqueue — never on keystroke/autosave/DnD |
+
+Mode switch is first-class in the top bar. Returning to `edit` should best-effort preserve selection.
+
+## HTML preview
+
+- Uses **document brand** tokens (`design_themes`) — not app chrome theme alone.
+- Follows `document.locale` for `dir`/`lang` (ADR 015) — independent of Next.js UI locale.
+- Must not be presented as a substitute for final PDF.
+- Show an honest “approximate” cue when pagination is estimate-based.
+
+## PDF preview vs final export
+
+- **Preview PDF:** queued job per **ADR 036 Accepted** (`docs/adr/036-editor-pdf-preview.md`); rate/concurrency capped (align with `26-performance-security-hardening.mdc`); distinct storage prefix + watermark; never on keystroke/autosave/DnD; membership sufficient to view (final export keeps `export.pdf` + approval gates).
+- **Final PDF:** existing export pipeline (ADR 007) + entitlements + approval gates (ADR 021) as already required.
+- Autosave, typing, and DnD **must never** enqueue Chromium/PDF work.
+
+## Page setup (first-class)
+
+`body.page` (size, orientation, margins, related print options) is edited in the editor UI (page settings / top bar) — not only buried in an export panel. Canvas paper frame must reflect size, orientation, and margin guides. Presets live in shared/export config — no one-off magic numbers scattered only in random React files (`07-document-editor.mdc`).
+
+## Inspector
+
+- Every selectable block type exposes understandable **Content** controls; **Design** for appearance props that preview/PDF honor; **Advanced** for link (ADR 018), `when` (ADR 014), `breakRules` (ADR 017).
+- Labels + hints via i18n (`fa`/`en`); field-level validation messages mapped from codes — no raw schema dumps.
+- `headerSlot` / `footerSlot`: guide user to Masters — not fake local chrome editing that diverges from PDF.
+
+## Gates & trust
+
+- Subscription **writable** and workflow **body lock** (`review` \| `approved` \| `published`) must be obvious in UI (banners + disabled mutations). API remains source of truth (`05-api-security-billing.mdc`, ADR 020/021).
+- Empty states: empty page, empty selection, locked — always with a next action.
+- Save feedback: saving / saved / error / offline (when implemented) — never silent loss.
+
+## i18n, RTL, motion
+
+- Editor chrome strings: `fa` + `en`; layout `dir` follows **UI** locale.
+- Document paper follows **document.locale**.
+- Delight baseline: shortcuts, command discovery (when shipped), guided empties, `prefers-reduced-motion` respected.
+- App shell rules still apply around the editor route (`28-panel-shell-ux.mdc`).
+
+## Forbidden
+
+- `eval` / `Function` / user-supplied script for bindings or plugins.
+- PDF/Chromium on interactive keystroke or autosave path.
+- Weakening CORS/Helmet for “editor convenience”.
+- Deleting Business/document data because subscription expired.
+- Shipping editor UX that only works in one of dark/light or one of fa/en.
+- Absolute free-canvas without an explicit product ADR reversing this law.
+
+## Related
+
+- Engine & data: `07-document-editor.mdc`
+- Blocks/templates: `13-templates-blocks.mdc`
+- Themes/fonts: `12-design-themes.mdc`, `11-fonts.mdc`
+- Columns ADR: `docs/adr/035-editor-flow-columns.md` (**Accepted** — implement in pack phase 05)
+- PDF preview ADR: `docs/adr/036-editor-pdf-preview.md` (**Accepted** — implement in pack phase 07)
+- Prompt pack: `implementation-prompts/05-editor-pagebuilder/`
+- Delight rubric (when present): `docs/qa/editor-pagebuilder-delight-rubric.md`

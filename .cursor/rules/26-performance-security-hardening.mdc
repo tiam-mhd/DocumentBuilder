@@ -17,13 +17,15 @@ alwaysApply: true
 | --- | --- |
 | OTP | existing `OTP_*` |
 | Share unlock | existing `SHARE_LINK_*` |
-| PDF export enqueue | `EXPORT_RATE_MAX` / `EXPORT_RATE_WINDOW_SECONDS` per `businessId` |
+| PDF **final** export enqueue | `EXPORT_RATE_MAX` / `EXPORT_RATE_WINDOW_SECONDS` per `businessId` |
+| PDF **preview** enqueue (ADR 036) | `EXPORT_PREVIEW_RATE_MAX` / `EXPORT_PREVIEW_RATE_WINDOW_SECONDS`; in-flight `EXPORT_PREVIEW_MAX_CONCURRENT_PER_BUSINESS` |
 
 ## Export queue cost controls
 
-- Cap **in-flight** jobs per Business: `queued` + `processing` ≤ `EXPORT_MAX_CONCURRENT_PER_BUSINESS`.
+- Cap **in-flight** **final** jobs per Business: `queued` + `processing` with purpose final ≤ `EXPORT_MAX_CONCURRENT_PER_BUSINESS`.
+- Cap **in-flight preview** jobs separately: ≤ `EXPORT_PREVIEW_MAX_CONCURRENT_PER_BUSINESS` (default 1) — previews must not starve finals (ADR 036).
 - Worker concurrency: `EXPORT_WORKER_CONCURRENCY` (default 1 — PDF is CPU/RAM heavy).
-- Never run PDF render on the interactive HTTP path (editor keystroke).
+- Never run PDF render on the interactive HTTP path (editor keystroke / autosave / DnD).
 
 ## Data / indexes
 
