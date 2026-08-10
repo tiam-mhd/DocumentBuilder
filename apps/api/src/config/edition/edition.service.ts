@@ -11,6 +11,10 @@ export type PublicSystemConfig = {
   platformCheckout: boolean;
   /** Show license activation UI (SELF_HOSTED only). */
   licenseActivation: boolean;
+  /** SAAS template marketplace (ADR 029); false on SELF_HOSTED. */
+  templateMarketplace: boolean;
+  /** SAAS platform admin console UI hint (ADR 031); false on SELF_HOSTED. */
+  platformAdminConsole: boolean;
 };
 
 /** Public system config returned by GET /system/config (includes live license flag). */
@@ -45,6 +49,8 @@ export class EditionService {
       trialEnabledByDefault: isSaas,
       platformCheckout: isSaas,
       licenseActivation: !isSaas,
+      templateMarketplace: isSaas,
+      platformAdminConsole: isSaas,
     };
   }
 }
