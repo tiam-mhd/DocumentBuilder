@@ -18,8 +18,10 @@
 | `02-phase-corporate` | شرکتی | ۱۴ | کامل |
 | `03-phase-professional` | حرفه‌ای | ۱۲ | کامل |
 | `04-phase-product` | محصول/پلتفرم تا GA | ۱۲ | کامل |
+| `05-editor-pagebuilder` | صفحه‌ساز سند (Elementor-grade UX) | ~۵۳ | کاتالوگ کامل · اجرا: فاز `00`–`01` ✅ · بعدی `02` |
 
-**جمع: ۶۶ تسک اجرایی + ۵ overview فاز**
+**جمع کاتالوگ اصلی: ۶۶ تسک اجرایی + ۵ overview فاز**  
+**پک صفحه‌ساز:** ببینید [`05-editor-pagebuilder/README.md`](./05-editor-pagebuilder/README.md) — وضعیت اجرا و اسناد قفل‌شده آنجا به‌روز نگه داشته می‌شود.
 
 ## استک قفل‌شده
 
@@ -39,4 +41,5 @@
 
 ## ترتیب اجرای فازها
 
-`00-foundation` → `01-phase-core` → `02-phase-corporate` → `03-phase-professional` → `04-phase-product` (آخرین فایل: `12-ga-release-checklist.md`)
+`00-foundation` → `01-phase-core` → `02-phase-corporate` → `03-phase-professional` → `04-phase-product` (آخرین فایل: `12-ga-release-checklist.md`)  
+سپس ارتقای UX ادیتور: `05-editor-pagebuilder` از فاز `00` (قوانین/ADR) → فعلاً تا `01` اجرا شده؛ ادامه از `02-page-print-setup`.
