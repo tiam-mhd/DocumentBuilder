@@ -391,7 +391,10 @@ export const BlockNodeSchema: z.ZodType<BlockNode> = z.lazy(() =>
       id: z.string().min(1),
       type: BlockTypeSchema,
       props: z.record(z.string(), z.unknown()).default({}),
-      children: z.array(BlockNodeSchema).optional(),
+      children: z
+        .array(BlockNodeSchema)
+        .nullish()
+        .transform((v) => (v == null ? undefined : v)),
       when: VisibilityConditionSchema.nullable().optional(),
       breakRules: BlockBreakRulesSchema.nullable().optional(),
       link: BlockLinkSchema.nullable().optional(),
@@ -581,33 +584,57 @@ export function upgradeDocumentLikeInput(input: unknown): unknown {
   const raw = input as Record<string, unknown>;
   const version = Number(raw.schemaVersion ?? 0);
 
+  let upgraded: Record<string, unknown>;
+
   if (version >= 3 && Array.isArray(raw.pages) && raw.pages.length > 0) {
-    return { ...raw, schemaVersion: DOCUMENT_SCHEMA_VERSION };
+    upgraded = { ...raw, schemaVersion: DOCUMENT_SCHEMA_VERSION };
+  } else {
+    const legacyBlocks = Array.isArray(raw.blocks)
+      ? (raw.blocks as BlockNode[])
+      : [];
+    const master = createDefaultMasterPage();
+    const pageId = newId('pg');
+
+    upgraded = {
+      ...raw,
+      schemaVersion: DOCUMENT_SCHEMA_VERSION,
+      masters:
+        Array.isArray(raw.masters) && (raw.masters as unknown[]).length > 0
+          ? raw.masters
+          : [master],
+      pages:
+        Array.isArray(raw.pages) && (raw.pages as unknown[]).length > 0
+          ? raw.pages
+          : [
+              {
+                id: pageId,
+                masterId: master.id,
+                blocks: legacyBlocks,
+              },
+            ],
+    };
   }
 
-  const legacyBlocks = Array.isArray(raw.blocks)
-    ? (raw.blocks as BlockNode[])
-    : [];
-  const master = createDefaultMasterPage();
-  const pageId = newId('pg');
+  return sanitizeNullBlockChildren(upgraded);
+}
 
-  return {
-    ...raw,
-    schemaVersion: DOCUMENT_SCHEMA_VERSION,
-    masters: Array.isArray(raw.masters) && (raw.masters as unknown[]).length > 0
-      ? raw.masters
-      : [master],
-    pages:
-      Array.isArray(raw.pages) && (raw.pages as unknown[]).length > 0
-        ? raw.pages
-        : [
-            {
-              id: pageId,
-              masterId: master.id,
-              blocks: legacyBlocks,
-            },
-          ],
-  };
+/** Mongo/legacy payloads sometimes store `children: null` — coerce for Zod. */
+function sanitizeNullBlockChildren(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sanitizeNullBlockChildren);
+  }
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+  const obj = value as Record<string, unknown>;
+  const next: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(obj)) {
+    if (key === 'children' && child == null) {
+      continue;
+    }
+    next[key] = sanitizeNullBlockChildren(child);
+  }
+  return next;
 }
 
 export function parseTemplateBody(input: unknown): TemplateBody {
