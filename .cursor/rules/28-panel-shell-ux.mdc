@@ -1,0 +1,45 @@
+# Panel Shell UX (Permanent)
+
+## Law
+
+Authenticated product chrome is a **sidebar + header panel**, not a top link farm.
+
+| Surface | Layout |
+| --- | --- |
+| Public / marketing / login / share / web profile | Lightweight chrome (no full nav) |
+| Authenticated `/app/*` | **Sidebar** (primary nav) + **compact header** + page stage |
+
+## Auth chrome
+
+- Unauthenticated visit to `/app/**` → redirect **login** (existing `RequireAuth`).
+- Successful login → **`/app`** (panel home).
+- **Logout** always visible in panel (sidebar footer or header); clears session + active business → `/login`.
+- Authenticated user on `/login` → redirect to `/app`.
+
+## Sidebar
+
+- **Minimal:** grouped links, quiet labels, one active indicator — no dense icon rainbow.
+- **Business switcher** lives at the **top of the sidebar** (not in the header link row). Custom popover/list — not a bare native `<select>` as the only UX.
+- Collapse on small viewports (drawer / overlay); header hamburger.
+- Theme + locale remain reachable (header or sidebar footer).
+
+## Header
+
+- Four icon actions only: **personal profile**, **business profile** (branding), **theme**, **locale**.
+- No duplicate full nav in the header; optional collapse control for the sidebar.
+
+## Page transitions
+
+- Route changes inside `/app` animate the main stage (opacity + short translate, ~320–420ms, shared easing with auth wizard).
+- Honor `prefers-reduced-motion: reduce`.
+- Do not remount the whole shell on every navigation (sidebar stays put).
+
+## Theme / i18n
+
+- Tokens only (`10-theme-and-i18n.mdc`); fa + en keys for all new chrome strings; RTL-aware sidebar placement (`inline-start`).
+
+## Forbidden
+
+- Returning to a wrap-heavy top navbar of every feature link.
+- Putting business switcher only in an unreachable overflow header.
+- Hard-coded marketing purple/glow chrome that ignores tokens.

@@ -1,0 +1,37 @@
+# Auth Login UX & Motion (Permanent)
+
+## Law
+
+**Login is a product moment.** Multi-step auth (mobile → method → password and/or OTP) must feel polished, calm, and delightful — not a bare form stack.
+
+## Auth methods (product)
+
+| Mode | When |
+| --- | --- |
+| OTP (SMS) | Always available (signup + login); provider: `SMS_PROVIDER` (`fake` \| `parsgreen`) |
+| Password | When user has set `passwordHash` |
+| Two-factor | When `twoFactorEnabled` — password **then** OTP (both required) |
+
+Never issue JWT after password alone if 2FA is on. Never log raw OTP, passwords, or Parsgreen token.
+
+## UI / UX (locked)
+
+1. **Single surface wizard** — prefer one route (`/login`) with in-place steps; avoid jarring full-page jumps between mobile / method / password / OTP unless deep-link requires it.
+2. **Step motion** — every step change animates (enter/exit: opacity + translate, ~280–400ms, easing `cubic-bezier(0.22, 1, 0.36, 1)` or equivalent). Direction follows progress (forward = slide-in from end; back = reverse). Respect `prefers-reduced-motion: reduce` (fade only / no slide).
+3. **Delight, not noise** — intentional micro-motion on focus, success check, OTP digit fill, and primary CTA press. No endless loops, no confetti spam, no purple-glow AI clichés.
+4. **Theme + i18n** — dark/light tokens only; all copy in `fa` + `en`; RTL/LTR correct (`dir` from locale).
+5. **Feedback** — inline errors mapped from API `code`; loading states disable double-submit; OTP shows cooldown / resend clearly.
+6. **Security settings** — set/change password and toggle 2FA live under authenticated account UI (not only API).
+
+## SMS (Parsgreen)
+
+- Real OTP path: REST `Apiv2/Message/SendOtp` with `Authorization: basic apikey:{PARSGREEN_API_TOKEN}`.
+- Token may be empty in repo `.env.example` — fill at deploy; never commit real tokens.
+- Empty token + `SMS_PROVIDER=parsgreen` → clear `SMS_MISCONFIGURED` on send (boot still succeeds).
+
+## Forbidden
+
+- Password-only JWT when 2FA enabled.
+- Hard-coded one-off auth colors outside theme tokens.
+- Step changes without transition (except reduced-motion).
+- Storing plaintext passwords or returning `passwordHash` / secrets in `PublicUser`.

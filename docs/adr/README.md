@@ -34,3 +34,4 @@ Locked at Foundation:
 - SAAS platform admin console — `031-saas-platform-admin.md`
 - Billing renewal / grace / dunning — `032-billing-dunning-renewal.md`
 - Pre-GA performance & security hardening — `033-performance-security-hardening.md`
+- Auth password / 2FA + Parsgreen SMS — `034-auth-password-2fa-parsgreen.md`

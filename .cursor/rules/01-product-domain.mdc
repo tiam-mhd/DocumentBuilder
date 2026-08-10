@@ -7,9 +7,11 @@ alwaysApply: true
 
 ## Identity
 
-- Auth is **mobile + OTP only** in MVP (no password login).
+- Auth is **mobile-first**. Methods: **OTP (SMS)**, optional **password**, optional **2FA** (password + OTP) — see `27-auth-login-ux.mdc`.
 - `User.mobile` is unique. One account per mobile number.
-- OTP: rate-limit, short TTL, single-use, hashed/stored securely; never log raw OTP.
+- OTP: rate-limit, short TTL, single-use, hashed/stored securely; never log raw OTP / passwords / SMS provider tokens.
+- Password: optional `passwordHash` (scrypt); set after first OTP login. 2FA flag requires OTP after successful password.
+- SMS providers: `fake` (dev) \| `parsgreen` (production OTP via Parsgreen REST).
 
 ## Multi-business
 
