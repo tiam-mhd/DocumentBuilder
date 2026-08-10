@@ -24,6 +24,26 @@ export function TrialBanner({
         <p className={styles.body}>
           {t('trialBannerBody', { days: TRIAL_DURATION_DAYS, ends })}
         </p>
+        {subscription.daysUntilEnd != null && subscription.daysUntilEnd <= 3 ? (
+          <Link className={styles.cta} href={`/${locale}/app/billing`}>
+            {t('renewCta')}
+          </Link>
+        ) : null}
+      </aside>
+    );
+  }
+
+  if (subscription.effectiveStatus === 'grace') {
+    const graceEnds = subscription.graceEndsAt
+      ? new Date(subscription.graceEndsAt).toLocaleDateString()
+      : '';
+    return (
+      <aside className={`${styles.banner} ${styles.pending}`} role="status">
+        <p className={styles.title}>{t('graceBannerTitle')}</p>
+        <p className={styles.body}>{t('graceBannerBody', { graceEnds })}</p>
+        <Link className={styles.cta} href={`/${locale}/app/billing`}>
+          {t('renewCta')}
+        </Link>
       </aside>
     );
   }
@@ -46,7 +66,25 @@ export function TrialBanner({
         <p className={styles.title}>{t('lockedBannerTitle')}</p>
         <p className={styles.body}>{t('lockedBannerBody')}</p>
         <Link className={styles.cta} href={`/${locale}/app/billing`}>
-          {t('pendingCta')}
+          {t('renewCta')}
+        </Link>
+      </aside>
+    );
+  }
+
+  if (
+    subscription.effectiveStatus === 'active' &&
+    subscription.daysUntilEnd != null &&
+    subscription.daysUntilEnd <= 7
+  ) {
+    return (
+      <aside className={`${styles.banner} ${styles.trial}`} role="status">
+        <p className={styles.title}>{t('renewSoonTitle')}</p>
+        <p className={styles.body}>
+          {t('renewSoonBody', { days: subscription.daysUntilEnd })}
+        </p>
+        <Link className={styles.cta} href={`/${locale}/app/billing`}>
+          {t('renewCta')}
         </Link>
       </aside>
     );

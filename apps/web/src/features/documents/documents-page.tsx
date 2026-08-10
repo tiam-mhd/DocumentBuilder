@@ -9,7 +9,6 @@ import type {
   PublicDocumentDetail,
   PublicDocumentTemplate,
 } from '@vdb/shared-types';
-import { MembershipRole } from '@vdb/shared-types';
 import {
   approveDocument,
   createDocument,
@@ -24,6 +23,7 @@ import {
 import { listTemplates } from '@/shared/api/templates';
 import { ApiClientError, mapApiErrorCode } from '@/shared/api/client';
 import { useBusinesses } from '@/shared/lib/business-context';
+import { useMembershipPermissions } from '@/shared/lib/use-membership-permissions';
 import { useEntitlements } from '@/features/billing/use-entitlements';
 import styles from './documents-page.module.css';
 
@@ -34,6 +34,7 @@ export function DocumentsPage() {
   const router = useRouter();
   const { activeBusiness } = useBusinesses();
   const { writable, loading: entLoading } = useEntitlements();
+  const { canPublish, canManageDocuments } = useMembershipPermissions();
   const [items, setItems] = useState<PublicDocument[]>([]);
   const [templates, setTemplates] = useState<PublicDocumentTemplate[]>([]);
   const [title, setTitle] = useState('');
@@ -43,9 +44,8 @@ export function DocumentsPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
-  const isApprover =
-    activeBusiness?.role === MembershipRole.Owner ||
-    activeBusiness?.role === MembershipRole.Admin;
+  const isApprover = canPublish;
+  const canMutate = writable && canManageDocuments && !entLoading;
 
   async function refresh() {
     if (!activeBusiness) {
@@ -192,7 +192,7 @@ export function DocumentsPage() {
           <input
             className={styles.input}
             value={title}
-            disabled={!writable || busy || entLoading}
+            disabled={!canMutate || busy}
             onChange={(e) => setTitle(e.target.value)}
             placeholder={t('titlePlaceholder')}
           />
@@ -202,7 +202,7 @@ export function DocumentsPage() {
           <select
             className={styles.input}
             value={templateId}
-            disabled={!writable || busy || entLoading || templates.length === 0}
+            disabled={!canMutate || busy || templates.length === 0}
             onChange={(e) => setTemplateId(e.target.value)}
           >
             {templates.length === 0 ? (
@@ -219,7 +219,7 @@ export function DocumentsPage() {
         <button
           type="button"
           className={styles.primary}
-          disabled={!writable || busy || entLoading || templates.length === 0}
+          disabled={!canMutate || busy || templates.length === 0}
           onClick={() => void onCreate()}
         >
           {busy ? t('creating') : t('create')}
@@ -234,7 +234,9 @@ export function DocumentsPage() {
         ) : null}
       </div>
 
-      {!writable ? <p className={styles.warn}>{t('readOnly')}</p> : null}
+      {!writable || !canManageDocuments ? (
+        <p className={styles.warn}>{t('readOnly')}</p>
+      ) : null}
       {error ? <p className={styles.error}>{error}</p> : null}
 
       {loading ? (
@@ -266,7 +268,7 @@ export function DocumentsPage() {
                   <button
                     type="button"
                     className={styles.secondary}
-                    disabled={!writable || busy}
+                    disabled={!canMutate || busy}
                     onClick={() => void onWorkflow(item, 'submit')}
                   >
                     {t('workflowSubmit')}
@@ -277,7 +279,7 @@ export function DocumentsPage() {
                     <button
                       type="button"
                       className={styles.secondary}
-                      disabled={!writable || busy}
+                      disabled={!canMutate || busy}
                       onClick={() => void onWorkflow(item, 'approve')}
                     >
                       {t('workflowApprove')}
@@ -285,7 +287,7 @@ export function DocumentsPage() {
                     <button
                       type="button"
                       className={styles.secondary}
-                      disabled={!writable || busy}
+                      disabled={!canMutate || busy}
                       onClick={() => void onWorkflow(item, 'reject')}
                     >
                       {t('workflowReject')}
@@ -297,7 +299,7 @@ export function DocumentsPage() {
                     <button
                       type="button"
                       className={styles.secondary}
-                      disabled={!writable || busy}
+                      disabled={!canMutate || busy}
                       onClick={() => void onWorkflow(item, 'publish')}
                     >
                       {t('workflowPublish')}
@@ -305,7 +307,7 @@ export function DocumentsPage() {
                     <button
                       type="button"
                       className={styles.secondary}
-                      disabled={!writable || busy}
+                      disabled={!canMutate || busy}
                       onClick={() => void onWorkflow(item, 'reopen')}
                     >
                       {t('workflowReopen')}
@@ -316,7 +318,7 @@ export function DocumentsPage() {
                   <button
                     type="button"
                     className={styles.secondary}
-                    disabled={!writable || busy}
+                    disabled={!canMutate || busy}
                     onClick={() => void onWorkflow(item, 'unpublish')}
                   >
                     {t('workflowUnpublish')}
@@ -325,7 +327,7 @@ export function DocumentsPage() {
                 <button
                   type="button"
                   className={styles.danger}
-                  disabled={!writable || busy}
+                  disabled={!canMutate || busy}
                   onClick={() => void onDelete(item.id)}
                 >
                   {t('delete')}

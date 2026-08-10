@@ -7,6 +7,7 @@ import { fetchBillingCatalog } from '@/shared/api/catalog';
 import { startCheckout } from '@/shared/api/billing';
 import { ApiClientError, mapApiErrorCode } from '@/shared/api/client';
 import { useBusinesses } from '@/shared/lib/business-context';
+import { useMembershipPermissions } from '@/shared/lib/use-membership-permissions';
 import { fetchSystemConfig } from '@/shared/api/system';
 import styles from './catalog-page.module.css';
 
@@ -26,6 +27,7 @@ export function CatalogPage({ locale }: { locale: string }) {
   const t = useTranslations('catalog');
   const tErrors = useTranslations('errors');
   const { activeBusiness } = useBusinesses();
+  const { canManageBilling } = useMembershipPermissions();
   const [catalog, setCatalog] = useState<BillingCatalog | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -71,6 +73,10 @@ export function CatalogPage({ locale }: { locale: string }) {
   async function onCheckout() {
     if (!activeBusiness || !selectedPlan) {
       setError(t('needBusiness'));
+      return;
+    }
+    if (!canManageBilling) {
+      setError(t('ownerOnly'));
       return;
     }
     setCheckoutBusy(true);
@@ -180,6 +186,7 @@ export function CatalogPage({ locale }: { locale: string }) {
           disabled={
             !platformCheckout ||
             !activeBusiness ||
+            !canManageBilling ||
             !selectedPlan ||
             checkoutBusy
           }

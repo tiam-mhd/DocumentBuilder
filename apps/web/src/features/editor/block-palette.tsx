@@ -1,7 +1,7 @@
 'use client';
 
 import {
-  BLOCK_REGISTRY,
+  getBlockRegistry,
   type BlockType,
 } from '@vdb/document-schema';
 import { useTranslations } from 'next-intl';
@@ -18,11 +18,12 @@ export function BlockPalette({ disabled }: Props) {
   const addBlock = useEditorStore((s) => s.addBlock);
   const { can } = useEntitlements();
 
-  const allowed = BLOCK_REGISTRY.filter((entry) => {
+  const registry = getBlockRegistry();
+  const allowed = registry.filter((entry) => {
     if (!entry.moduleCode) return true;
     return can(entry.moduleCode);
   });
-  const locked = BLOCK_REGISTRY.filter((entry) => {
+  const locked = registry.filter((entry) => {
     if (!entry.moduleCode) return false;
     return !can(entry.moduleCode);
   });

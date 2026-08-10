@@ -1,0 +1,98 @@
+.section {
+  display: grid;
+  gap: var(--space-3, 1rem);
+  max-width: 52rem;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.sub {
+  margin: 0.5rem 0 0;
+  font-size: 1.05rem;
+}
+
+.hint,
+.privacy,
+.statLabel {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 0.9rem;
+}
+
+.privacy {
+  font-size: 0.8rem;
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.input {
+  font: inherit;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.btn {
+  appearance: none;
+  font: inherit;
+  padding: 0.45rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 1rem;
+}
+
+.statValue {
+  margin: 0.15rem 0 0;
+  font-size: 1.75rem;
+  font-weight: 650;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.table th,
+.table td {
+  text-align: start;
+  padding: 0.45rem 0.35rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.list {
+  margin: 0;
+  padding-inline-start: 1.2rem;
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+}

@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { EntitlementCodes } from '@vdb/shared-types';
-import { getPrimaryPage } from '@vdb/document-schema';
+import { getBlockRegistry, getPrimaryPage } from '@vdb/document-schema';
 import { useEntitlements } from '@/features/billing/use-entitlements';
 import { findBlock, isUnderRepeater, useEditorStore } from './store/editor-store';
 import { BindingInsertField } from './binding-insert-field';
@@ -56,7 +56,11 @@ export function BlockInspector({ disabled }: Props) {
   return (
     <div className={styles.wrap}>
       <h2 className={styles.title}>
-        {t('inspectorTitle')} · {tBlocks(block.type)}
+        {t('inspectorTitle')} ·{' '}
+        {tBlocks(
+          (getBlockRegistry().find((e) => e.type === block.type)?.labelKey ??
+            block.type) as 'text',
+        )}
       </h2>
 
       {block.type === 'text' ? (
@@ -448,6 +452,34 @@ export function BlockInspector({ disabled }: Props) {
 
       {block.type === 'repeater' ? (
         <RepeaterInspectorFields block={block} disabled={disabled} />
+      ) : null}
+
+      {block.type === 'plugin.notice' ? (
+        <>
+          <label className={styles.label}>
+            {t('noticeTitle')}
+            <input
+              className={styles.input}
+              disabled={disabled}
+              value={String(block.props.title ?? '')}
+              onChange={(e) =>
+                updateBlockProps(block.id, { title: e.target.value })
+              }
+            />
+          </label>
+          <label className={styles.label}>
+            {t('noticeBody')}
+            <textarea
+              className={styles.textarea}
+              disabled={disabled}
+              rows={3}
+              value={String(block.props.body ?? '')}
+              onChange={(e) =>
+                updateBlockProps(block.id, { body: e.target.value })
+              }
+            />
+          </label>
+        </>
       ) : null}
 
       {block.type === 'divider' ||

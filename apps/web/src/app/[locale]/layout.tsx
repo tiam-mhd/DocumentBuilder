@@ -9,7 +9,9 @@ import { THEME_COOKIE } from '@/shared/ui/theme/theme-types';
 import { EditionProvider } from '@/shared/lib/edition-context';
 import { AuthProvider } from '@/shared/lib/auth-context';
 import { BusinessProvider } from '@/shared/lib/business-context';
+import { BrandingProvider } from '@/shared/lib/branding-context';
 import { AppShell } from '@/shared/ui/app-shell';
+import '@/shared/lib/load-plugins';
 import '@/styles/tokens.css';
 
 export function generateStaticParams() {
@@ -56,9 +58,11 @@ export default async function LocaleLayout({ children, params }: Props) {
           <ThemeProvider initialPreference={initialPreference}>
             <AuthProvider>
               <BusinessProvider>
-                <EditionProvider>
-                  <AppShell>{children}</AppShell>
-                </EditionProvider>
+                <BrandingProvider>
+                  <EditionProvider>
+                    <AppShell>{children}</AppShell>
+                  </EditionProvider>
+                </BrandingProvider>
               </BusinessProvider>
             </AuthProvider>
           </ThemeProvider>

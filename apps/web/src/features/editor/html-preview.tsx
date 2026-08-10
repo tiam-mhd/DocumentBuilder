@@ -149,6 +149,16 @@ function renderBlock(
     case 'headerSlot':
     case 'footerSlot':
       return null;
+    case 'plugin.notice': {
+      const title = String(block.props.title ?? '').trim();
+      const body = String(block.props.body ?? '').trim();
+      return (
+        <aside key={block.id} className={styles.notice}>
+          {title ? <strong className={styles.noticeTitle}>{title}</strong> : null}
+          {body ? <p className={styles.noticeBody}>{body}</p> : t('noticeEmpty')}
+        </aside>
+      );
+    }
     default:
       return (
         <p key={block.id} className={styles.unknown}>

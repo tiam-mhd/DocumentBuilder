@@ -140,6 +140,24 @@
   font-style: italic;
 }
 
+.notice {
+  margin: 0.5rem 0;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--doc-secondary, var(--border)) 55%, transparent);
+  border-inline-start: 4px solid var(--doc-primary, var(--accent, #2563eb));
+  border-radius: var(--radius, 6px);
+}
+
+.noticeTitle {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: var(--doc-primary, var(--fg));
+}
+
+.noticeBody {
+  margin: 0;
+}
+
 .repeater {
   display: grid;
   gap: 0.75rem;

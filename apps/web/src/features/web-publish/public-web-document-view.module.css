@@ -1,0 +1,85 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(
+      1200px 600px at 10% -10%,
+      color-mix(in srgb, var(--brand-accent, #1b4d3e) 18%, transparent),
+      transparent 60%
+    ),
+    var(--bg, #0f1412);
+  color: var(--fg, #e8eee9);
+}
+
+.chrome {
+  padding: 1.25rem 1.5rem 0.75rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--brand-accent, #1b4d3e) 35%, transparent);
+}
+
+.brand {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  max-width: 960px;
+  margin-inline: auto;
+}
+
+.logo {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.displayName {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.title {
+  margin: 0.15rem 0 0;
+  font-size: clamp(1.25rem, 2.5vw, 1.75rem);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.frameWrap {
+  flex: 1;
+  width: min(100%, 960px);
+  margin: 0 auto;
+  padding: 1rem 1rem 2rem;
+}
+
+.frame {
+  width: 100%;
+  min-height: 80vh;
+  border: 0;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 40px color-mix(in srgb, #000 25%, transparent);
+}
+
+.footer {
+  padding: 0.75rem 1.5rem 1.5rem;
+  text-align: center;
+  font-size: 0.8rem;
+  opacity: 0.65;
+}
+
+.footer p {
+  margin: 0;
+}
+
+@media (prefers-color-scheme: light) {
+  .page {
+    background:
+      radial-gradient(
+        1200px 600px at 10% -10%,
+        color-mix(in srgb, var(--brand-accent, #1b4d3e) 12%, transparent),
+        transparent 60%
+      ),
+      #f4f7f5;
+    color: #122018;
+  }
+}

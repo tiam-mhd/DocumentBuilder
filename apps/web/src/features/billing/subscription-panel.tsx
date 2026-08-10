@@ -72,6 +72,18 @@ export function SubscriptionPanel() {
                 : t('noEnd')}
             </dd>
           </div>
+          {subscription.graceEndsAt ? (
+            <div>
+              <dt>{t('graceEndsAt')}</dt>
+              <dd>{new Date(subscription.graceEndsAt).toLocaleString()}</dd>
+            </div>
+          ) : null}
+          {subscription.daysUntilEnd != null ? (
+            <div>
+              <dt>{t('daysUntilEnd')}</dt>
+              <dd>{subscription.daysUntilEnd}</dd>
+            </div>
+          ) : null}
         </dl>
       ) : (
         <p className={styles.hint}>{t('missing')}</p>

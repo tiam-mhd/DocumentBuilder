@@ -268,3 +268,35 @@ export function deleteDocumentComment(
     { method: 'DELETE' },
   );
 }
+
+export function fetchDocumentWebPublish(
+  businessId: string,
+  documentId: string,
+) {
+  return apiFetch<import('@vdb/shared-types').PublicDocumentWebPublish>(
+    `/businesses/${businessId}/documents/${documentId}/web-publish`,
+  );
+}
+
+export function updateDocumentWebPublish(
+  businessId: string,
+  documentId: string,
+  body: { webSlug?: string | null; webPublished?: boolean },
+) {
+  return apiFetch<import('@vdb/shared-types').PublicDocumentWebPublish>(
+    `/businesses/${businessId}/documents/${documentId}/web-publish`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  );
+}
+
+/** Unauthenticated public profile (server or client). */
+export function fetchPublicWebDocument(businessId: string, slug: string) {
+  return apiFetch<import('@vdb/shared-types').PublicWebDocumentView>(
+    `/public/documents/${businessId}/${slug}`,
+    { auth: false },
+  );
+}

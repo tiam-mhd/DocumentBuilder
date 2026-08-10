@@ -9,6 +9,7 @@ import { getDocument } from '@/shared/api/documents';
 import { getDefaultTheme } from '@/shared/api/themes';
 import { ApiClientError, mapApiErrorCode } from '@/shared/api/client';
 import { useBusinesses } from '@/shared/lib/business-context';
+import { useMembershipPermissions } from '@/shared/lib/use-membership-permissions';
 import { useEntitlements } from '@/features/billing/use-entitlements';
 import { BlockInspector } from './block-inspector';
 import { BlockPalette } from './block-palette';
@@ -18,6 +19,8 @@ import { MasterPanel } from './master-panel';
 import { ExportPanel } from './export-panel';
 import { VersionHistoryPanel } from './version-history-panel';
 import { WorkflowPanel } from './workflow-panel';
+import { WebPublishPanel } from './web-publish-panel';
+import { ShareLinksPanel } from './share-links-panel';
 import { CommentsPanel } from './comments-panel';
 import { useEditorAutosave } from './use-editor-autosave';
 import { useEditorStore } from './store/editor-store';
@@ -53,6 +56,7 @@ export function EditorShell({ documentId }: Props) {
   const locale = useLocale();
   const { activeBusiness } = useBusinesses();
   const { writable, loading: entLoading, can, has } = useEntitlements();
+  const { canManageDocuments, canExportPdf } = useMembershipPermissions();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [tokens, setTokens] = useState<DesignThemeTokens | null>(
@@ -76,12 +80,12 @@ export function EditorShell({ documentId }: Props) {
   const bodyLocked = DOCUMENT_BODY_LOCKED_STATUSES.includes(
     docStatus as DocumentStatusValue,
   );
-  const disabled = !writable || entLoading || bodyLocked;
+  const disabled = !writable || entLoading || bodyLocked || !canManageDocuments;
   const missingModules = body
     ? documentCollectRequiredModuleCodes(body).filter((code) => !has(code))
     : [];
 
-  useEditorAutosave(writable && !entLoading && !bodyLocked);
+  useEditorAutosave(writable && !entLoading && !bodyLocked && canManageDocuments);
 
   useEffect(() => {
     let cancelled = false;
@@ -235,7 +239,9 @@ export function EditorShell({ documentId }: Props) {
         </div>
       </header>
 
-      {!writable ? <p className={styles.warn}>{t('readOnly')}</p> : null}
+      {!writable || !canManageDocuments ? (
+        <p className={styles.warn}>{t('readOnly')}</p>
+      ) : null}
       {bodyLocked ? (
         <p className={styles.warn}>{t('publishedLocked')}</p>
       ) : null}
@@ -253,21 +259,31 @@ export function EditorShell({ documentId }: Props) {
           <WorkflowPanel
             businessId={activeBusiness.id}
             documentId={documentId}
+            disabled={!writable || entLoading || !canManageDocuments}
+          />
+          <WebPublishPanel
+            businessId={activeBusiness.id}
+            documentId={documentId}
+            disabled={!writable || entLoading}
+          />
+          <ShareLinksPanel
+            businessId={activeBusiness.id}
+            documentId={documentId}
             disabled={!writable || entLoading}
           />
           <CommentsPanel
             businessId={activeBusiness.id}
             documentId={documentId}
-            disabled={!writable || entLoading}
+            disabled={!writable || entLoading || !canManageDocuments}
           />
           <ExportPanel
-            disabled={!writable || entLoading}
-            canExport={can(EntitlementCodes.ExportPdf)}
+            disabled={!writable || entLoading || !canExportPdf}
+            canExport={can(EntitlementCodes.ExportPdf) && canExportPdf}
           />
           <VersionHistoryPanel
             businessId={activeBusiness.id}
             documentId={documentId}
-            disabled={!writable || entLoading}
+            disabled={!writable || entLoading || !canManageDocuments}
           />
           <BlockInspector disabled={disabled} />
         </aside>

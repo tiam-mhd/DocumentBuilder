@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { MembershipRole } from '@vdb/shared-types';
 import {
   approveDocument,
   publishDocument,
@@ -12,7 +11,7 @@ import {
   unpublishDocument,
 } from '@/shared/api/documents';
 import { ApiClientError, mapApiErrorCode } from '@/shared/api/client';
-import { useBusinesses } from '@/shared/lib/business-context';
+import { useMembershipPermissions } from '@/shared/lib/use-membership-permissions';
 import { useEditorStore } from './store/editor-store';
 import styles from './workflow-panel.module.css';
 
@@ -25,16 +24,14 @@ type Props = {
 export function WorkflowPanel({ businessId, documentId, disabled }: Props) {
   const t = useTranslations('editor');
   const tErrors = useTranslations('errors');
-  const { activeBusiness } = useBusinesses();
+  const { canPublish } = useMembershipPermissions();
   const status = useEditorStore((s) => s.status);
   const setStatus = useEditorStore((s) => s.setStatus);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState('');
 
-  const role = activeBusiness?.role;
-  const isApprover =
-    role === MembershipRole.Owner || role === MembershipRole.Admin;
+  const isApprover = canPublish;
 
   async function run(
     fn: () => Promise<{ status: string }>,

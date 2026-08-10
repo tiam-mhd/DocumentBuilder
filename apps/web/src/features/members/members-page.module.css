@@ -1,0 +1,129 @@
+.section {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+}
+
+.h2 {
+  margin: var(--space-4) 0 0;
+  font-size: 1.15rem;
+}
+
+.hint {
+  margin: 0;
+  color: var(--fg-muted);
+}
+
+.meta {
+  margin: 0.25rem 0 0;
+  color: var(--fg-muted);
+  font-size: 0.85rem;
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+}
+
+.inviteForm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--fg-muted);
+}
+
+.input {
+  min-width: 10rem;
+  background: var(--bg-elevated);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 4px);
+  padding: 0.55rem 0.75rem;
+}
+
+.primary,
+.secondary {
+  border-radius: calc(var(--radius) - 4px);
+  padding: 0.55rem 0.85rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border: none;
+}
+
+.secondary {
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--border);
+}
+
+.primary:disabled,
+.secondary:disabled,
+.input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-elevated);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.badge {
+  margin-inline-start: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--accent);
+}
+
+.inviteResult {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.linkBox {
+  display: block;
+  padding: var(--space-3);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 4px);
+  word-break: break-all;
+  font-size: 0.85rem;
+}

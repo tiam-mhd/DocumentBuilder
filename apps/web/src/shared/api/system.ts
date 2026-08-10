@@ -19,6 +19,8 @@ export type PublicSystemConfig = {
   platformCheckout: boolean;
   licenseActivation: boolean;
   licenseActive: boolean;
+  templateMarketplace: boolean;
+  platformAdminConsole: boolean;
 };
 
 export function fetchHealth() {

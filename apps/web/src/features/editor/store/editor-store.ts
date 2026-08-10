@@ -190,7 +190,16 @@ function createBlock(type: BlockType): BlockNode {
       return { id: newBlockId(type), type, props: { slot: 'header' } };
     case 'footerSlot':
       return { id: newBlockId(type), type, props: { slot: 'footer' } };
+    case 'plugin.notice':
+      return {
+        id: newBlockId(type),
+        type,
+        props: { title: '', body: '' },
+      };
     default:
+      if (type.startsWith('plugin.')) {
+        return { id: newBlockId(type), type, props: {} };
+      }
       return { id: newBlockId('text'), type: 'text', props: { content: '' } };
   }
 }

@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { MembershipRole } from '@vdb/shared-types';
 import { useBusinesses } from '@/shared/lib/business-context';
 import { ApiClientError, mapApiErrorCode } from '@/shared/api/client';
 import styles from './businesses-page.module.css';
@@ -95,6 +96,10 @@ export function BusinessesPage() {
         <ul className={styles.list}>
           {businesses.map((business) => {
             const isActive = activeBusiness?.id === business.id;
+            const canSettings =
+              business.role === MembershipRole.Owner ||
+              business.role === MembershipRole.Admin;
+            const isOwner = business.role === MembershipRole.Owner;
             return (
               <li
                 key={business.id}
@@ -117,25 +122,25 @@ export function BusinessesPage() {
                       {t('select')}
                     </button>
                   ) : null}
-                  {business.role === 'OWNER' ? (
-                    <>
-                      <button
-                        type="button"
-                        className={styles.secondary}
-                        onClick={() => void onRename(business.id, business.name)}
-                        disabled={busy}
-                      >
-                        {t('rename')}
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.danger}
-                        onClick={() => void onDelete(business.id, business.name)}
-                        disabled={busy}
-                      >
-                        {t('delete')}
-                      </button>
-                    </>
+                  {canSettings ? (
+                    <button
+                      type="button"
+                      className={styles.secondary}
+                      onClick={() => void onRename(business.id, business.name)}
+                      disabled={busy}
+                    >
+                      {t('rename')}
+                    </button>
+                  ) : null}
+                  {isOwner ? (
+                    <button
+                      type="button"
+                      className={styles.danger}
+                      onClick={() => void onDelete(business.id, business.name)}
+                      disabled={busy}
+                    >
+                      {t('delete')}
+                    </button>
                   ) : null}
                 </div>
               </li>

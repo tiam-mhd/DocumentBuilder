@@ -1,0 +1,40 @@
+.wrap {
+  max-width: 28rem;
+  margin: 3rem auto;
+  padding: 1.5rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.input {
+  font: inherit;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border, #334);
+  border-radius: 6px;
+  background: var(--bg, #111);
+  color: var(--fg, #eee);
+}
+
+.btn {
+  appearance: none;
+  display: inline-block;
+  font: inherit;
+  text-align: center;
+  text-decoration: none;
+  padding: 0.55rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid var(--border, #334);
+  background: var(--bg-elevated, #1a2420);
+  color: var(--fg, #eee);
+  cursor: pointer;
+}
+
+.error {
+  color: var(--danger, #c44);
+  margin: 0;
+}

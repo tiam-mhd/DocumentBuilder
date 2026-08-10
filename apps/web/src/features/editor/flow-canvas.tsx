@@ -18,9 +18,14 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { BlockNode } from '@vdb/document-schema';
+import { getBlockRegistry } from '@vdb/document-schema';
 import { useTranslations } from 'next-intl';
 import { useEditorStore } from './store/editor-store';
 import styles from './flow-canvas.module.css';
+
+function blockLabelKey(type: string): string {
+  return getBlockRegistry().find((e) => e.type === type)?.labelKey ?? type;
+}
 
 type Props = {
   blocks: BlockNode[];
@@ -143,7 +148,7 @@ export function FlowCanvas({ blocks, selectedBlockId, disabled }: Props) {
               block={block}
               selected={selectedBlockId === block.id}
               disabled={disabled}
-              label={tBlocks(block.type)}
+              label={tBlocks(blockLabelKey(block.type) as 'text')}
             />
           ))}
         </ul>
