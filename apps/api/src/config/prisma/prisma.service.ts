@@ -76,6 +76,9 @@ function postgresErrorLabel(error: unknown, depth = 0): string {
         candidate as (typeof SAFE_POSTGRES_ERROR_CODES)[number],
       ),
     );
+  const messageCode = SAFE_POSTGRES_ERROR_CODES.find((candidate) =>
+    new RegExp(`\\b${candidate}\\b`, 'i').test(message),
+  );
   const signatureCode = SAFE_POSTGRES_ERROR_SIGNATURES.find(({ pattern }) =>
     pattern.test(message),
   )?.code;
@@ -85,7 +88,7 @@ function postgresErrorLabel(error: unknown, depth = 0): string {
   const causeCode = causeLabel?.includes(':')
     ? causeLabel.split(':').at(-1)
     : undefined;
-  const code = directCode || causeCode || signatureCode;
+  const code = directCode || messageCode || causeCode || signatureCode;
 
   return code && code !== 'UNKNOWN' ? `${name}:${code}` : name;
 }
@@ -112,6 +115,7 @@ export class PrismaService
   private lastPostgresFailure: string | undefined;
 
   async onModuleInit(): Promise<void> {
+    this.logger.log('PostgreSQL diagnostics: sanitized-v2');
     this.logger.log(`PostgreSQL target: ${postgresTarget()}`);
     try {
       await this.$connect();
@@ -139,9 +143,10 @@ export class PrismaService
 
   private logPostgresFailure(stage: string, error: unknown) {
     const label = postgresErrorLabel(error);
-    if (this.lastPostgresFailure === label) return;
+    const failureKey = `${stage}:${label}`;
+    if (this.lastPostgresFailure === failureKey) return;
 
-    this.lastPostgresFailure = label;
+    this.lastPostgresFailure = failureKey;
     this.logger.warn(`PostgreSQL ${stage} failed (${label})`);
   }
 

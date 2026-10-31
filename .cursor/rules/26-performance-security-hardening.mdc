@@ -11,7 +11,7 @@ alwaysApply: true
 - **Helmet:** enabled on Nest HTTP (secure headers). Do not disable in production for convenience.
 - **Trust proxy:** when `TRUST_PROXY=true`, enable Express trust proxy so IP allowlists / rate keys see real client IPs behind reverse proxies.
 - **Next.js same-origin redirects behind a proxy:** middleware redirects for locale/auth navigation must use an absolute URL built from the validated public origin, so internal container hosts and ports never reach the browser. Next middleware requires an absolute redirect URL. Trust forwarded host/protocol headers only when Nginx sets them from the ingress request; do not trust arbitrary client-supplied values.
-- **Dependency health diagnostics:** public health responses expose status only; logs may include sanitized dependency error names/codes and non-secret target host/port/database, but never full connection URLs, credentials, or raw error messages. Unwrap nested causes and classify only allowlisted error codes/signatures; suppress duplicate warnings until the failure changes or recovers.
+- **Dependency health diagnostics:** health responses expose status only and set `Cache-Control: no-store, no-cache, must-revalidate` so monitoring clients receive a fresh report rather than a conditional `304`. Logs may include sanitized dependency error names/codes and non-secret target host/port/database, but never full connection URLs, credentials, or raw error messages. Unwrap nested causes, classify only allowlisted error codes/signatures, and deduplicate by stage plus failure until it changes or recovers.
 
 ## Rate limits (Redis)
 
