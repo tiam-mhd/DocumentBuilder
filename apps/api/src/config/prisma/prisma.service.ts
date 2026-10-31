@@ -6,7 +6,52 @@ type PrismaErrorDetails = {
   code?: unknown;
   errorCode?: unknown;
   meta?: unknown;
+  message?: unknown;
+  cause?: unknown;
 };
+
+const SAFE_POSTGRES_ERROR_CODES = [
+  'P1000',
+  'P1001',
+  'P1002',
+  'P1003',
+  'P1010',
+  'P1011',
+  'P1012',
+  'P1013',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ETIMEDOUT',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'EHOSTUNREACH',
+  '28P01',
+  '3D000',
+  '42501',
+  '53300',
+  '57P03',
+  '08001',
+  '08006',
+] as const;
+
+const SAFE_POSTGRES_ERROR_SIGNATURES = [
+  {
+    pattern: /can't reach database server|could not connect to server/i,
+    code: 'DB_UNREACHABLE',
+  },
+  {
+    pattern: /password authentication failed|authentication failed/i,
+    code: 'DB_AUTHENTICATION_FAILED',
+  },
+  { pattern: /database .* does not exist/i, code: 'DB_NAME_NOT_FOUND' },
+  { pattern: /connection refused/i, code: 'CONNECTION_REFUSED' },
+  {
+    pattern: /getaddrinfo .* (?:not found|failed)|name or service not known/i,
+    code: 'DNS_LOOKUP_FAILED',
+  },
+  { pattern: /timeout|timed out/i, code: 'CONNECTION_TIMEOUT' },
+  { pattern: /no pg_hba\.conf entry/i, code: 'PG_HBA_REJECTED' },
+] as const;
 
 function safeErrorToken(value: unknown) {
   return typeof value === 'string'
@@ -14,8 +59,8 @@ function safeErrorToken(value: unknown) {
     : '';
 }
 
-function postgresErrorLabel(error: unknown) {
-  if (!error || typeof error !== 'object') return 'UNKNOWN';
+function postgresErrorLabel(error: unknown, depth = 0): string {
+  if (!error || typeof error !== 'object' || depth > 3) return 'UNKNOWN';
 
   const details = error as PrismaErrorDetails;
   const meta =
@@ -23,11 +68,26 @@ function postgresErrorLabel(error: unknown) {
       ? (details.meta as { code?: unknown })
       : undefined;
   const name = safeErrorToken(details.name) || 'Error';
-  const code = [details.errorCode, details.code, meta?.code]
+  const message = typeof details.message === 'string' ? details.message : '';
+  const directCode = [details.errorCode, details.code, meta?.code]
     .map(safeErrorToken)
-    .find(Boolean);
+    .find((candidate) =>
+      SAFE_POSTGRES_ERROR_CODES.includes(
+        candidate as (typeof SAFE_POSTGRES_ERROR_CODES)[number],
+      ),
+    );
+  const signatureCode = SAFE_POSTGRES_ERROR_SIGNATURES.find(({ pattern }) =>
+    pattern.test(message),
+  )?.code;
+  const causeLabel = details.cause
+    ? postgresErrorLabel(details.cause, depth + 1)
+    : undefined;
+  const causeCode = causeLabel?.includes(':')
+    ? causeLabel.split(':').at(-1)
+    : undefined;
+  const code = directCode || causeCode || signatureCode;
 
-  return code ? `${name}:${code}` : name;
+  return code && code !== 'UNKNOWN' ? `${name}:${code}` : name;
 }
 
 function postgresTarget() {
