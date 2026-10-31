@@ -7,6 +7,18 @@ const intlMiddleware = createMiddleware(routing);
 
 const PROTECTED_SEGMENTS = new Set(['app']);
 
+function useRelativeLocation(response: NextResponse, requestUrl: string) {
+  const location = response.headers.get('location');
+  if (!location) return response;
+
+  const target = new URL(location, requestUrl);
+  response.headers.set(
+    'location',
+    `${target.pathname}${target.search}${target.hash}`,
+  );
+  return response;
+}
+
 export default function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const segments = pathname.split('/').filter(Boolean);
@@ -24,11 +36,11 @@ export default function middleware(request: NextRequest) {
     if (!token) {
       const login = new URL(`/${locale}/login`, request.url);
       login.searchParams.set('next', pathname);
-      return NextResponse.redirect(login);
+      return useRelativeLocation(NextResponse.redirect(login), request.url);
     }
   }
 
-  return intlMiddleware(request);
+  return useRelativeLocation(intlMiddleware(request), request.url);
 }
 
 export const config = {

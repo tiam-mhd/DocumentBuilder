@@ -78,6 +78,13 @@ For the SAAS platform-admin console, set `PLATFORM_ADMIN_MOBILES` to that same m
 
 Check `https://<your-domain>/api/health`; the Docker image healthcheck requires PostgreSQL, Redis, and MongoDB all to report `up`. Review service logs after the initial deployment. For local files, database backups, and platform-level disaster recovery, keep an independent backup plan; tenant ZIP backups do not include Redis or replace database backups.
 
+### Runflare health and redirect troubleshooting
+
+- `https://<your-domain>/healthz` checks that public traffic reaches the container Nginx listener on port `8080`; it does not depend on database health.
+- `https://<your-domain>/api/health` checks PostgreSQL, Redis, and MongoDB. `degraded` means the API route is reachable but at least one dependency is unavailable. PostgreSQL health runs `SELECT 1`, so a failed check is a connection, credential, or database-access issue; rerunning migrations does not fix it.
+- If the browser is redirected to an internal URL such as `localhost:3002`, confirm the public domain targets this Docker service on container port `8080` and rebuild from the current repository revision. Middleware locale/auth redirects use path-relative `Location` values so container hostnames are not exposed.
+- For PostgreSQL `down`, compare the Docker service's runtime `DATABASE_URL` with the exact PostgreSQL internal hostname, port, database, username, and password shown by Runflare. Keep both services in the same project and URL-encode reserved characters in the username/password.
+
 ## Editions
 
 Set in environment:
