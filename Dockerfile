@@ -1,5 +1,11 @@
 FROM node:22-bookworm-slim
 
+# Prisma may generate its Debian engine during npm ci's postinstall, so make
+# OpenSSL discoverable before installing workspace dependencies.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
