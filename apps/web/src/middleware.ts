@@ -7,15 +7,51 @@ const intlMiddleware = createMiddleware(routing);
 
 const PROTECTED_SEGMENTS = new Set(['app']);
 
-function useRelativeLocation(response: NextResponse, requestUrl: string) {
+function getPublicOrigin(request: NextRequest) {
+  const forwardedHost = request.headers
+    .get('x-forwarded-host')
+    ?.split(',')[0]
+    ?.trim();
+  const host = forwardedHost || request.headers.get('host');
+  const forwardedProtocol = request.headers
+    .get('x-forwarded-proto')
+    ?.split(',')[0]
+    ?.trim()
+    .toLowerCase();
+  const protocol =
+    forwardedProtocol === 'http' || forwardedProtocol === 'https'
+      ? forwardedProtocol
+      : new URL(request.url).protocol.slice(0, -1);
+
+  if (!host) return request.nextUrl.origin;
+
+  try {
+    const origin = new URL(`${protocol}://${host}`);
+    if (
+      origin.username ||
+      origin.password ||
+      origin.pathname !== '/' ||
+      origin.search ||
+      origin.hash
+    ) {
+      return request.nextUrl.origin;
+    }
+    return origin.origin;
+  } catch {
+    return request.nextUrl.origin;
+  }
+}
+
+function usePublicOrigin(response: NextResponse, request: NextRequest) {
   const location = response.headers.get('location');
   if (!location) return response;
 
-  const target = new URL(location, requestUrl);
-  response.headers.set(
-    'location',
+  const target = new URL(location, request.url);
+  const publicTarget = new URL(
     `${target.pathname}${target.search}${target.hash}`,
+    getPublicOrigin(request),
   );
+  response.headers.set('location', publicTarget.toString());
   return response;
 }
 
@@ -36,11 +72,11 @@ export default function middleware(request: NextRequest) {
     if (!token) {
       const login = new URL(`/${locale}/login`, request.url);
       login.searchParams.set('next', pathname);
-      return useRelativeLocation(NextResponse.redirect(login), request.url);
+      return usePublicOrigin(NextResponse.redirect(login), request);
     }
   }
 
-  return useRelativeLocation(intlMiddleware(request), request.url);
+  return usePublicOrigin(intlMiddleware(request), request);
 }
 
 export const config = {

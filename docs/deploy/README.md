@@ -82,7 +82,7 @@ Check `https://<your-domain>/api/health`; the Docker image healthcheck requires 
 
 - `https://<your-domain>/healthz` checks that public traffic reaches the container Nginx listener on port `8080`; it does not depend on database health.
 - `https://<your-domain>/api/health` checks PostgreSQL, Redis, and MongoDB. `degraded` means the API route is reachable but at least one dependency is unavailable. PostgreSQL health runs `SELECT 1`, so a failed check is a connection, credential, or database-access issue; rerunning migrations does not fix it.
-- If the browser is redirected to an internal URL such as `localhost:3002`, confirm the public domain targets this Docker service on container port `8080` and rebuild from the current repository revision. Middleware locale/auth redirects use path-relative `Location` values so container hostnames are not exposed.
+- If the browser is redirected to an internal URL such as `localhost:3002`, confirm the public domain targets this Docker service on container port `8080` and rebuild from the current repository revision. Middleware locale/auth redirects must use an absolute URL rebuilt from the public host and protocol forwarded by Nginx; Next.js middleware rejects relative redirect URLs.
 - For PostgreSQL `down`, compare the Docker service's runtime `DATABASE_URL` with the exact PostgreSQL internal hostname, port, database, username, and password shown by Runflare. Keep both services in the same project and URL-encode reserved characters in the username/password.
 
 ## Editions

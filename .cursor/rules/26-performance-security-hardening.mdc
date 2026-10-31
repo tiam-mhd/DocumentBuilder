@@ -10,7 +10,7 @@ alwaysApply: true
 - **CORS:** allow only `CORS_ORIGINS` (comma list); credentials on; no `*`.
 - **Helmet:** enabled on Nest HTTP (secure headers). Do not disable in production for convenience.
 - **Trust proxy:** when `TRUST_PROXY=true`, enable Express trust proxy so IP allowlists / rate keys see real client IPs behind reverse proxies.
-- **Next.js same-origin redirects behind a proxy:** middleware redirects for locale/auth navigation must use a path-relative `Location` (or a validated public origin), so internal container hosts and ports never reach the browser. Trust forwarded host/protocol headers only when they are set by the platform ingress; do not trust arbitrary client-supplied values.
+- **Next.js same-origin redirects behind a proxy:** middleware redirects for locale/auth navigation must use an absolute URL built from the validated public origin, so internal container hosts and ports never reach the browser. Next middleware requires an absolute redirect URL. Trust forwarded host/protocol headers only when Nginx sets them from the ingress request; do not trust arbitrary client-supplied values.
 
 ## Rate limits (Redis)
 
