@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { createConnection } from 'node:net';
 
 type PrismaErrorDetails = {
   name?: unknown;
@@ -25,6 +26,10 @@ const SAFE_POSTGRES_ERROR_CODES = [
   'ENOTFOUND',
   'EAI_AGAIN',
   'EHOSTUNREACH',
+  'ENETUNREACH',
+  'EHOSTDOWN',
+  'EACCES',
+  'EPIPE',
   '28P01',
   '3D000',
   '42501',
@@ -123,6 +128,9 @@ export class PrismaService
       this.logPostgresRecovery();
     } catch (error) {
       this.logPostgresFailure('initial connection', error);
+      void this.logPostgresTcpProbe().catch(() => {
+        this.logger.warn('PostgreSQL TCP probe failed (UNKNOWN)');
+      });
     }
   }
 
@@ -148,6 +156,56 @@ export class PrismaService
 
     this.lastPostgresFailure = failureKey;
     this.logger.warn(`PostgreSQL ${stage} failed (${label})`);
+  }
+
+  private async logPostgresTcpProbe(): Promise<void> {
+    let host: string;
+    let port: number;
+
+    try {
+      const url = new URL(process.env.DATABASE_URL ?? '');
+      host = url.hostname;
+      port = Number(url.port || 5432);
+      if (!host || !Number.isInteger(port) || port < 1 || port > 65535) {
+        throw new Error('Invalid PostgreSQL target');
+      }
+    } catch {
+      this.logger.warn('PostgreSQL TCP probe skipped (invalid target)');
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      const socket = createConnection({ host, port });
+      let settled = false;
+      let timeout: NodeJS.Timeout | undefined;
+      const finish = (result: string, succeeded: boolean) => {
+        if (settled) return;
+        settled = true;
+        if (timeout) clearTimeout(timeout);
+        socket.destroy();
+        const message = `PostgreSQL TCP probe ${result}`;
+        if (succeeded) this.logger.log(message);
+        else this.logger.warn(message);
+        resolve();
+      };
+
+      timeout = setTimeout(
+        () => finish('failed (ETIMEDOUT)', false),
+        2500,
+      );
+      socket.once('connect', () =>
+        finish('succeeded (connection accepted)', true),
+      );
+      socket.once('error', (error: NodeJS.ErrnoException) => {
+        const code = safeErrorToken(error.code);
+        const safeCode = SAFE_POSTGRES_ERROR_CODES.includes(
+          code as (typeof SAFE_POSTGRES_ERROR_CODES)[number],
+        )
+          ? code
+          : 'UNKNOWN';
+        finish(`failed (${safeCode})`, false);
+      });
+    });
   }
 
   private logPostgresRecovery() {
