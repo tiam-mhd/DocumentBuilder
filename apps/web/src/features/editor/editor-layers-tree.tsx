@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import type { BlockNode, DocumentBody } from '@vdb/document-schema';
 import { getBlockRegistry } from '@vdb/document-schema';

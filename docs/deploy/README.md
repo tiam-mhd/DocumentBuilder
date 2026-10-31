@@ -4,6 +4,80 @@ Primary target for both editions: **Docker on a VPS** running NestJS + Next.js +
 
 Shared cPanel / PHP hosting is **not** the primary path.
 
+## Runflare (SAAS)
+
+The Runflare bundle is in the repository root `Dockerfile`. It serves Next.js and NestJS through one Nginx entrypoint on port `8080`; the application processes stay private on ports `3002` and `3001`. This keeps the web app and API in one Runflare deployment.
+
+### Minimum Runflare resources
+
+Create one Runflare project and four deployments in the same project/cluster:
+
+1. One Docker service for this repository (Next.js + NestJS + Nginx + the in-process PDF worker).
+2. One PostgreSQL database.
+3. One Redis database.
+4. One MongoDB database.
+
+The app requires all three databases, so fewer than four deployments means dropping a required dependency. The attached object-storage disk is a persistent disk on the Docker service, not an extra application deployment. Runflare counts both services and databases as project deployments; its current free plan lists two deployments, so select a plan with at least four. Runflare's project and database setup guides explain this deployment/resource model and its available database types: [getting started](https://runflare.com/docs/get-started/), [create project](https://runflare.com/docs/create-project/), [PostgreSQL](https://runflare.com/docs/postgres/), [MongoDB](https://runflare.com/docs/mongo/), and [Runflare database types](https://runflare.com/).
+
+Keep the Docker service and databases in the same project. Use the **internal service hostnames and credentials shown in Runflare**, not public/remote endpoints. PostgreSQL's internal port is `5432`; MongoDB's is `27017`. Use the Redis connection URL shown for that Redis deployment. Runflare's internal Postgres and Mongo connection examples are in its [database guides](https://runflare.com/docs/postgres/) and [MongoDB guide](https://runflare.com/docs/mongo/).
+
+### Prepare configuration
+
+1. Create the Docker deployment from this repository and the root `Dockerfile` (or deploy it with Runflare CLI from the repo root). The image listens on container port `8080`; route public HTTP traffic to that port. If the Runflare network form asks for both ports, expose HTTP port `80` to target port `8080` using a public/NodePort entry. Runflare distinguishes public NodePort traffic from project-internal ClusterIP traffic in its [network guide](https://runflare.com/docs/network/).
+2. Create PostgreSQL, Redis, and MongoDB. Copy their internal hosts, users, and passwords into the environment file below. URL-encode any reserved characters in database usernames/passwords before inserting them into a URI.
+3. Add a persistent disk to the Docker service mounted at exactly `/var/lib/vdb/object-storage`. Files uploaded by users and generated export artifacts use this location. Keep the Docker service at one replica while using local disk storage; multiple app replicas need shared object storage (S3-compatible) instead. Runflare documents that disk-mounted files remain when the service restarts: [persistent service disk](https://runflare.com/docs/add-disk-to-service/).
+4. Generate a local configuration file:
+
+   ```powershell
+   npm run deploy:runflare:env
+   ```
+
+   This creates a Git-ignored `.env.runflare` and generates unique 32-byte values for `OTP_PEPPER`, `JWT_SECRET`, and `LICENSE_PEPPER`. It never overwrites an existing file. Replace the required `__FILL_*__` values with values from your Runflare project and accounts. `PLATFORM_ADMIN_MOBILES` is optional; clear it if you do not need the SAAS admin console. The domain must be the final HTTPS hostname attached to the Docker service.
+5. Add those variables to the Docker service's runtime environment with Runflare bulk edit. Mark the database URLs, peppers, Parsgreen token, and other credentials as **Secret**. Do not put a real SMS token or merchant credential in Git. Runflare restarts a service after environment changes; its guide describes bulk edit and Secret mode: [environment variables](https://runflare.com/docs/setup-environment-variable/).
+
+`NEXT_PUBLIC_API_URL=/api` is baked into the Next.js build in the Dockerfile, and Nginx sends `/api/*` to NestJS. The app therefore uses one public HTTPS domain and needs no separate API service/domain. If this API path or public hostname changes, rebuild/redeploy the Docker image and update `CORS_ORIGINS`, `WEB_ORIGIN`, and `API_PUBLIC_URL` together.
+
+### Required values to supply
+
+The generated `.env.runflare` already contains production mode, SAAS edition, safe runtime defaults, storage path, PDF renderer, and generated secrets. The remaining placeholders come from your accounts or from services Runflare creates:
+
+| Variable | Value to supply |
+| --- | --- |
+| `CORS_ORIGINS`, `WEB_ORIGIN`, `API_PUBLIC_URL` | Same assigned HTTPS domain; the API URL ends in `/api`. |
+| `DATABASE_URL` | Runflare PostgreSQL host/password and database `vdb`. |
+| `REDIS_URL` | Full connection URL shown by the Redis deployment. |
+| `MONGODB_URI` | Runflare MongoDB host/user/password; keep `vdb` as the app database and `authSource=admin` if its user is created in `admin`. |
+| `PARSGREEN_API_TOKEN` | API token from your Parsgreen account. OTP sign-in will not work until this is set. |
+| `ZARINPAL_MERCHANT_ID` | Production merchant ID. Fake payments are not enabled for this SAAS deployment. |
+| `PLATFORM_ADMIN_MOBILES` | Your own Iranian mobile in normalized E.164 form (`+98...`) if you need the SAAS platform-admin console. Leave empty if you only need a Business OWNER account. |
+
+The Parsgreen token, Zarinpal merchant ID, domain, and Runflare database credentials cannot be inferred from the repository. `PAYMENT_PROVIDER=zarinpal` and `ZARINPAL_SANDBOX=false` are intentional: a fake payment adapter would bypass the production billing flow. `LICENSE_ISSUER_SECRET` and S3 credentials are not required for this `SAAS` + local persistent disk setup.
+
+### Deploy and initialize
+
+Install and authenticate the [Runflare CLI](https://runflare.com/docs/get-started/), then deploy from this repository root and select the project and Docker service. The CLI deploys the project root and observes `.gitignore`; see [CLI deploy](https://runflare.com/docs/work-with-cli/cli-deploy/) and [Docker hosting](https://runflare.com/%D9%87%D8%A7%D8%B3%D8%AA-%D8%A7%D8%A8%D8%B1%DB%8C-docker/):
+
+```powershell
+runflare login
+runflare deploy
+```
+
+Attach the HTTPS domain to the Docker service using Runflare's [domain instructions](https://runflare.com/docs/how-to-add-domain/) and [service domain mapping](https://runflare.com/docs/add-domain-to-service/). Set `CORS_ORIGINS` to the origin only (no path or trailing slash), `WEB_ORIGIN` to the same origin, and `API_PUBLIC_URL` to that origin plus `/api`.
+
+After the Docker service and databases are running, use its Runflare terminal to apply migrations and seed the plan/catalog:
+
+```bash
+cd /app
+npm run prisma:deploy -w @vdb/api
+npm run db:seed
+```
+
+Then visit the public domain, enter your mobile number, request the OTP, and complete verification. This creates the first user; the user owns their password and can set one in **Profile → Security** after signing in. There is deliberately no fixed/default mobile/password to publish. Login is mobile-first with OTP and optional password as defined by the current auth rules.
+
+For the SAAS platform-admin console, set `PLATFORM_ADMIN_MOBILES` to that same mobile in `+98...` form and run `npm run db:seed` again after the OTP signup; the seed only grants the role to a user row that already exists. Then sign out/in or refresh. A normal first user can still create a Business and become its OWNER without platform-admin access.
+
+Check `https://<your-domain>/api/health`; the Docker image healthcheck requires PostgreSQL, Redis, and MongoDB all to report `up`. Review service logs after the initial deployment. For local files, database backups, and platform-level disaster recovery, keep an independent backup plan; tenant ZIP backups do not include Redis or replace database backups.
+
 ## Editions
 
 Set in environment:

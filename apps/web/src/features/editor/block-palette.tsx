@@ -27,6 +27,7 @@ const GROUP_TYPES: Record<PaletteGroupId, readonly string[]> = {
   media: ['image', 'gallery'],
   data: ['qr', 'toc', 'repeater'],
   modules: ['map', 'orgChart', 'timeline'],
+  other: [],
 };
 
 const GROUP_ORDER: PaletteGroupId[] = [

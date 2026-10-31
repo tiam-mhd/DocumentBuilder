@@ -22,6 +22,7 @@
     "db:seed": "npm run prisma:seed -w @vdb/api",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
+    "deploy:runflare:env": "node scripts/deploy/create-runflare-env.mjs",
     "test:e2e:saas": "node scripts/e2e/saas-funnel.mjs",
     "test:e2e:self-hosted": "node scripts/e2e/self-hosted-funnel.mjs",
     "test:e2e:corporate": "node scripts/e2e/corporate-sample.mjs",
