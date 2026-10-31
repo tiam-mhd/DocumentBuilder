@@ -9,6 +9,8 @@ WORKDIR /app
 
 # npm ci runs the repository postinstall, which builds these workspace packages.
 COPY package.json package-lock.json ./
+# Workspace package tsconfigs extend this root config during postinstall.
+COPY tsconfig.base.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/api/prisma apps/api/prisma
 COPY apps/web/package.json apps/web/package.json
